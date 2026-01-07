@@ -143,10 +143,16 @@ export function BadgeConfigField({ formData, onChange }: BadgeConfigFieldProps) 
 
 			<div className={badgeStyle === 'text' ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-4 gap-3'}>
 				<div className={badgeStyle === 'text' ? 'space-y-2' : 'col-span-2 space-y-2'}>
-					<Label className="text-xs">Texto de la etiqueta</Label>
+					<div className="flex justify-between items-center">
+						<Label className="text-xs">Texto de la etiqueta</Label>
+						<span className={cn('text-[10px]', (formData.badge?.length || 0) >= 30 ? 'text-destructive font-bold' : 'text-muted-foreground')}>
+							{formData.badge?.length || 0}/30
+						</span>
+					</div>
 					<Input
 						placeholder="Ej: Amigo, VIP..."
 						value={formData.badge || ''}
+						maxLength={30}
 						onChange={e => onChange({ ...formData, badge: e.target.value || undefined })}
 					/>
 				</div>

@@ -88,19 +88,21 @@ function LivePreview({ displayName, originalName, avatarSrc, customization }: Li
 						{customization.badge &&
 							(customization.badgeStyle === 'text' ? (
 								<span
-									className="text-[11px] opacity-70"
+									className="text-[11px] opacity-70 truncate max-w-[120px]"
 									style={{ color: customization.badgeColor || '#85939e' }}
+									title={customization.badge}
 								>
 									{customization.badge}
 								</span>
 							) : (
 								<Badge
 									variant="secondary"
-									className="text-[10px] px-1.5 py-0 h-4 rounded-sm"
+									className="text-[10px] px-1.5 py-0 h-4 rounded-sm truncate max-w-[120px] block"
 									style={{
 										backgroundColor: customization.badgeColor || 'var(--muted)',
 										color: customization.badgeTextColor || undefined,
 									}}
+									title={customization.badge}
 								>
 									{customization.badge}
 								</Badge>
