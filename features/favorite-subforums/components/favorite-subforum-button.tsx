@@ -1,7 +1,7 @@
 /**
  * FavoriteSubforumButton - Star button to mark/unmark a subforum as favorite
  */
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { logger } from '@/lib/logger'
 import Star from 'lucide-react/dist/esm/icons/star'
 import { toast } from '@/lib/lazy-toast'
@@ -21,12 +21,14 @@ interface FavoriteSubforumButtonProps {
 
 /**
  * FavoriteSubforumButton component - A star icon that toggles a subforum's favorite status.
- * Integrates with a centralized listener system to stay in sync across different contexts.
- * @param props - Component properties including subforum data and visual options
+ * Uses optimistic updates for instant visual feedback without flicker.
  */
 export function FavoriteSubforumButton({ subforum, size = 16, className = '' }: FavoriteSubforumButtonProps) {
 	const [isFavorite, setIsFavorite] = useState(false)
-	const [isLoading, setIsLoading] = useState(true)
+	const [isInitializing, setIsInitializing] = useState(true)
+	
+	// Ref to prevent double-clicks while toggle is in progress
+	const isTogglingRef = useRef(false)
 
 	// Load initial state from storage
 	useEffect(() => {
@@ -37,22 +39,24 @@ export function FavoriteSubforumButton({ subforum, size = 16, className = '' }: 
 				const favoriteResult = await isSubforumFavorite(subforum.id)
 				if (!cancelled) {
 					setIsFavorite(favoriteResult)
-					setIsLoading(false)
+					setIsInitializing(false)
 				}
 			} catch (err) {
 				logger.error('Error loading favorite state:', err)
 				if (!cancelled) {
-					setIsLoading(false)
+					setIsInitializing(false)
 				}
 			}
 		}
 
 		void loadState()
 
-		// Subscribe to changes using centralized listener system
-		// This handles both window events and storage.onChanged
+		// Subscribe to external changes (other tabs, sidebar updates)
+		// Only update if we're not currently toggling (to avoid reverting optimistic update)
 		const unsubscribe = subscribeFavoriteSubforumsChanges(() => {
-			void loadState()
+			if (!isTogglingRef.current) {
+				void loadState()
+			}
 		})
 
 		return () => {
@@ -62,18 +66,25 @@ export function FavoriteSubforumButton({ subforum, size = 16, className = '' }: 
 	}, [subforum.id])
 
 	/**
-	 * Handles the click event to add or remove the subforum from favorites
+	 * Handles the click event with optimistic update
 	 */
 	const handleClick = useCallback(
 		async (e: React.MouseEvent) => {
 			e.preventDefault()
 			e.stopPropagation()
 
-			if (isLoading) return
+			// Prevent double-clicks or clicks during initialization
+			if (isTogglingRef.current || isInitializing) return
 
-			setIsLoading(true)
+			// Optimistic update: toggle state immediately
+			const previousState = isFavorite
+			setIsFavorite(!previousState)
+			isTogglingRef.current = true
+
 			try {
 				const result = await toggleFavoriteSubforum(subforum)
+				
+				// Sync with actual result (in case of race conditions)
 				setIsFavorite(result.isFavorite)
 
 				if (result.isFavorite) {
@@ -82,20 +93,22 @@ export function FavoriteSubforumButton({ subforum, size = 16, className = '' }: 
 					toast.success(`${subforum.name} eliminado de favoritos`)
 				}
 			} catch (err) {
+				// Revert optimistic update on error
+				setIsFavorite(previousState)
 				logger.error('Error toggling favorite:', err)
 				toast.error('Error al actualizar favoritos')
 			} finally {
-				setIsLoading(false)
+				isTogglingRef.current = false
 			}
 		},
-		[subforum, isLoading]
+		[subforum, isFavorite, isInitializing]
 	)
 
 	return (
 		<button
 			type="button"
 			onClick={handleClick}
-			disabled={isLoading}
+			disabled={isInitializing}
 			className={cn(
 				'flex items-center justify-center h-8 w-8 rounded-lg',
 				'bg-transparent text-muted-foreground cursor-pointer transition-all duration-150 relative',
@@ -107,7 +120,8 @@ export function FavoriteSubforumButton({ subforum, size = 16, className = '' }: 
 			title={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
 			aria-label={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
 		>
-			<Star size={size} className={isLoading ? 'animate-pulse' : ''} fill={isFavorite ? 'currentColor' : 'none'} />
+			<Star size={size} fill={isFavorite ? 'currentColor' : 'none'} />
 		</button>
 	)
 }
+
