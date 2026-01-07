@@ -28,8 +28,10 @@ export function StorageInspector({ triggerButton }: StorageInspectorProps) {
 	const [loading, setLoading] = useState(false)
 
 	async function loadDetails() {
-		// Always reload to get fresh data
-		setLoading(true)
+		// Only show loading if we don't have cached data
+		if (!items) {
+			setLoading(true)
+		}
 		try {
 			const rawItems = await browser.storage.local.get(null)
 			const analyzed = Object.entries(rawItems).map(([key, value]) => analyzeStorageValue(key, value))
