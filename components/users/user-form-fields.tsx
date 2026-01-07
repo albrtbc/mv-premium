@@ -128,9 +128,9 @@ export function BadgeConfigField({ formData, onChange }: BadgeConfigFieldProps) 
 				<Tabs
 					value={badgeStyle}
 					onValueChange={v => onChange({ ...formData, badgeStyle: v as 'badge' | 'text' })}
-					className="h-8"
+					className="h-8 w-full"
 				>
-					<TabsList className="h-8 p-0.5">
+					<TabsList className="h-8 p-0.5 w-full">
 						<TabsTrigger value="badge" className="text-[10px] h-7">
 							Badge
 						</TabsTrigger>
@@ -254,7 +254,7 @@ export function IgnoreUserField({ formData, onChange }: IgnoreUserFieldProps) {
 						onValueChange={v => onChange({ ...formData, ignoreType: v as 'hide' | 'mute' })}
 						className="w-full"
 					>
-						<TabsList className="grid grid-cols-2 h-9 p-1 bg-secondary/50">
+						<TabsList className="grid grid-cols-2 h-9 p-1 bg-secondary/50 w-full">
 							<TabsTrigger 
 								value="hide" 
 								className="text-xs h-7 gap-1.5 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground data-[state=active]:shadow-sm"
