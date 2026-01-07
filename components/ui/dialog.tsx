@@ -163,58 +163,55 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<'div'>) {
  * DialogContent component - The actual dialog window content
  */
 function DialogContent({
-	className,
-	children,
-	showCloseButton = true,
-	...props
+  className,
+  children,
+  showCloseButton = true,
+  ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-	showCloseButton?: boolean
+  showCloseButton?: boolean
 }) {
-	return (
-		<DialogPortal>
-			<DialogOverlay />
-			<DialogPrimitive.Content
-				data-slot="dialog-content"
-				className={cn(
-					// Positioning - use flexbox centering instead of transform to avoid blur at non-100% zoom
-					'fixed inset-0 z-50 m-auto',
-					'h-fit w-full max-w-lg max-h-[85vh]',
-					// Sizing
-					'grid gap-4 overflow-y-auto',
-					// Appearance
-					'rounded-lg border border-border bg-card text-card-foreground p-6',
-					'shadow-2xl',
-					// pointer-events-auto to interact with content
-					'pointer-events-auto',
-					// Animation
-					'data-[state=open]:animate-in data-[state=closed]:animate-out',
-					'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-					'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-					'duration-200',
-					className
-				)}
-				{...props}
-			>
-				{children}
-				{showCloseButton && (
-					<DialogPrimitive.Close
-						data-slot="dialog-close"
-						className={cn(
-							'absolute right-4 top-4',
-							'flex items-center justify-center w-6 h-6',
-							'rounded-sm opacity-70 transition-opacity',
-							'hover:opacity-100',
-							'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
-							'disabled:pointer-events-none'
-						)}
-					>
-						<XIcon className="h-4 w-4" />
-						<span className="sr-only">Close</span>
-					</DialogPrimitive.Close>
-				)}
-			</DialogPrimitive.Content>
-		</DialogPortal>
-	)
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">       
+        <DialogPrimitive.Content
+          data-slot="dialog-content"
+          className={cn(
+            'w-full max-w-lg max-h-[85vh]',
+            'pointer-events-auto',
+            'grid gap-4 overflow-y-auto',
+            'rounded-lg border border-border bg-card text-card-foreground p-6',
+            'shadow-2xl',
+            'will-change-[transform,opacity]',
+            'duration-200',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+            className
+          )}
+          {...props}
+        >
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close
+              data-slot="dialog-close"
+              className={cn(
+                'absolute right-4 top-4',
+                'flex items-center justify-center w-6 h-6',
+                'rounded-sm opacity-70 transition-opacity',
+                'hover:opacity-100',
+                'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
+                'disabled:pointer-events-none'
+              )}
+            >
+              <XIcon className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Content>
+      </div>
+    </DialogPortal>
+  )
 }
 
 /**
