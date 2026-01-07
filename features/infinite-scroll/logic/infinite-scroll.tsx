@@ -29,16 +29,8 @@ import { logger } from '@/lib/logger'
 
 // Extracted modules
 import {
-	toggleInfiniteScrollDebug,
-	registerDebugGlobals,
-	updateDebugIndicators,
-	isDebugMode,
-	type DebugState,
-} from './infinite-scroll-debug'
-import {
 	PAGES_BEFORE,
 	PAGES_AFTER,
-	WINDOW_SIZE,
 	MIN_PAGES_BEFORE_UNLOAD,
 	WINDOW_MANAGEMENT_DEBOUNCE,
 	PAGE_BLOCK_CLASS,
@@ -47,9 +39,6 @@ import {
 	type PageBlock,
 	type PageMarker,
 } from './infinite-scroll-state'
-
-// Re-export debug functions for external use
-export { toggleInfiniteScrollDebug, isDebugMode }
 
 // =============================================================================
 // STATE
@@ -77,48 +66,6 @@ const SENTINEL_ID = DOM_MARKERS.IDS.INFINITE_SENTINEL
 const INDICATOR_CONTAINER_ID = DOM_MARKERS.IDS.INFINITE_INDICATOR
 const BUTTON_CONTAINER_ID = DOM_MARKERS.IDS.INFINITE_SCROLL_BUTTON_CONTAINER
 let dividerCounter = 0
-
-// =============================================================================
-// DEBUG STATE GETTER
-// =============================================================================
-
-/**
- * Get current state of the sliding window for debugging.
- * Call from console: mvInfiniteScrollState()
- */
-export function getInfiniteScrollState(): DebugState {
-	const blocks: DebugState['pageBlocks'] = []
-
-	pageBlocks.forEach((block, pageNum) => {
-		blocks.push({
-			page: pageNum,
-			isLoaded: block.isLoaded,
-			cachedHeight: block.cachedHeight,
-			hasCachedHTML: block.cachedHTML !== null,
-		})
-	})
-
-	return {
-		isActive: isScrollActive,
-		startPage,
-		visiblePage,
-		loadedPagesCount,
-		totalPages,
-		windowConfig: {
-			PAGES_BEFORE,
-			PAGES_AFTER,
-			WINDOW_SIZE,
-			MIN_PAGES_BEFORE_UNLOAD,
-		},
-		currentWindow: {
-			start: Math.max(startPage, visiblePage - PAGES_BEFORE),
-			end: Math.min(startPage + loadedPagesCount - 1, visiblePage + PAGES_AFTER),
-		},
-		pageBlocks: blocks.sort((a, b) => a.page - b.page),
-		loadedInDOM: blocks.filter(b => b.isLoaded).length,
-		unloadedPlaceholders: blocks.filter(b => !b.isLoaded).length,
-	}
-}
 
 // =============================================================================
 // URL & PAGE DETECTION
@@ -323,7 +270,6 @@ function managePageWindow(): void {
 	})
 
 	updatePlaceholderObservers()
-	updateDebugIndicators(getInfiniteScrollState())
 }
 
 function unloadPage(block: PageBlock): void {
@@ -703,9 +649,6 @@ function startInfiniteScroll(): void {
 	createIndicator()
 	createObserver()
 	setupScrollTracking()
-
-	registerDebugGlobals(getInfiniteScrollState)
-	toggleInfiniteScrollDebug(true)
 
 	updateButton()
 }
