@@ -10,7 +10,7 @@ import X from 'lucide-react/dist/esm/icons/x'
 import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down'
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right'
 import FolderOpen from 'lucide-react/dist/esm/icons/folder-open'
-import Inbox from 'lucide-react/dist/esm/icons/inbox'
+import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Search from 'lucide-react/dist/esm/icons/search'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -328,12 +328,18 @@ export function DraftsList({ isOpen, onClose, onRestore }: DraftsListProps) {
 						<ScrollArea className="h-full w-full" onWheel={e => e.stopPropagation()}>
 						{/* Empty State */}
 						{drafts.length === 0 ? (
-							<div className="flex flex-col items-center justify-center h-[400px] p-8 text-center">
-								<div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-									<Inbox className="w-8 h-8 text-muted-foreground" />
+							<div className="flex flex-col items-center justify-center p-12 h-full text-center">
+								{/* Premium Empty State */}
+								<div className={cn(
+									'relative h-20 w-20 rounded-2xl flex items-center justify-center mb-6',
+									'bg-gradient-to-br from-primary/20 to-primary/5 shadow-lg shadow-primary/5 backdrop-blur-md',
+									'ring-1 ring-primary/20'
+								)}>
+									<div className="absolute inset-0 rounded-2xl animate-pulse bg-primary/5" />
+									<FileText className="h-10 w-10 text-primary drop-shadow-sm" />
 								</div>
-								<h3 className="text-base font-medium text-foreground mb-2">Sin borradores</h3>
-								<p className="text-sm text-muted-foreground max-w-[240px]">
+								<h3 className="text-lg font-semibold text-foreground mb-2">Tu espacio creativo</h3>
+								<p className="text-muted-foreground max-w-xs mx-auto text-sm leading-relaxed">
 									Los borradores que guardes aparecerán aquí.
 								</p>
 							</div>
@@ -430,23 +436,20 @@ export function DraftsList({ isOpen, onClose, onRestore }: DraftsListProps) {
 					</div>
 				</div>
 
-				{/* Footer */}
-				<DialogFooter className="px-4 py-3 border-t border-border justify-between items-center sm:justify-between bg-muted/30">
-					<span className="text-xs text-muted-foreground">
-						Datos privados en tu dispositivo
-					</span>
-					{drafts.length > 0 && (
+				{/* Footer - Only show if there are drafts */}
+				{drafts.length > 0 && (
+					<DialogFooter className="px-4 py-3 border-t border-border justify-end items-center bg-muted/30">
 						<Button
-							variant="ghost"
+							variant="outline"
 							size="sm"
 							onClick={handleClearAllRequest}
-							className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+							className="h-8 px-3 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground border-destructive/20"
 						>
-							<Trash2 className="w-3 h-3 mr-1" />
+							<Trash2 className="w-3.5 h-3.5 mr-1.5" />
 							Eliminar todo
 						</Button>
-					)}
-				</DialogFooter>
+					</DialogFooter>
+				)}
 			</DialogContent>
 		</Dialog>
 

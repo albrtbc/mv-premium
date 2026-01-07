@@ -252,28 +252,31 @@ export function InsertTemplateDialog({ open, onOpenChange, onInsert }: InsertTem
 			>
 				{/* Header */}
 				<div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0 bg-muted/10">
-					<div className="flex items-center gap-2 text-foreground font-semibold">
+					<DialogTitle className="flex items-center gap-2 text-foreground text-base font-semibold">
+						<Wand2 className="w-4 h-4 text-muted-foreground" />
 						<span>Insertar Plantilla</span>
-					</div>
+					</DialogTitle>
 					<Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenChange(false)}>
 						<X className="h-4 w-4" />
 					</Button>
 				</div>
 
-				{/* Search */}
-				<div className="p-3 border-b border-border/50 bg-background/50 backdrop-blur-sm z-10">
-					<div className="relative">
-						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-						<Input
-							placeholder="Buscar por nombre, contenido, comando..."
-							value={searchQuery}
-							onChange={e => setSearchQuery(e.target.value)}
-							onKeyDown={handleKeyDown}
-							className="pl-9 bg-muted/30 border-muted-foreground/20 focus:bg-background h-10 transition-colors"
-							autoFocus
-						/>
+				{/* Search - Only show if we have templates */}
+				{templates.length > 0 && (
+					<div className="p-3 border-b border-border/50 bg-background/50 backdrop-blur-sm z-10">
+						<div className="relative">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+							<Input
+								placeholder="Buscar por nombre, contenido, comando..."
+								value={searchQuery}
+								onChange={e => setSearchQuery(e.target.value)}
+								onKeyDown={handleKeyDown}
+								className="pl-9 bg-muted/30 border-muted-foreground/20 focus:bg-background h-10 transition-colors"
+								autoFocus
+							/>
+						</div>
 					</div>
-				</div>
+				)}
 
 				{/* Content */}
 				<div className="flex-1 min-h-0 overflow-hidden bg-muted/5 relative">
@@ -283,9 +286,25 @@ export function InsertTemplateDialog({ open, onOpenChange, onInsert }: InsertTem
 							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4" />
 							<p className="text-sm">Cargando biblioteca...</p>
 						</div>
+					) : templates.length === 0 ? (
+						<div className="flex flex-col items-center justify-center p-12 h-full text-center">
+							{/* Premium Empty State */}
+							<div className={cn(
+								'relative h-20 w-20 rounded-2xl flex items-center justify-center mb-6',
+								'bg-gradient-to-br from-primary/20 to-primary/5 shadow-lg shadow-primary/5 backdrop-blur-md',
+								'ring-1 ring-primary/20'
+							)}>
+								<div className="absolute inset-0 rounded-2xl animate-pulse bg-primary/5" />
+								<Wand2 className="h-10 w-10 text-primary drop-shadow-sm" />
+							</div>
+							<h3 className="text-lg font-semibold text-foreground mb-2">Tu biblioteca está vacía</h3>
+							<p className="text-muted-foreground max-w-xs mx-auto text-sm leading-relaxed">
+								Guarda tus respuestas frecuentes como plantillas para usarlas aquí.
+							</p>
+						</div>
 					) : !hasResults ? (
 						<div className="flex flex-col items-center justify-center p-12 text-muted-foreground/50">
-							<Wand2 className="h-12 w-12 mb-4 opacity-20" />
+							<Search className="h-12 w-12 mb-4 opacity-20" />
 							<p className="text-base font-medium text-muted-foreground">No se encontraron plantillas</p>
 							<p className="text-xs mt-1">Prueba con otros términos de búsqueda</p>
 						</div>
