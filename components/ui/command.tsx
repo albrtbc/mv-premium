@@ -40,6 +40,7 @@ const CommandDialog = ({ children, shouldFilter, className, ...props }: CommandD
 const CommandInput = React.forwardRef<React.ComponentRef<typeof CommandPrimitive.Input>, React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input> & { breadcrumbs?: React.ReactNode }>(
 	({ className, breadcrumbs, ...props }, ref) => {
 		return (
+			// eslint-disable-next-line react/no-unknown-property
 			<div className="flex items-center border-b border-border/40 bg-transparent px-6" cmdk-input-wrapper="">
 				<Search className="mr-3 h-4 w-4 shrink-0 opacity-50 text-foreground" />
 				{breadcrumbs && (

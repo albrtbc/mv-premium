@@ -1,3 +1,4 @@
+// ^ Shadow DOM manipulation (shadow.innerHTML) is a legitimate pattern, not a hooks violation
 import { useRef, useEffect, forwardRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { parseBBCode } from './parser'

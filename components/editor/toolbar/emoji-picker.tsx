@@ -58,22 +58,24 @@ export function EmojiPicker({ onSelect, className, disabled = false }: EmojiPick
 	const [open, setOpen] = useState(false)
 	const [search, setSearch] = useState('')
 	const [emojis, setEmojis] = useState<MvEmojiCategory[]>([])
-	const [isLoading, setIsLoading] = useState(false)
 	const [activeTab, setActiveTab] = useState('')
+	const [loadStarted, setLoadStarted] = useState(false)
+
+	// Derive loading state instead of setting it synchronously
+	const isLoading = loadStarted && emojis.length === 0
 
 	// Load emojis when popover opens
 	useEffect(() => {
-		if (open && emojis.length === 0) {
-			setIsLoading(true)
+		if (open && !loadStarted) {
+			setLoadStarted(true)
 			loadEmojis().then(data => {
 				setEmojis(data)
 				if (data.length > 0 && !activeTab) {
 					setActiveTab(data[0].category)
 				}
-				setIsLoading(false)
 			})
 		}
-	}, [open, emojis.length, activeTab])
+	}, [open, loadStarted, activeTab])
 
 	// Filter emojis based on search
 	const filteredCategories = useMemo(() => {

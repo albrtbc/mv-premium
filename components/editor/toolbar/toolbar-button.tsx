@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -19,7 +20,8 @@ export function ToolbarButton({
 	highlighted = false,
 	highlightTooltip,
 }: ToolbarButtonProps) {
-	const IconComponent = getToolbarIcon(button.icon)
+	// Memoize icon lookup to prevent "component created during render" warning
+	const Icon = useMemo(() => getToolbarIcon(button.icon), [button.icon])
 
 	return (
 		<Tooltip>
@@ -35,7 +37,7 @@ export function ToolbarButton({
 					)}
 					disabled={disabled}
 				>
-					{IconComponent ? <IconComponent className="h-4 w-4" /> : <span>{button.label[0]}</span>}
+					{Icon ? <Icon className="h-4 w-4" /> : <span>{button.label[0]}</span>}
 				</Button>
 			</TooltipTrigger>
 			<TooltipContent side="bottom" className="text-xs">
