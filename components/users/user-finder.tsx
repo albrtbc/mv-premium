@@ -147,6 +147,17 @@ export function UserFinder() {
 
 		try {
 			await removeUserCustomization(username)
+
+			// Refresh all Mediavida tabs so changes apply immediately
+			try {
+				const tabs = await browser.tabs.query({ url: '*://*.mediavida.com/*' })
+				for (const tab of tabs) {
+					if (tab.id) browser.tabs.reload(tab.id)
+				}
+			} catch (tabError) {
+				logger.warn('Could not refresh tabs:', tabError)
+			}
+
 			toast.success('Personalización eliminada', {
 				description: `Se eliminó la configuración de ${username}`,
 			})

@@ -6,10 +6,12 @@
 import { getUserCustomizations, saveUserCustomizations } from '@/features/user-customizations/storage'
 import { openNoteDialog } from './components/note-editor-dialog'
 import { isMVDarkMode } from '@/lib/theme-utils'
-import { DOM_MARKERS } from '@/constants'
+import { DOM_MARKERS, MV_SELECTORS } from '@/constants'
+import { NOTE_ICON_STYLES, NOTE_ICON_SVG } from './logic/customizations-styles'
 
 const INJECTED_MARKER = DOM_MARKERS.EDITOR.GENERIC_INJECTED
 const MVP_ACTIONS_CLASS = DOM_MARKERS.CLASSES.USER_CARD_ACTIONS
+const USER_NOTE_CLASS = DOM_MARKERS.CLASSES.USER_NOTE
 
 /**
  * Initialize the user card observer
@@ -184,6 +186,9 @@ async function toggleIgnore(
 
 	if (data.users[username]?.isIgnored) {
 		setTimeout(() => location.reload(), 300)
+	} else {
+		// Also reload when removing ignore to restore hidden posts
+		setTimeout(() => location.reload(), 300)
 	}
 }
 
@@ -215,5 +220,44 @@ async function openNoteEditor(username: string, currentNote: string, avatarUrl: 
 	}
 
 	await saveUserCustomizations(data)
+
+	// Update note icons in DOM without page reload
+	updateNoteIconsForUser(username, trimmed)
+
 	return trimmed
+}
+
+/**
+ * Updates note icons in the DOM for a specific user without page reload.
+ * Adds, updates, or removes note icons based on whether there's a note.
+ * Only processes avatar links (not mentions in post content).
+ */
+function updateNoteIconsForUser(username: string, note: string): void {
+	// Find all user-card links inside avatars for this user (not mentions in post content)
+	const avatarLinks = document.querySelectorAll<HTMLAnchorElement>(
+		`${MV_SELECTORS.THREAD.POST_AVATAR} a.user-card[href*="/id/${username}" i]`
+	)
+
+	avatarLinks.forEach(link => {
+		// The link is inside the avatar, so get the avatar container directly
+		const avatarContainer = link.closest(MV_SELECTORS.THREAD.POST_AVATAR) as HTMLElement
+		if (!avatarContainer) return
+
+		// Remove existing note icon if present
+		const existingNote = avatarContainer.querySelector(`.${USER_NOTE_CLASS}`)
+		if (existingNote) existingNote.remove()
+
+		// If there's a note, add the icon
+		if (note) {
+			avatarContainer.style.overflow = 'visible'
+			avatarContainer.style.position = 'relative'
+
+			const noteIcon = document.createElement('div')
+			noteIcon.className = USER_NOTE_CLASS
+			noteIcon.setAttribute('data-tooltip', note)
+			noteIcon.style.cssText = NOTE_ICON_STYLES
+			noteIcon.innerHTML = NOTE_ICON_SVG
+			avatarContainer.appendChild(noteIcon)
+		}
+	})
 }
