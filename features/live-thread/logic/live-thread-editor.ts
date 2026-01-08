@@ -51,7 +51,7 @@ export function setupFormInterceptor(): void {
 				setLastPostTimestamp(Date.now())
 				currentPollInterval = POLL_INTERVALS.HIGH_ACTIVITY
 				toggleFormVisibility(false)
-				setTimeout(() => void pollForNewPosts(), 500)
+				setTimeout(() => void pollForNewPosts(), 100)
 			}
 		} catch (error) {
 			logger.error('LiveThread submit error:', error)

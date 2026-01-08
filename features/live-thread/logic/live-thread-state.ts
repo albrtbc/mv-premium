@@ -31,7 +31,7 @@ export type LiveStatus = 'connected' | 'updating' | 'error' | 'paused'
 export const MAX_VISIBLE_POSTS = 30
 
 export const POLL_INTERVALS = {
-	HIGH_ACTIVITY: 5000,
+	HIGH_ACTIVITY: 3000,
 	NORMAL: 10000,
 	LOW_ACTIVITY: 20000,
 	INACTIVE: 45000,
