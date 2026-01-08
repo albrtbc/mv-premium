@@ -71,11 +71,10 @@ export {
 	// UI State
 	selectSettingsActiveTab,
 	// Advanced
-	selectDebugMode,
+	// Advanced
 	selectSyncEnabled,
 	// Composite selectors
 	selectApiKeys,
 	// Hooks with built-in selectors
 	useTheme,
-	useDebugMode,
 } from './settings-selectors'

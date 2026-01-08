@@ -68,10 +68,6 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().liveThreadEnabled).toBe(false)
 		})
 
-		it('has debug mode disabled by default', () => {
-			expect(useSettingsStore.getState().debugMode).toBe(false)
-		})
-
 		it('has empty API keys by default', () => {
 			const state = useSettingsStore.getState()
 			expect(state.imgbbApiKey).toBe('')
@@ -103,11 +99,11 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().infiniteScrollEnabled).toBe(true)
 		})
 
-		it('setDebugMode toggles debug mode', () => {
+		it('setInfiniteScrollEnabled toggles infinite scroll', () => {
 			act(() => {
-				useSettingsStore.getState().setDebugMode(true)
+				useSettingsStore.getState().setInfiniteScrollEnabled(true)
 			})
-			expect(useSettingsStore.getState().debugMode).toBe(true)
+			expect(useSettingsStore.getState().infiniteScrollEnabled).toBe(true)
 		})
 
 		it('setImgbbApiKey updates API key', () => {
@@ -162,14 +158,12 @@ describe('settings-store', () => {
 			act(() => {
 				useSettingsStore.getState().updateSettings({
 					theme: 'light',
-					debugMode: true,
 					infiniteScrollEnabled: true,
 				})
 			})
 
 			const state = useSettingsStore.getState()
 			expect(state.theme).toBe('light')
-			expect(state.debugMode).toBe(true)
 			expect(state.infiniteScrollEnabled).toBe(true)
 		})
 
@@ -186,7 +180,6 @@ describe('settings-store', () => {
 			act(() => {
 				// Change several settings
 				useSettingsStore.getState().setTheme('light')
-				useSettingsStore.getState().setDebugMode(true)
 				useSettingsStore.getState().setBoldColor('#000000')
 
 				// Reset
@@ -195,7 +188,6 @@ describe('settings-store', () => {
 
 			const state = useSettingsStore.getState()
 			expect(state.theme).toBe(DEFAULT_SETTINGS.theme)
-			expect(state.debugMode).toBe(DEFAULT_SETTINGS.debugMode)
 			expect(state.boldColor).toBe(DEFAULT_SETTINGS.boldColor)
 		})
 	})

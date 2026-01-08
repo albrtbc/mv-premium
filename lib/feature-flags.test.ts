@@ -10,7 +10,6 @@ const mockState = {
 	infiniteScrollEnabled: false,
 	liveThreadEnabled: true,
 	mutedWordsEnabled: false,
-	debugMode: false,
 	geminiApiKey: '',
 	tmdbApiKey: 'test-api-key',
 }
@@ -35,7 +34,6 @@ describe('feature-flags', () => {
 		mockState.infiniteScrollEnabled = false
 		mockState.liveThreadEnabled = true
 		mockState.mutedWordsEnabled = false
-		mockState.debugMode = false
 		mockState.geminiApiKey = ''
 		mockState.tmdbApiKey = 'test-api-key'
 	})

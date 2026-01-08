@@ -70,9 +70,6 @@ interface SettingsActions {
 	// Keyboard Shortcuts
 	setShortcut: (actionId: string, keyCombo: string | null) => void
 
-	// Advanced
-	setDebugMode: (enabled: boolean) => void
-
 	// Batch operations
 	updateSettings: (updates: Partial<Settings>) => void
 	resetSettings: () => void
@@ -188,9 +185,6 @@ export const useSettingsStore = create<SettingsState>()(
 				set(state => ({
 					shortcuts: { ...state.shortcuts, [actionId]: keyCombo },
 				})),
-
-			// Advanced
-			setDebugMode: enabled => set({ debugMode: enabled }),
 
 			// Batch update for multiple settings at once
 			updateSettings: updates => {
