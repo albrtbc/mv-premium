@@ -256,9 +256,10 @@ export function injectFavoriteSubforumsSidebar(): void {
 	if (document.getElementById(SIDEBAR_CONTAINER_ID)) return
 
 	// Detect page type by URL pattern
-	// Thread URLs: /foro/subforum/thread-title-123456 (ends with numeric ID)
+	// Thread URLs: /foro/subforum/thread-title-123456 or /foro/subforum/thread-title-123456/page
+	// The thread slug ends with numeric ID, optionally followed by /pageNum
 	const path = window.location.pathname
-	const isThreadPage = /^\/foro\/[^/]+\/[^/]+-\d+\/?$/.test(path)
+	const isThreadPage = /^\/foro\/[^/]+\/[^/]+-\d+(\/\d+)?\/?$/.test(path)
 
 	// Create container
 	const container = document.createElement('div')

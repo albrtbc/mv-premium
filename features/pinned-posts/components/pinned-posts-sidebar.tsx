@@ -91,7 +91,7 @@ export function PinnedPostsSidebar() {
 						'cursor-pointer flex items-center gap-3 p-3 px-4 transition-all relative overflow-hidden',
 						'bg-[color-mix(in_srgb,var(--muted)30%,transparent)] hover:bg-[color-mix(in_srgb,var(--muted)50%,transparent)]',
 						'border-b border-[color-mix(in_srgb,var(--border)30%,transparent)]',
-						isCollapsed && 'border-b-0'
+						isCollapsed && 'border-b-transparent delay-200'
 					)}
 				>
 					{/* Highlight effect on hover */}
