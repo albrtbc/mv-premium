@@ -100,6 +100,10 @@ export const MV_STYLES = `
     overflow-x: hidden !important;
 }
 
+.post-contents > :first-child {
+    margin-top: 0 !important;
+}
+
 a, blockquote, h1, h2, h3, h4, h5, img, li, ol, p, pre, table, tbody, td, th, thead, tr, ul {
     margin: 0; padding: 0; border: 0; font-size: 100%; font: inherit; vertical-align: baseline;
 }

@@ -519,13 +519,13 @@ export async function parseBBCode(input: string): Promise<string> {
 
 	// Store code blocks with their promises for lazy highlighting
 	const codeBlocks: { placeholder: string; htmlPromise: Promise<string> | string }[] = []
-	let processedInput = input.replace(/{{cursor}}/g, '')
+	let processedInput = input.replace(/{{cursor}}/g, '').trim()
 
 	// 1. Protect large code blocks [code]...[/code]
 	processedInput = processedInput.replace(/\[code(?:=([^\]]+))?\]([\s\S]*?)\[\/code\]/gi, (_, lang, code) => {
 		const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`
 		codeBlocks.push({ placeholder, htmlPromise: highlightCodeBlock(code, lang) })
-		return placeholder
+		return placeholder + '\n\n'
 	})
 
 	// ========================================================================
@@ -535,7 +535,7 @@ export async function parseBBCode(input: string): Promise<string> {
 		const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`
 		// If no language (undefined), highlightCodeBlock will auto-detect
 		codeBlocks.push({ placeholder, htmlPromise: highlightCodeBlock(code, lang || undefined) })
-		return placeholder
+		return placeholder + '\n\n'
 	})
 
 	// ========================================================================
@@ -548,7 +548,7 @@ export async function parseBBCode(input: string): Promise<string> {
 			placeholder,
 			htmlPromise: parseMediaTag(url), // Sync func returns string directly
 		})
-		return placeholder
+		return placeholder + '\n\n'
 	})
 
 	// 2. Protect Inline Code (Backticks)
@@ -585,10 +585,10 @@ export async function parseBBCode(input: string): Promise<string> {
 	// The [*] marker starts a list item that continues until the next [*] or [/list]
 	// This allows multi-line content (like sub-indices) inside a single <li>
 	html = html.replace(/\[list\]([\s\S]*?)\[\/list\]/gi, (_, content) => {
-		return '<ul>' + parseListItems(content) + '</ul>'
+		return '<ul>' + parseListItems(content) + '</ul>\n\n'
 	})
 	html = html.replace(/\[list=1\]([\s\S]*?)\[\/list\]/gi, (_, content) => {
-		return '<ol>' + parseListItems(content) + '</ol>'
+		return '<ol>' + parseListItems(content) + '</ol>\n\n'
 	})
 
 	// 4.2. Markdown Lists (The smart function)
@@ -601,7 +601,7 @@ export async function parseBBCode(input: string): Promise<string> {
 			.filter(line => line.trim().length > 0)
 			.map(line => line.replace(/^&gt; ?/, ''))
 			.join('<br>')
-		return `<blockquote class="quote"><p>${content}</p></blockquote>`
+		return `<blockquote class="quote"><p>${content}</p></blockquote>\n\n`
 	})
 
 	// 5. Formatting
@@ -614,13 +614,13 @@ export async function parseBBCode(input: string): Promise<string> {
 	html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>')
 
 	// 6. Headers
-	html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>')
-	html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>')
-	html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>')
-	html = html.replace(/^#### (.+)$/gm, '<h5>$1</h5>')
-	html = html.replace(/\[h1\]([\s\S]*?)\[\/h1\]/gi, '<h2>$1</h2>')
-	html = html.replace(/\[h2\]([\s\S]*?)\[\/h2\]/gi, '<h3>$1</h3>')
-	html = html.replace(/\[bar\]([\s\S]*?)\[\/bar\]/gi, '<h3 class="bar">$1</h3>')
+	html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>\n\n')
+	html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>\n\n')
+	html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>\n\n')
+	html = html.replace(/^#### (.+)$/gm, '<h5>$1</h5>\n\n')
+	html = html.replace(/\[h1\]([\s\S]*?)\[\/h1\]/gi, '<h2>$1</h2>\n\n')
+	html = html.replace(/\[h2\]([\s\S]*?)\[\/h2\]/gi, '<h3>$1</h3>\n\n')
+	html = html.replace(/\[bar\]([\s\S]*?)\[\/bar\]/gi, '<h3 class="bar">$1</h3>\n\n')
 
 	// 7. Links and Images
 	html = html.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank">$2</a>')
@@ -653,12 +653,12 @@ export async function parseBBCode(input: string): Promise<string> {
 	})
 
 	// 7.5. Center
-	html = html.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div class="center"><p>$1</p></div>')
+	html = html.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div class="center"><p>$1</p></div>\n\n')
 
 	// 7.6. Media (videos, tweets, etc.)
 	html = html.replace(
 		/\[media\]([\s\S]*?)\[\/media\]/gi,
-		'<div class="media-embed"><a href="$1" target="_blank">$1</a></div>'
+		'<div class="media-embed"><a href="$1" target="_blank">$1</a></div>\n\n'
 	)
 
 	// 7.6.5. User Mentions (@username, max 13 chars)
@@ -676,14 +676,14 @@ export async function parseBBCode(input: string): Promise<string> {
 
 	// 8. BBCode Quotes - with and without author
 	html = html.replace(/\[quote=([^\]]+)\]([\s\S]*?)\[\/quote\]/gi, (_, author, content) => {
-		return `<blockquote class="quote"><p>${content}</p><footer>— <cite>${author}</cite></footer></blockquote>`
+		return `<blockquote class="quote"><p>${content}</p><footer>— <cite>${author}</cite></footer></blockquote>\n\n`
 	})
-	html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote class="quote"><p>$1</p></blockquote>')
+	html = html.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote class="quote"><p>$1</p></blockquote>\n\n')
 
 	// 9. Spoilers
 	html = html.replace(/\[spoiler(?:=([^\]]*))?](.*?)\[\/spoiler\]/gis, (_, title, content) => {
 		const displayTitle = title?.trim() || 'Spoiler'
-		return `<div class="spoiler-wrap"><a href="#" class="spoiler">${displayTitle}</a><div class="spoiler animated"><p>${content}</p></div></div>`
+		return `<div class="spoiler-wrap"><a href="#" class="spoiler">${displayTitle}</a><div class="spoiler animated"><p>${content}</p></div></div>\n\n`
 	})
 
 	// 10. Lists (BBCode and Markdown)

@@ -106,7 +106,7 @@ export const MVPreview = forwardRef<HTMLDivElement, MVPreviewProps>(
             ${MV_STYLES}
             :host { --mv-bold-color: ${boldColor}; ${fontSizeStyle} }
         </style>
-        <div class="posts-contents" id="content-container">
+        <div class="post-contents" id="content-container">
             <!-- Content loading... -->
         </div>
     `
@@ -122,7 +122,7 @@ export const MVPreview = forwardRef<HTMLDivElement, MVPreviewProps>(
                     ${MV_STYLES}
                     :host { --mv-bold-color: ${boldColor}; ${fontSizeStyle} }
                 </style>
-                <div class="posts-contents" id="content-container">
+                <div class="post-contents" id="content-container">
                     ${htmlContent}
                 </div>
             `
