@@ -8,7 +8,7 @@ import Activity from 'lucide-react/dist/esm/icons/activity'
 import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
 import Download from 'lucide-react/dist/esm/icons/download'
 import Upload from 'lucide-react/dist/esm/icons/upload'
-import RotateCcw from 'lucide-react/dist/esm/icons/rotate-ccw'
+import TriangleAlert from 'lucide-react/dist/esm/icons/triangle-alert'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -161,7 +161,7 @@ export function AdvancedContent() {
 				<div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4">
 					<div className="flex items-start gap-3">
 						<div className="p-2 rounded-full bg-destructive/10">
-							<RotateCcw className="h-5 w-5 text-destructive" />
+							<TriangleAlert className="h-5 w-5 text-destructive" />
 						</div>
 						<div className="flex-1">
 							<h3 className="text-base font-semibold text-destructive">Zona de Peligro</h3>
@@ -170,7 +170,7 @@ export function AdvancedContent() {
 								configuraciones y palabras silenciadas. Esta acción es irreversible.
 							</p>
 							<Button variant="destructive" className="mt-4 gap-2" onClick={() => setShowResetDialog(true)}>
-								<RotateCcw className="h-4 w-4" />
+								<Trash2 className="h-4 w-4" />
 								Eliminar todos mis datos
 							</Button>
 						</div>
