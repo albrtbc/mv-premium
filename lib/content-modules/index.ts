@@ -35,6 +35,7 @@ export {
 	markAsInjected,
 } from './utils/react-helpers'
 export { createDebouncedObserver, observeDocument, disconnectObserver } from './utils/mutation-observer'
+export { injectScrollToBottomButton } from './utils/scroll-to-bottom'
 
 // Feature modules - re-exported from features/
 export {

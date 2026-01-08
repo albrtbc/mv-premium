@@ -145,6 +145,11 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 	// THREAD PAGES
 	// =========================================================================
 	if (pageContext?.isThread) {
+		// Inject scroll-to-bottom button (lightweight, no dynamic import needed)
+		import('@/lib/content-modules').then(({ injectScrollToBottomButton }) => {
+			injectScrollToBottomButton()
+		})
+
 		// Parallel load thread features using allSettled to prevent single failure from breaking all
 		const results = await Promise.allSettled([
 			import('@/features/pinned-posts/logic/pin-posts'),
