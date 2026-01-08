@@ -43,92 +43,89 @@ export const MVPreview = forwardRef<HTMLDivElement, MVPreviewProps>(
 			}
 		}, [ref])
 
+
 		// Shadow DOM Logic
 		useEffect(() => {
 			const container = internalRef.current
 			if (!container) return
 
-			// 1. Create or get Shadow Root
-			const shadow = container.shadowRoot || container.attachShadow({ mode: 'open' })
-
-			// 2. Check if content is empty
-			const isEmpty = !content.trim()
-
-			// 3. Cleanup previous Steam roots before re-rendering
-			steamRootsRef.current.forEach(root => {
-				try {
-					root.unmount()
-				} catch (e) {
-					// Ignore unmount errors
-				}
-			})
-			steamRootsRef.current.clear()
-
-			// 4. Handle empty state immediately
-			if (isEmpty) {
+			// 1. Initialize Shadow DOM (One-time setup)
+			// We check if shadowRoot already exists to strictly avoid re-attaching or overwriting if React re-mounts the node but keeps the instance
+			let shadow = container.shadowRoot
+			if (!shadow) {
+				shadow = container.attachShadow({ mode: 'open' })
 				shadow.innerHTML = `
-            <style>
-                ${MV_STYLES}
-                .empty-state {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    height: 300px;
-                    color: #888;
-                    text-align: center;
-                    gap: 12px;
-                    user-select: none;
-                }
-                .empty-state svg {
-                    width: 48px;
-                    height: 48px;
-                    opacity: 0.4;
-                }
-                .empty-state p {
-                    font-size: 14px;
-                    opacity: 0.8;
-                    margin: 0;
-                }
-            </style>
-            <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-                <p>Empieza a escribir en el editor para ver aquí la previsualización al estilo Mediavida.</p>
-            </div>
-        `
+					<style id="static-styles">${MV_STYLES}</style>
+					<style id="dynamic-styles"></style>
+					<div class="post-contents" id="content-container"></div>
+				`
+			} else {
+				// If shadow exists but is empty/broken (edge case), repair it
+				if (!shadow.getElementById('content-container')) {
+					shadow.innerHTML = `
+						<style id="static-styles">${MV_STYLES}</style>
+						<style id="dynamic-styles"></style>
+						<div class="post-contents" id="content-container"></div>
+					`
+				}
+			}
+		}, [])
+
+		// 2. Handle Dynamic Styles (Theme, Bold Color, Font Size)
+		useEffect(() => {
+			const container = internalRef.current
+			if (!container || !container.shadowRoot) return
+
+			const dynamicStyleSheet = container.shadowRoot.getElementById('dynamic-styles')
+			if (dynamicStyleSheet) {
+				const fontSizeStyle = fontSize ? `--mv-font-size: ${fontSize}px;` : ''
+				dynamicStyleSheet.textContent = `
+					:host { --mv-bold-color: ${boldColor}; ${fontSizeStyle} }
+				`
+			}
+		}, [boldColor, fontSize])
+
+		// 3. Handle Content Updates (Async parsing without clearing old content)
+		useEffect(() => {
+			const container = internalRef.current
+			if (!container || !container.shadowRoot) return
+			const shadow = container.shadowRoot
+			const contentContainer = shadow.getElementById('content-container')
+			if (!contentContainer) return
+
+			// Handle empty state
+			if (!content.trim()) {
+				// Only update if not already in empty state
+				if (!contentContainer.querySelector('.empty-state')) {
+					contentContainer.innerHTML = `
+						<div class="empty-state">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; opacity: 0.4;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+							<p style="font-size: 14px; opacity: 0.8; margin: 0;">Empieza a escribir en el editor para ver aquí la previsualización al estilo Mediavida.</p>
+						</div>
+					`
+					// Ensure specific empty state styles exist
+					const styleEl = shadow.getElementById('static-styles')
+					if (styleEl && !styleEl.textContent?.includes('.empty-state')) {
+						styleEl.textContent += `
+							.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: #888; text-align: center; gap: 12px; user-select: none; }
+						`
+					}
+				}
 				return
 			}
 
-			// 5. Show loading placeholder while parsing (optional - very fast usually)
-			const fontSizeStyle = fontSize ? `--mv-font-size: ${fontSize}px;` : ''
-			shadow.innerHTML = `
-        <style>
-            ${MV_STYLES}
-            :host { --mv-bold-color: ${boldColor}; ${fontSizeStyle} }
-        </style>
-        <div class="post-contents" id="content-container">
-            <!-- Content loading... -->
-        </div>
-    `
-
-			// 6. Parse content async and update when ready
+			// Parse and Render
+			let isMounted = true
 			const parseAndRender = async () => {
 				try {
 					const htmlContent = await parseBBCode(content)
-
-					// Re-inject with parsed content
-					shadow.innerHTML = `
-                <style>
-                    ${MV_STYLES}
-                    :host { --mv-bold-color: ${boldColor}; ${fontSizeStyle} }
-                </style>
-                <div class="post-contents" id="content-container">
-                    ${htmlContent}
-                </div>
-            `
+					if (!isMounted) return
+					
+					// Update content directly
+					contentContainer.innerHTML = htmlContent
 
 					// Re-bind Spoiler Events
-					const triggers = shadow.querySelectorAll('a.spoiler')
+					const triggers = contentContainer.querySelectorAll('a.spoiler')
 					triggers.forEach(trigger => {
 						trigger.addEventListener('click', e => {
 							e.preventDefault()
@@ -147,8 +144,14 @@ export const MVPreview = forwardRef<HTMLDivElement, MVPreviewProps>(
 						})
 					})
 
+					// Cleanup old steam roots
+					steamRootsRef.current.forEach(root => {
+						try { root.unmount() } catch (e) {}
+					})
+					steamRootsRef.current.clear()
+
 					// Hydrate Steam Embeds
-					const steamPlaceholders = shadow.querySelectorAll('.steam-embed-placeholder[data-steam-appid]')
+					const steamPlaceholders = contentContainer.querySelectorAll('.steam-embed-placeholder[data-steam-appid]')
 					steamPlaceholders.forEach(placeholder => {
 						const appIdStr = placeholder.getAttribute('data-steam-appid')
 						if (!appIdStr) return
@@ -166,23 +169,24 @@ export const MVPreview = forwardRef<HTMLDivElement, MVPreviewProps>(
 							logger.error('Failed to hydrate Steam embed:', e)
 						}
 					})
+
 				} catch (error) {
 					logger.error('Error parsing BBCode:', error)
 				}
 			}
 
 			void parseAndRender()
-		}, [content, useDirectFetch, boldColor, fontSize]) // Re-run whenever content, boldColor or fontSize changes
+
+			return () => {
+				isMounted = false
+			}
+		}, [content, useDirectFetch]) // Re-run when content changes
 
 		// Cleanup on unmount
 		useEffect(() => {
 			return () => {
 				steamRootsRef.current.forEach(root => {
-					try {
-						root.unmount()
-					} catch (e) {
-						// Ignore unmount errors
-					}
+					try { root.unmount() } catch (e) {}
 				})
 				steamRootsRef.current.clear()
 			}
