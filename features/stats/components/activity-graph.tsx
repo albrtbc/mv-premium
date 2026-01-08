@@ -200,12 +200,12 @@ function getSmallIcon(action: string) {
 function getActionVerb(entry: ActivityEntry, hasContext: boolean): string {
 	switch (entry.action) {
 		case 'create':
-			return hasContext ? 'creó hilo en' : 'creó un hilo'
+			return 'creó un hilo en'
 		case 'update':
-			return hasContext ? 'editó un mensaje en' : 'editó un mensaje'
+			return 'editó un mensaje en'
 		case 'publish':
 		default:
-			return hasContext ? 'respondió en' : 'publicó una respuesta'
+			return 'respondió en'
 	}
 }
 
@@ -480,7 +480,7 @@ export const ActivityGraph = memo(function ActivityGraph({
 
 			{/* Selected Day Details */}
 			{selectedDay && selectedDay.entries.length > 0 && (
-				<div className="border border-border/50 rounded-xl bg-card/40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm mt-6">
+				<div className="border border-border/50 rounded-xl bg-card/40 overflow-hidden animate-in fade-in-0 slide-in-from-bottom-2 duration-150 ease-out shadow-lg mt-6">
 					{/* Header */}
 					<div className="px-5 py-4 flex items-start justify-between border-b border-border/50 bg-muted/10">
 						<div>
@@ -491,7 +491,7 @@ export const ActivityGraph = memo(function ActivityGraph({
 						</div>
 						<button
 							onClick={() => setSelectedDay(null)}
-							className="text-muted-foreground hover:text-foreground transition-colors p-2 hover:bg-muted/20 rounded-lg"
+							className="text-muted-foreground hover:text-foreground transition-all p-2 hover:bg-muted/30 rounded-lg hover:scale-110"
 							aria-label="Cerrar"
 						>
 							<X className="h-5 w-5" />
@@ -500,8 +500,16 @@ export const ActivityGraph = memo(function ActivityGraph({
 
 					{/* Activity list */}
 					<div className="divide-y divide-border/50 max-h-75 overflow-y-auto scrollbar-thin">
-						{selectedDay.entries.map(entry => (
-							<div key={entry.id} className="px-5 py-4 flex gap-4 hover:bg-muted/10 transition-colors group">
+						{selectedDay.entries.map((entry, index) => (
+							<div 
+								key={entry.id} 
+								className={cn(
+									"px-5 py-4 flex gap-4 hover:bg-muted/10 transition-all group animate-in fade-in-0 slide-in-from-left-1 duration-150 fill-mode-backwards",
+									index === 1 && "delay-75",
+									index === 2 && "delay-100",
+									index > 2 && "delay-150"
+								)}
+							>
 								<div className="mt-0.5 shrink-0">{getActivityIcon(entry.action)}</div>
 								<div className="flex-1 min-w-0 flex flex-col justify-center">
 									<div className="flex items-baseline justify-between mb-0.5">
