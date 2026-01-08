@@ -22,7 +22,7 @@ export {
 export { ActivityGraph, ActivityGraphSkeleton } from './components/activity-graph'
 
 // Content Script Utils
-export { setupPostTracker } from './post-tracker'
+export { setupPostTracker, completePendingThreadCreation } from './post-tracker'
 
 // Time Tracker
 export * from './logic/time-tracker'

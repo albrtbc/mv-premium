@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
 	FAVORITE_SUBFORUMS: 'mvp-favorite-subforums',
 	LIVE_THREADS: 'mvp-live-threads',
 	ACTIVITY: 'mvp-activity',
+	PENDING_THREAD_CREATION: 'mvp-pending-thread-creation',
 	LAST_SEEN_VERSION: 'mvp-last-seen-version',
 	DRAFTS: 'mvp-drafts',
 	EDITOR_PRESERVE: 'mvp-editor-preserve',

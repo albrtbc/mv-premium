@@ -8,11 +8,10 @@ import { getActivityData, formatDateKey, type ActivityData, type ActivityEntry }
 import { getCurrentUser } from '@/entrypoints/options/lib/current-user'
 import { cn } from '@/lib/utils'
 import Calendar from 'lucide-react/dist/esm/icons/calendar'
-import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Plus from 'lucide-react/dist/esm/icons/plus'
 import TrendingUp from 'lucide-react/dist/esm/icons/trending-up'
 import Pencil from 'lucide-react/dist/esm/icons/pencil'
-import MessageSquare from 'lucide-react/dist/esm/icons/message-square'
+import Send from 'lucide-react/dist/esm/icons/send'
 import X from 'lucide-react/dist/esm/icons/x'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -177,10 +176,10 @@ function getActivityIcon(action: string) {
 			)
 		case 'publish':
 		default:
-			// Reply - Use PRIMARY for main action
+			// Reply - Use Send to match POSTS stat card
 			return (
 				<div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10 border border-primary/20">
-					<MessageSquare className="h-4 w-4 text-primary" />
+					<Send className="h-4 w-4 text-primary" />
 				</div>
 			)
 	}
@@ -194,7 +193,7 @@ function getSmallIcon(action: string) {
 			return <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
 		case 'publish':
 		default:
-			return <MessageSquare className="h-3.5 w-3.5 text-primary" />
+			return <Send className="h-3.5 w-3.5 text-primary" />
 	}
 }
 

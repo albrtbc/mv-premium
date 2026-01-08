@@ -150,6 +150,11 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 			injectScrollToBottomButton()
 		})
 
+		// Check for pending thread creation (captures URL after redirect from new thread page)
+		import('@/features/stats').then(({ completePendingThreadCreation }) => {
+			completePendingThreadCreation()
+		})
+
 		// Parallel load thread features using allSettled to prevent single failure from breaking all
 		const results = await Promise.allSettled([
 			import('@/features/pinned-posts/logic/pin-posts'),
