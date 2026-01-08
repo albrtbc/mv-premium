@@ -96,8 +96,12 @@ async function injectButtons(card: HTMLElement): Promise<void> {
 
 	const hideBtn = createButton('fa-eye-slash', isIgnoredHide ? 'Oculto' : 'Ocultar',
 		'Oculta completamente los posts de este usuario', !!isIgnoredHide)
-	const muteBtn = createButton('fa-volume-off', isIgnoredMute ? 'Silenciado' : 'Silenciar',
-		'Colapsa los mensajes pero permite verlos con un clic', !!isIgnoredMute)
+	const muteBtn = createButton(
+		isIgnoredMute ? 'fa-user-times' : 'fa-user',
+		isIgnoredMute ? 'Ignorado' : 'Ignorar',
+		'Colapsa los mensajes pero permite verlos con un clic',
+		!!isIgnoredMute
+	)
 	const noteBtn = createButton('fa-sticky-note-o', currentNote ? 'Nota ✓' : 'Nota',
 		'Añade una nota privada a este usuario', !!currentNote)
 
@@ -182,7 +186,7 @@ async function toggleIgnore(
 
 	const newState = data.users[username]
 	updateButtonState(hideBtn, !!(newState?.isIgnored && newState?.ignoreType === 'hide'), 'Oculto', 'Ocultar')
-	updateButtonState(muteBtn, !!(newState?.isIgnored && newState?.ignoreType === 'mute'), 'Silenciado', 'Silenciar')
+	updateButtonState(muteBtn, !!(newState?.isIgnored && newState?.ignoreType === 'mute'), 'Ignorado', 'Ignorar', 'fa-user-times', 'fa-user')
 
 	if (data.users[username]?.isIgnored) {
 		setTimeout(() => location.reload(), 300)
@@ -193,9 +197,25 @@ async function toggleIgnore(
 }
 
 /** Update button visual state */
-function updateButtonState(btn: HTMLElement, isActive: boolean, activeLabel: string, inactiveLabel: string): void {
+function updateButtonState(
+	btn: HTMLElement,
+	isActive: boolean,
+	activeLabel: string,
+	inactiveLabel: string,
+	activeIcon?: string,
+	inactiveIcon?: string
+): void {
 	btn.querySelector('span')!.textContent = isActive ? activeLabel : inactiveLabel
 	btn.classList.toggle('mvp-btn-active', isActive)
+	
+	// Update icon if provided
+	if (activeIcon && inactiveIcon) {
+		const iconEl = btn.querySelector('i')
+		if (iconEl) {
+			iconEl.className = `fa ${isActive ? activeIcon : inactiveIcon}`
+		}
+	}
+	
 	;(btn as HTMLAnchorElement).blur()
 }
 

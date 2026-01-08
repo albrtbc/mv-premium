@@ -248,32 +248,57 @@ export function GalleryCarousel({ media, initialIndex = 0, isOpen, onClose }: Ga
 						</Button>
 					</div>
 
-					{/* Thumbnail Strip */}
-					{media.length > 1 && media.length <= 20 && (
-						<div className="flex items-center justify-center gap-1.5 mt-3 overflow-x-auto max-w-full pb-1">
-							{media.map((item, index) => (
-								<button
-									key={item.id}
-									onClick={() => api?.scrollTo(index)}
-									className={`
-                    relative flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all
-                    ${
-											index === currentIndex
-												? 'border-primary ring-2 ring-primary/50'
-												: 'border-white/20 hover:border-white/40'
-										}
-                  `}
-								>
-									<img src={item.thumbnail || item.src} alt="" className="w-full h-full object-cover" />
-									{item.type === 'video' && (
-										<div className="absolute inset-0 flex items-center justify-center bg-black/40">
-											<Play className="w-4 h-4 text-white fill-white" />
-										</div>
-									)}
-								</button>
-							))}
-						</div>
-					)}
+					{/* Thumbnail Strip - windowed for performance */}
+					{media.length > 1 && (() => {
+						// Only render thumbnails near the current index for performance
+						const WINDOW_SIZE = 10; // Show 10 on each side
+						const startIdx = Math.max(0, currentIndex - WINDOW_SIZE);
+						const endIdx = Math.min(media.length, currentIndex + WINDOW_SIZE + 1);
+						const visibleMedia = media.slice(startIdx, endIdx);
+						
+						return (
+							<div className="flex items-center justify-center gap-1.5 mt-3 max-w-full pb-1 px-4">
+								{/* Show "..." if there are images before */}
+								{startIdx > 0 && (
+									<span className="text-white/40 text-xs px-1">...</span>
+								)}
+								
+								{visibleMedia.map((item, idx) => {
+									const realIndex = startIdx + idx;
+									return (
+										<button
+											key={item.id}
+											onClick={() => api?.scrollTo(realIndex)}
+											className={`
+												relative flex-shrink-0 w-10 h-10 rounded overflow-hidden border-2 transition-all
+												${realIndex === currentIndex
+													? 'border-primary ring-2 ring-primary/50 scale-110'
+													: 'border-white/20 hover:border-white/40 opacity-60 hover:opacity-100'
+												}
+											`}
+										>
+											<img src={item.thumbnail || item.src} alt="" className="w-full h-full object-cover" loading="lazy" />
+											{item.type === 'video' && (
+												<div className="absolute inset-0 flex items-center justify-center bg-black/40">
+													<Play className="w-3 h-3 text-white fill-white" />
+												</div>
+											)}
+										</button>
+									);
+								})}
+								
+								{/* Show "..." if there are images after */}
+								{endIdx < media.length && (
+									<span className="text-white/40 text-xs px-1">...</span>
+								)}
+								
+								{/* Counter */}
+								<span className="text-white/50 text-xs ml-2 font-mono">
+									{currentIndex + 1}/{media.length}
+								</span>
+							</div>
+						);
+					})()}
 				</div>
 			</div>
 		</ShadowWrapper>
