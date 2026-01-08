@@ -17,7 +17,7 @@ export default defineConfig({
 			'https://api.imgbb.com/*',
 		],
 		name: 'MV Premium',
-		description: 'Mejoras de calidad de vida para Mediavida',
+		description: 'La experiencia definitiva para Mediavida. Potencia el foro con herramientas modernas, navegación fluida y personalización total.',
 		web_accessible_resources: [
 			{
 				resources: ['icon/*.png', 'assets/*.css'],
