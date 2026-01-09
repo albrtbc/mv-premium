@@ -162,25 +162,21 @@ table.mv-table td a {
 }
 
 /* ============================================================================
-   CODE BLOCK FLASH PREVENTION
-   Hide code until it's highlighted (by hljs OR our Prism highlighter)
+   CODE BLOCK STYLING
+   Apply consistent styles to code blocks highlighted by our Prism highlighter
+   
+   NOTE: Previously we used visibility:hidden to prevent "flash of unstyled code"
+   but this caused code to be permanently invisible if highlighting failed.
+   Now we show code immediately and let highlighting enhance it.
    ============================================================================ */
 
-/* Hide unhighlighted code blocks */
-pre.code code:not(.hljs):not([data-mvp-highlighted="true"]) {
-	visibility: hidden !important;
-}
-
-code[class*='language-']:not(.hljs):not([data-mvp-highlighted="true"]) {
-	visibility: hidden !important;
-}
-
-/* Show highlighted code (hljs or our Prism) */
+/* Ensure highlighted code is visible and styled */
 code.hljs,
 code[data-mvp-highlighted="true"] {
 	visibility: visible !important;
 }
 
+/* Position wrapper for absolute header positioning */
 pre.code:has(code.hljs),
 pre.code:has(code[data-mvp-highlighted="true"]) {
 	position: relative;

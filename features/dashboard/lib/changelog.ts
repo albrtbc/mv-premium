@@ -3,6 +3,8 @@
  * This data is used to inform users about updates via the dashboard and badges.
  */
 
+import { browser } from "#imports"
+
 export interface ChangeEntry {
 	type: 'feature' | 'fix' | 'improvement'
 	description: string
@@ -19,8 +21,8 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
 	{
-		version: '1.0.0',
-		date: '2025-01-05',
+		version: browser.runtime.getManifest().version,
+		date: '2025-01-09',
 		title: 'Lanzamiento Oficial',
 		summary:
 			'La extensión definitiva para potenciar tu experiencia en Mediavida. Diseño moderno, herramientas avanzadas y personalización total.',

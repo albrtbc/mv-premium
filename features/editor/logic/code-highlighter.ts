@@ -164,6 +164,11 @@ export async function highlightCodeBlocks(force = false) {
 			continue
 		}
 
+		// IMPORTANT: Save original content BEFORE any modifications
+		// This allows us to restore if highlighting fails
+		const originalHTML = target.innerHTML
+		const originalText = target.textContent || ''
+
 		try {
 			// Extract specified language BEFORE any modifications
 			const specifiedLang = extractSpecifiedLanguage(target, wrapper)
@@ -181,7 +186,17 @@ export async function highlightCodeBlocks(force = false) {
 			// Extract text content
 			const text = extractCodeText(target, force)
 
-			// Skip if it doesn't look like actual code
+			// Skip if empty - but still mark as processed and ensure visible
+			if (!text.trim()) {
+				target.setAttribute(HIGHLIGHTED_ATTR, 'true')
+				// Restore original content if extraction returned empty
+				if (originalText.trim()) {
+					target.innerHTML = originalHTML
+				}
+				continue
+			}
+
+			// Skip if it doesn't look like actual code - but mark as processed
 			if (!looksLikeCode(text)) {
 				target.setAttribute(HIGHLIGHTED_ATTR, 'true')
 				continue
@@ -196,8 +211,29 @@ export async function highlightCodeBlocks(force = false) {
 				language: detectedLang,
 			})
 
+			// Verify we got valid highlighted code back
+			if (!highlightedCode || !highlightedCode.trim()) {
+				// Fallback: restore original and mark as processed
+				logger.warn('Highlight returned empty, restoring original content', { lang: detectedLang })
+				target.innerHTML = originalHTML
+				target.setAttribute(HIGHLIGHTED_ATTR, 'true')
+				target.classList.add(`language-${detectedLang}`)
+				attachCodeHeader(target, detectedLang, text)
+				continue
+			}
+
 			// Apply highlighting (sanitized to prevent XSS)
-			target.innerHTML = sanitizeHighlightedCode(highlightedCode)
+			const sanitized = sanitizeHighlightedCode(highlightedCode)
+			
+			// Only replace if sanitized result is non-empty
+			if (sanitized.trim()) {
+				target.innerHTML = sanitized
+			} else {
+				// Sanitization returned empty - restore original
+				logger.warn('Sanitization returned empty, restoring original content')
+				target.innerHTML = originalHTML
+			}
+			
 			target.classList.add(`language-${detectedLang}`)
 
 			// Mark as processed
@@ -207,6 +243,10 @@ export async function highlightCodeBlocks(force = false) {
 			attachCodeHeader(target, detectedLang, text)
 		} catch (e) {
 			logger.error('Highlight error:', e)
+			// On error, restore original content and mark as processed
+			// This ensures the code is visible even if highlighting failed
+			target.innerHTML = originalHTML
+			target.setAttribute(HIGHLIGHTED_ATTR, 'true')
 		}
 	}
 }
