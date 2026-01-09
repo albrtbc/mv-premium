@@ -7,7 +7,7 @@ export default defineConfig({
 	imports: false, // Disable auto-imports to avoid duplicated imports warnings
 
 	manifest: {
-		permissions: ['storage', 'scripting', 'activeTab', 'contextMenus'],
+		permissions: ['storage', 'activeTab', 'contextMenus'],
 		host_permissions: [
 			'*://*.mediavida.com/*',
 			'*://store.steampowered.com/*',
