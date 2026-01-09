@@ -121,19 +121,7 @@ function VersionCard({
 					<div className="space-y-1">
 						<CardTitle className="text-lg flex items-center gap-2 flex-wrap">
 							<span className="font-mono">v{entry.version}</span>
-							{isLatest && (
-								<Badge className="text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-500 text-black font-bold">
-									Actual
-								</Badge>
-							)}
 						</CardTitle>
-						<CardDescription className="text-sm">
-							{new Date(entry.date).toLocaleDateString('es-ES', {
-								year: 'numeric',
-								month: 'long',
-								day: 'numeric',
-							})}
-						</CardDescription>
 					</div>
 					<Badge variant="outline" className="text-xs shrink-0">
 						{filteredChanges.length} cambios
