@@ -154,17 +154,19 @@ export function useTextEditor(options: UseTextEditorOptions = {}): UseTextEditor
 	// 3. Action Execution
 	const executeAction = useCallback(
 		(buttonId: string) => {
+			// Handle built-in undo/redo actions FIRST (before checking buttons array)
+			// This ensures they work even if defined in buttons with empty handlers
+			if (buttonId === 'undo') {
+				undo()
+				return
+			}
+			if (buttonId === 'redo') {
+				redo()
+				return
+			}
+
 			const button = buttons.find(b => b.id === buttonId)
 			if (!button) {
-				// Handle built-in actions
-				if (buttonId === 'undo') {
-					undo()
-					return
-				}
-				if (buttonId === 'redo') {
-					redo()
-					return
-				}
 				return
 			}
 

@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useState } from 'react'
 import type { HistoryEntry } from '@/types/editor'
 
 const MAX_HISTORY = 50
@@ -21,6 +21,16 @@ export function useEditorHistory({
 	const redoStackRef = useRef<HistoryEntry[]>([])
 	const lastPushTimeRef = useRef<number>(0)
 
+	// Use state for reactive can undo/redo (refs don't trigger re-renders)
+	const [canUndo, setCanUndo] = useState(false)
+	const [canRedo, setCanRedo] = useState(false)
+
+	// Update UI state after every operation
+	const updateCanStates = useCallback(() => {
+		setCanUndo(historyRef.current.length > 0)
+		setCanRedo(redoStackRef.current.length > 0)
+	}, [])
+
 	const pushHistory = useCallback(
 		(content: string, selectionStart: number, selectionEnd: number) => {
 			const now = Date.now()
@@ -35,6 +45,7 @@ export function useEditorHistory({
 					selectionEnd,
 					timestamp: now,
 				}
+				updateCanStates()
 				return
 			}
 
@@ -60,8 +71,9 @@ export function useEditorHistory({
 			// Clear redo stack on new action
 			redoStackRef.current = []
 			lastPushTimeRef.current = now
+			updateCanStates()
 		},
-		[maxHistory]
+		[maxHistory, updateCanStates]
 	)
 
 	const saveCurrentState = useCallback(() => {
@@ -91,7 +103,8 @@ export function useEditorHistory({
 		// Pop and apply previous state
 		const prevState = history.pop()!
 		updateValue(prevState.content, prevState.selectionStart)
-	}, [getTextarea, getValue, updateValue])
+		updateCanStates()
+	}, [getTextarea, getValue, updateValue, updateCanStates])
 
 	const redo = useCallback(() => {
 		const redoStack = redoStackRef.current
@@ -112,15 +125,16 @@ export function useEditorHistory({
 		// Pop and apply redo state
 		const redoState = redoStack.pop()!
 		updateValue(redoState.content, redoState.selectionStart)
-	}, [getTextarea, getValue, updateValue])
+		updateCanStates()
+	}, [getTextarea, getValue, updateValue, updateCanStates])
 
 	return {
 		pushHistory,
 		saveCurrentState,
 		undo,
 		redo,
-		canUndo: historyRef.current.length > 0,
-		canRedo: redoStackRef.current.length > 0,
+		canUndo,
+		canRedo,
 		historyLength: historyRef.current.length,
 	}
 }
