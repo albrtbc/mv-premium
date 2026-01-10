@@ -33,6 +33,7 @@ import {
 	CommandList,
 } from '@/components/ui/command'
 import { NativeFidIcon } from '@/components/native-fid-icon'
+import { getSubforumName } from '@/lib/subforums'
 import { browser } from 'wxt/browser'
 import { STORAGE_KEYS } from '@/constants'
 
@@ -212,7 +213,7 @@ export function CommandMenu({ open: controlledOpen, onOpenChange: setControlledO
 										<HighlightMatch text={thread.title} query={search} />
 									</span>
 									<span className="text-[10px] text-muted-foreground/60 line-clamp-1 group-hover:text-primary/70 group-data-[selected=true]:text-primary/70 transition-colors">
-										<HighlightMatch text={thread.subforum} query={search} />
+										<HighlightMatch text={getSubforumName(thread.subforumId.replace('/foro/', ''))} query={search} />
 									</span>
 								</div>
 							</CommandItem>

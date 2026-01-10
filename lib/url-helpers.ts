@@ -92,9 +92,17 @@ export function getSubforumInfo(threadId: string): SubforumInfo {
 
 /**
  * Convert a slug to a readable name
- * Example: "off-topic" → "Off Topic"
+ * First tries to find the official name from ALL_SUBFORUMS,
+ * falls back to capitalizing the slug.
+ * Example: "hard-soft" → "Hardware y software"
  */
 export function slugToName(slug: string): string {
+	// Try to find official name
+	const subforum = ALL_SUBFORUMS.find(s => s.slug === slug)
+	if (subforum) {
+		return subforum.name
+	}
+	// Fallback: capitalize slug
 	return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
