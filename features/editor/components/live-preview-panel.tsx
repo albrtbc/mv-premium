@@ -205,7 +205,7 @@ export function LivePreviewPanel({ textarea, onClose }: LivePreviewPanelProps) {
 					}}
 					className="mv-live-preview__scroll"
 				>
-					<MVPreview content={content} className="mv-live-preview__content" fontSize={15} />
+					<MVPreview content={content} className="mv-live-preview__content" fontSize={15} useDirectFetch={false} />
 				</div>
 			</div>
 		</>,

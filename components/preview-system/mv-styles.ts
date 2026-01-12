@@ -480,13 +480,12 @@ ul ul, ol ul, ul ol {
 
 /* Header Image */
 .steam-card-image {
-    flex: 0 0 184px;
-    height: 95px;
-    margin-right: 14px;
+    flex: 0 0 auto;
+    width: 184px;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius, 3px);
     overflow: hidden;
     background: #171a21;
 }
@@ -502,6 +501,7 @@ ul ul, ol ul, ul ol {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    padding-left: 14px;
     padding-right: 80px;
     min-width: 0;
     gap: 2px;

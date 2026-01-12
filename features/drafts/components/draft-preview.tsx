@@ -178,6 +178,7 @@ export function DraftPreview({
 					<MVPreview 
 						content={draft.content} 
 						className="text-sm leading-relaxed"
+						useDirectFetch={false}
 					/>
 				</div>
 			</ScrollArea>
