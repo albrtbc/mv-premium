@@ -186,7 +186,8 @@ function resetCustomizedElements(): void {
 		.forEach(el => el.remove())
 
 	// Reset all customized elements
-	document.querySelectorAll(`[${DOM_MARKERS.DATA_ATTRS.USER_CUSTOMIZED}]`).forEach(el => {
+	// NOTE: Must use 'data-' prefix because elements are marked via dataset.mvpCustomized (which creates data-mvp-customized)
+	document.querySelectorAll(`[data-${DOM_MARKERS.DATA_ATTRS.USER_CUSTOMIZED}]`).forEach(el => {
 		const link = el as HTMLAnchorElement
 
 		// 1. Reset Nickname/Text

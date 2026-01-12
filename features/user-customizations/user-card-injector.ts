@@ -66,7 +66,12 @@ async function injectButtons(card: HTMLElement): Promise<void> {
 	const avatarUrl = avatarImg?.src || ''
 
 	const data = await getUserCustomizations()
-	const userCustomization = data.users[username] || {}
+	
+	// Case-insensitive lookup for existing user customization
+	// The user might be stored as "UserName" but textContent shows "username"
+	const matchingKey = Object.keys(data.users).find(key => key.toLowerCase() === username.toLowerCase())
+	const storageKey = matchingKey || username // Use existing key if found, otherwise use new username
+	const userCustomization = matchingKey ? data.users[matchingKey] : {}
 
 	const controlsContainer = card.querySelector('.user-controls')
 	if (!controlsContainer) return
@@ -107,17 +112,17 @@ async function injectButtons(card: HTMLElement): Promise<void> {
 
 	hideBtn.addEventListener('click', async e => {
 		e.preventDefault()
-		await toggleIgnore(username, avatarUrl, 'hide', hideBtn, muteBtn)
+		await toggleIgnore(storageKey, avatarUrl, 'hide', hideBtn, muteBtn)
 	})
 
 	muteBtn.addEventListener('click', async e => {
 		e.preventDefault()
-		await toggleIgnore(username, avatarUrl, 'mute', hideBtn, muteBtn)
+		await toggleIgnore(storageKey, avatarUrl, 'mute', hideBtn, muteBtn)
 	})
 
 	noteBtn.addEventListener('click', async e => {
 		e.preventDefault()
-		const newNote = await openNoteEditor(username, currentNote, avatarUrl)
+		const newNote = await openNoteEditor(storageKey, currentNote, avatarUrl)
 		if (newNote !== null) {
 			currentNote = newNote
 			updateButtonState(noteBtn, !!currentNote, 'Nota ✓', 'Nota')
@@ -168,27 +173,37 @@ async function toggleIgnore(
 	hideBtn: HTMLElement, muteBtn: HTMLElement
 ): Promise<void> {
 	const data = await getUserCustomizations()
-	const existing = data.users[username] || {}
+	
+	// Case-insensitive lookup to find existing user data
+	const matchingKey = Object.keys(data.users).find(key => key.toLowerCase() === username.toLowerCase())
+	const storageKey = matchingKey || username
+	// Create a COPY of existing data to avoid mutation issues
+	const existing = matchingKey ? { ...data.users[matchingKey] } : {}
 
 	if (existing.isIgnored && existing.ignoreType === type) {
-		delete existing.isIgnored
-		delete existing.ignoreType
-		if (!Object.values(existing).some(v => v !== undefined && v !== '')) {
-			delete data.users[username]
+		// Remove ignore status but preserve other fields
+		const { isIgnored: _, ignoreType: __, ...restOfExisting } = existing
+		
+		// Check if there are any other meaningful values left
+		const hasOtherValues = Object.values(restOfExisting).some(v => v != null && v !== '')
+		
+		if (hasOtherValues) {
+			data.users[storageKey] = restOfExisting
 		} else {
-			data.users[username] = existing
+			delete data.users[storageKey]
 		}
 	} else {
-		data.users[username] = { ...existing, isIgnored: true, ignoreType: type, avatarUrl: avatarUrl || existing.avatarUrl }
+		// Add or update ignore status, preserve all other fields
+		data.users[storageKey] = { ...existing, isIgnored: true, ignoreType: type, avatarUrl: avatarUrl || existing.avatarUrl }
 	}
 
 	await saveUserCustomizations(data)
 
-	const newState = data.users[username]
+	const newState = data.users[storageKey]
 	updateButtonState(hideBtn, !!(newState?.isIgnored && newState?.ignoreType === 'hide'), 'Oculto', 'Ocultar')
 	updateButtonState(muteBtn, !!(newState?.isIgnored && newState?.ignoreType === 'mute'), 'Ignorado', 'Ignorar', 'fa-user-times', 'fa-user')
 
-	if (data.users[username]?.isIgnored) {
+	if (data.users[storageKey]?.isIgnored) {
 		setTimeout(() => location.reload(), 300)
 	} else {
 		// Also reload when removing ignore to restore hidden posts
@@ -225,24 +240,39 @@ async function openNoteEditor(username: string, currentNote: string, avatarUrl: 
 	if (newNote === null) return null
 
 	const data = await getUserCustomizations()
-	const existing = data.users[username] || {}
+	
+	// Case-insensitive lookup to find existing user data
+	const matchingKey = Object.keys(data.users).find(key => key.toLowerCase() === username.toLowerCase())
+	const storageKey = matchingKey || username
+	
+	// Create a COPY of existing data to avoid mutation issues
+	const existing = matchingKey ? { ...data.users[matchingKey] } : {}
+	
 	const trimmed = newNote.trim()
 
 	if (trimmed) {
-		data.users[username] = { ...existing, note: trimmed, avatarUrl: avatarUrl || existing.avatarUrl }
+		// Add or update note, preserve all other fields
+		data.users[storageKey] = { ...existing, note: trimmed, avatarUrl: avatarUrl || existing.avatarUrl }
 	} else {
-		delete existing.note
-		if (!Object.values(existing).some(v => v !== undefined && v !== '')) {
-			delete data.users[username]
+		// Remove note but preserve other fields
+		const { note: _, ...restOfExisting } = existing
+		
+		// Check if there are any other meaningful values left
+		const hasOtherValues = Object.values(restOfExisting).some(v => v != null && v !== '')
+		
+		if (hasOtherValues) {
+			// Keep the entry with other values (badge, color, etc.)
+			data.users[storageKey] = restOfExisting
 		} else {
-			data.users[username] = existing
+			// No other values, remove the entire entry
+			delete data.users[storageKey]
 		}
 	}
 
 	await saveUserCustomizations(data)
 
 	// Update note icons in DOM without page reload
-	updateNoteIconsForUser(username, trimmed)
+	updateNoteIconsForUser(storageKey, trimmed)
 
 	return trimmed
 }
