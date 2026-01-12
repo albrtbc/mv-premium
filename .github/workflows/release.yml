@@ -41,7 +41,7 @@ jobs:
 
       - name: Zip Firefox extension
         run: |
-          cd .output/firefox-mv3
+          cd .output/firefox-mv2
           zip -r ../../mv-premium-firefox-${{ github.ref_name }}.zip .
 
       - name: Create GitHub Release
@@ -51,7 +51,7 @@ jobs:
             mv-premium-chrome-${{ github.ref_name }}.zip
             mv-premium-firefox-${{ github.ref_name }}.zip
           generate_release_notes: true
-          draft: false
+          draft: true
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
