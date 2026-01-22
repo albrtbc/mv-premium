@@ -42,7 +42,7 @@
 		--mv-orange: #fc8f22;
 		--mv-danger: #e02f2f;
 
-		--mvp-bold-color: #c9a227;
+		--mvp-bold-color: inherit;
 	}
 
 	.dark {

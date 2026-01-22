@@ -5,23 +5,35 @@ import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import Settings2 from 'lucide-react/dist/esm/icons/settings-2'
 import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingsSection } from '../../components/settings/settings-section'
 import { SettingRow, ColorPickerWithConfirm } from '../../components/settings'
 import { useSettingsStore } from '@/store/settings-store'
 
 export function ContentTabContent() {
-	const { boldColor, setBoldColor } = useSettingsStore()
+	const { boldColor, boldColorEnabled, setBoldColor, setBoldColorEnabled } = useSettingsStore()
 
 	return (
 		<SettingsSection title="Contenido" description="Funciones para visualizar y organizar contenido en hilos.">
 			{/* Text Styling */}
 			<SettingRow
 				icon={<Sparkles className="h-4 w-4" />}
-				label="Color de negrita"
-				description="Color del texto en negrita en los posts de Mediavida."
+				label="Personalizar color de negrita"
+				description="Usa un color personalizado para el texto en negrita. Desactivado = color nativo de Mediavida."
 			>
-				<ColorPickerWithConfirm value={boldColor} defaultValue="#c9a227" onConfirm={setBoldColor} />
+				<div className="flex items-center gap-3">
+					{boldColorEnabled && (
+						<ColorPickerWithConfirm value={boldColor || '#ffffff'} defaultValue="#ffffff" onConfirm={setBoldColor} />
+					)}
+					<Switch
+						checked={boldColorEnabled}
+						onCheckedChange={checked => {
+							setBoldColorEnabled(checked)
+							toast.success(checked ? 'Color personalizado activado' : 'Color nativo restaurado')
+						}}
+					/>
+				</div>
 			</SettingRow>
 
 			<Separator />

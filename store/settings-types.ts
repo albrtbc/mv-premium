@@ -25,6 +25,7 @@ export interface Settings {
 	// Theme & Appearance
 	theme: ThemeMode
 	boldColor: string
+	boldColorEnabled: boolean
 	codeTheme: string
 
 	// API Keys

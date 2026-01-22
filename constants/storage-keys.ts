@@ -22,6 +22,7 @@ export const STORAGE_KEYS = {
 	// API Keys
 	IMGBB_KEY: 'mvp-imgbb-key',
 	BOLD_COLOR: 'mvp-bold-color',
+	BOLD_COLOR_ENABLED: 'mvp-bold-color-enabled',
 
 	// Features
 	MUTED_WORDS: 'mvp-muted-words',

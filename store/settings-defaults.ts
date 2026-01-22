@@ -12,7 +12,8 @@ import type { Settings } from './settings-types'
 export const DEFAULT_SETTINGS: Settings = {
 	// Theme & Appearance
 	theme: 'dark',
-	boldColor: '#c9a227',
+	boldColor: '',
+	boldColorEnabled: false,
 	codeTheme: 'github-dark',
 
 	// API Keys

@@ -38,6 +38,7 @@ interface SettingsActions {
 	// Theme & Appearance
 	setTheme: (theme: Settings['theme']) => void
 	setBoldColor: (color: string) => void
+	setBoldColorEnabled: (enabled: boolean) => void
 	setCodeTheme: (theme: string) => void
 
 	// API Keys
@@ -154,6 +155,11 @@ export const useSettingsStore = create<SettingsState>()(
 			// Also write to the separate key that content script watches
 			storage.setItem(`local:${STORAGE_KEYS.BOLD_COLOR}`, color)
 		},
+			setBoldColorEnabled: enabled => {
+				set({ boldColorEnabled: enabled })
+				// Also write to separate key for content script
+				storage.setItem(`local:${STORAGE_KEYS.BOLD_COLOR_ENABLED}`, enabled)
+			},
 			setCodeTheme: theme => set({ codeTheme: theme }),
 
 			// API Keys (all persisted via Zustand persist middleware)

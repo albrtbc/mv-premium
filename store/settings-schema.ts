@@ -50,7 +50,8 @@ export type UltrawideMode = z.infer<typeof ultrawideSchema>
 export const settingsSchema = z.object({
 	// Theme & Appearance
 	theme: z.enum(['light', 'dark', 'system']).default('dark'),
-	boldColor: hexColorSchema.default('#c9a227'),
+	boldColor: hexColorSchema.default(''),
+	boldColorEnabled: z.boolean().default(false),
 	codeTheme: z.string().default('github-dark'),
 
 	// API Keys

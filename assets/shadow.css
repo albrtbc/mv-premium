@@ -77,7 +77,7 @@
 	--mv-danger: #e02f2f;
 
 	/* --- Extension-specific --- */
-	--mvp-bold-color: #c9a227;
+	--mvp-bold-color: inherit;
 
 	/* --- Table tokens (defaults, overridden by theme system) --- */
 	--table-header: #f4f4f5;
