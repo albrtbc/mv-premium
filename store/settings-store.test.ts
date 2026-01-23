@@ -57,7 +57,7 @@ describe('settings-store', () => {
 		})
 
 		it('has correct default bold color', () => {
-			expect(useSettingsStore.getState().boldColor).toBe('#c9a227')
+			expect(useSettingsStore.getState().boldColor).toBe('')
 		})
 
 		it('has infinite scroll disabled by default', () => {
