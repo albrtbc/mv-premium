@@ -84,19 +84,19 @@ function executeAction(actionId: string) {
 
 		// Appearance
 		case 'theme-toggle':
-			// Use lazy import to avoid circular dependencies
-			import('@/lib/theme-utils').then(({ isMVDarkMode }) => {
-				const isDark = isMVDarkMode()
-				const nextTheme = isDark ? 'light' : 'dark'
+			// Read current theme from storage and toggle it
+			browser.storage.local.get(STORAGE_KEYS.THEME).then(result => {
+				const currentTheme = result[STORAGE_KEYS.THEME] || 'dark'
+				const nextTheme = currentTheme === 'dark' ? 'light' : 'dark'
 
-				// Persist
+				// Persist - the storage listener will apply the change
 				browser.storage.local
 					.set({
 						[STORAGE_KEYS.THEME]: nextTheme,
 						[STORAGE_KEYS.THEME_RAW]: nextTheme,
 					})
 					.catch(err => logger.error('Theme toggle storage error:', err))
-			})
+			}).catch(err => logger.error('Theme toggle read error:', err))
 			break
 	}
 }
