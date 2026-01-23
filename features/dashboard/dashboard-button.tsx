@@ -10,9 +10,35 @@ import { sendMessage } from '@/lib/messaging'
 import { hasUnseenChanges, watchVersionChanges } from './lib/whats-new-storage'
 import { browser } from 'wxt/browser'
 import { DOM_MARKERS, MV_SELECTORS } from '@/constants'
+import { getSettings } from '@/store/settings-store'
+import type { DashboardIcon } from '@/store/settings-types'
 
 const INJECTED_MARKER = DOM_MARKERS.CLASSES.DASHBOARD_INJECTED
 const BADGE_ID = DOM_MARKERS.IDS.WHATS_NEW_BADGE
+
+/**
+ * Returns the HTML for the dashboard icon based on user preference.
+ * @param iconType - The icon type from settings
+ * @returns HTML string for the icon
+ */
+function getDashboardIconHTML(iconType: DashboardIcon): string {
+	const iconStyles = 'font-size: 18px; vertical-align: middle; transition: all 0.2s ease-in-out;'
+	
+	switch (iconType) {
+		case 'user-shield':
+			return `<i class="fa fa-shield mv-dashboard-icon" style="${iconStyles}"></i>`
+		case 'dashboard':
+			return `<i class="fa fa-th-large mv-dashboard-icon" style="${iconStyles}"></i>`
+		case 'rocket':
+			return `<i class="fa fa-rocket mv-dashboard-icon" style="${iconStyles}"></i>`
+		case 'gears':
+			return `<i class="fa fa-cogs mv-dashboard-icon" style="${iconStyles}"></i>`
+		case 'logo':
+		default:
+			const iconUrl = browser.runtime.getURL('/icon/48.png')
+			return `<img src="${iconUrl}" class="mv-dashboard-logo" style="width: 20px; height: 20px; vertical-align: middle; transition: all 0.2s ease-in-out; filter: drop-shadow(0 0 0 rgba(255,165,0,0));" />`
+	}
+}
 
 /** Unified badge styles */
 const BADGE_STYLES = `
@@ -68,6 +94,10 @@ export async function injectDashboardButton(): Promise<void> {
 
 	// Check if there are unseen changes
 	const hasUnseen = await hasUnseenChanges()
+	
+	// Get user's preferred icon
+	const settings = await getSettings()
+	const iconType = settings.dashboardIcon || 'logo'
 
 	// Create the button container (matching native navbar style)
 	const li = document.createElement('li')
@@ -82,18 +112,15 @@ export async function injectDashboardButton(): Promise<void> {
 	button.setAttribute('aria-label', 'Abrir panel de MVPremium')
 	button.style.position = 'relative'
 
-	const iconUrl = browser.runtime.getURL('/icon/48.png')
+	const iconHTML = getDashboardIconHTML(iconType)
 	button.innerHTML = `
-		<img src="${iconUrl}" 
-			class="mv-dashboard-logo"
-			style="width: 20px; height: 20px; vertical-align: middle; transition: all 0.2s ease-in-out; filter: drop-shadow(0 0 0 rgba(255,165,0,0));" 
-		/>
+		${iconHTML}
 		<span class="title">Dashboard</span>
 		${hasUnseen ? `<span id="${BADGE_ID}" style="${BADGE_STYLES}">NEW</span>` : ''}
 		<style>
-			.flink:hover .mv-dashboard-logo {
-				filter: brightness(1.2) drop-shadow(0 0 4px rgba(255, 180, 0, 0.6)) !important;
-				transform: scale(1.1);
+			.flink:hover .mv-dashboard-logo,
+			.flink:hover .mv-dashboard-icon {
+				opacity: 0.8;
 			}
 			@keyframes badge-pulse {
 				0%, 100% { opacity: 1; transform: scale(1); }

@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	boldColor: '',
 	boldColorEnabled: false,
 	codeTheme: 'github-dark',
+	dashboardIcon: 'logo',
 
 	// API Keys
 	imgbbApiKey: '',

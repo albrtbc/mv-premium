@@ -1,8 +1,12 @@
 /**
- * Content Tab Content - Bold color + page width settings
+ * Content Tab Content - Bold color + page width settings + dashboard icon
  */
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import Settings2 from 'lucide-react/dist/esm/icons/settings-2'
+import LayoutDashboard from 'lucide-react/dist/esm/icons/layout-dashboard'
+import Shield from 'lucide-react/dist/esm/icons/shield'
+import Rocket from 'lucide-react/dist/esm/icons/rocket'
+import Cog from 'lucide-react/dist/esm/icons/cog'
 import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
@@ -10,9 +14,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SettingsSection } from '../../components/settings/settings-section'
 import { SettingRow, ColorPickerWithConfirm } from '../../components/settings'
 import { useSettingsStore } from '@/store/settings-store'
+import type { DashboardIcon } from '@/store/settings-types'
+import { browser } from 'wxt/browser'
+
+const logoUrl = browser.runtime.getURL('/icon/48.png')
+
+const DASHBOARD_ICON_OPTIONS: { value: DashboardIcon; label: string; icon: React.ReactNode }[] = [
+	{ value: 'logo', label: 'Logo MV Premium', icon: <img src={logoUrl} alt="Logo" className="h-4 w-4" /> },
+	{ value: 'user-shield', label: 'Escudo', icon: <Shield className="h-4 w-4" /> },
+	{ value: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+	{ value: 'rocket', label: 'Cohete', icon: <Rocket className="h-4 w-4" /> },
+	{ value: 'gears', label: 'Engranajes', icon: <Cog className="h-4 w-4" /> },
+]
 
 export function ContentTabContent() {
-	const { boldColor, boldColorEnabled, setBoldColor, setBoldColorEnabled } = useSettingsStore()
+	const { boldColor, boldColorEnabled, setBoldColor, setBoldColorEnabled, dashboardIcon, setSetting } =
+		useSettingsStore()
 
 	return (
 		<SettingsSection title="Contenido" description="Funciones para visualizar y organizar contenido en hilos.">
@@ -34,6 +51,37 @@ export function ContentTabContent() {
 						}}
 					/>
 				</div>
+			</SettingRow>
+
+			<Separator />
+
+			{/* Dashboard Icon Selection */}
+			<SettingRow
+				icon={<LayoutDashboard className="h-4 w-4" />}
+				label="Icono del Dashboard"
+				description="Elige el icono que aparece en el navbar de Mediavida para acceder al panel."
+			>
+				<Select
+					value={dashboardIcon || 'logo'}
+					onValueChange={val => {
+						setSetting('dashboardIcon', val as DashboardIcon)
+						toast.success('Icono actualizado. Recarga Mediavida para ver el cambio.')
+					}}
+				>
+					<SelectTrigger className="w-[180px]">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{DASHBOARD_ICON_OPTIONS.map(opt => (
+							<SelectItem key={opt.value} value={opt.value}>
+								<span className="flex items-center gap-2">
+									{opt.icon}
+									{opt.label}
+								</span>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</SettingRow>
 
 			<Separator />

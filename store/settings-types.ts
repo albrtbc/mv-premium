@@ -20,6 +20,9 @@ export type AIModel = 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flas
 /** Ultrawide mode levels */
 export type UltrawideMode = 'off' | 'wide' | 'extra-wide' | 'full'
 
+/** Dashboard icon options */
+export type DashboardIcon = 'logo' | 'user-shield' | 'dashboard' | 'rocket' | 'gears'
+
 /** Full settings object type */
 export interface Settings {
 	// Theme & Appearance
@@ -27,6 +30,7 @@ export interface Settings {
 	boldColor: string
 	boldColorEnabled: boolean
 	codeTheme: string
+	dashboardIcon: DashboardIcon
 
 	// API Keys
 	imgbbApiKey: string

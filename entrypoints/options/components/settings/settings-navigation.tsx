@@ -100,7 +100,7 @@ export function SettingsNavigation() {
 			<SettingRow
 				icon={<Images className="h-4 w-4" />}
 				label="Botón de galería"
-				description="Muestra el botón para ver todas las imágenes del hilo en una galería."
+				description="Muestra el botón para ver todas las imágenes de cada página del hilo en una galería."
 			>
 				<Switch
 					checked={galleryButtonEnabled}
