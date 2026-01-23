@@ -133,7 +133,9 @@ function detectTotalPages(): number {
 
 async function fetchPage(pageNum: number): Promise<Document | null> {
 	const baseUrl = getBaseUrl()
-	const url = pageNum === 1 ? baseUrl : `${baseUrl}/${pageNum}`
+	const relativePath = pageNum === 1 ? baseUrl : `${baseUrl}/${pageNum}`
+	// Firefox extensions require absolute URLs for fetch
+	const url = relativePath.startsWith('/') ? `${window.location.origin}${relativePath}` : relativePath
 
 	try {
 		const response = await fetch(url, {
