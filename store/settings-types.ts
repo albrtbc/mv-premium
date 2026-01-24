@@ -46,6 +46,7 @@ export interface Settings {
 
 	// Feature Toggles - Navigation
 	infiniteScrollEnabled: boolean
+	autoInfiniteScrollEnabled: boolean
 	liveThreadEnabled: boolean
 	galleryButtonEnabled: boolean
 	nativeLiveDelayEnabled: boolean

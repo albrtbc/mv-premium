@@ -3,6 +3,7 @@
  */
 import HelpCircle from 'lucide-react/dist/esm/icons/help-circle'
 import InfinityIcon from 'lucide-react/dist/esm/icons/infinity'
+import Zap from 'lucide-react/dist/esm/icons/zap'
 import Radio from 'lucide-react/dist/esm/icons/radio'
 import Images from 'lucide-react/dist/esm/icons/images'
 import Clock from 'lucide-react/dist/esm/icons/clock'
@@ -19,6 +20,7 @@ export function SettingsNavigation() {
 	const {
 		infiniteScrollEnabled,
 		setInfiniteScrollEnabled,
+		autoInfiniteScrollEnabled,
 		liveThreadEnabled,
 		setLiveThreadEnabled,
 		galleryButtonEnabled,
@@ -68,6 +70,10 @@ export function SettingsNavigation() {
 					checked={infiniteScrollEnabled}
 					onCheckedChange={(checked) => {
 						setInfiniteScrollEnabled(checked)
+						// Si se desactiva, también desactivar auto-activación
+						if (!checked) {
+							setSetting('autoInfiniteScrollEnabled', false)
+						}
 						reloadMediavidaTabs()
 						toast.success(
 							checked ? 'Scroll infinito activado' : 'Configuración guardada'
@@ -75,6 +81,28 @@ export function SettingsNavigation() {
 					}}
 				/>
 			</SettingRow>
+
+			{infiniteScrollEnabled && (
+				<SettingRow
+					icon={<Zap className="h-4 w-4" />}
+					label="Activar automáticamente"
+					description="El scroll infinito se activa automáticamente al entrar en un hilo (excepto en hilos LIVE)."
+					className="ml-6 border-l-2 border-primary/30 pl-4"
+				>
+					<Switch
+						checked={autoInfiniteScrollEnabled}
+						onCheckedChange={(checked) => {
+							setSetting('autoInfiniteScrollEnabled', checked)
+							reloadMediavidaTabs()
+							toast.success(
+								checked
+									? 'Auto-activación de scroll infinito activada'
+									: 'Configuración guardada'
+							)
+						}}
+					/>
+				</SettingRow>
+			)}
 
 			<Separator />
 

@@ -6,6 +6,7 @@ import SquareX from 'lucide-react/dist/esm/icons/square-x'
 interface InfiniteScrollButtonProps {
 	isActive: boolean
 	isDisabled: boolean
+	isAutoMode: boolean
 	onActivate: () => void
 	onDeactivate: () => void
 	currentPage?: number
@@ -21,6 +22,7 @@ interface InfiniteScrollButtonProps {
 export function InfiniteScrollButton({
 	isActive,
 	isDisabled,
+	isAutoMode,
 	onActivate,
 	onDeactivate,
 	currentPage,
@@ -47,22 +49,29 @@ export function InfiniteScrollButton({
 	const disabledStyles = 'opacity-40 cursor-not-allowed grayscale'
 
 	if (isActive) {
+		const isExitDisabled = isAutoMode
 		return (
 			<button
-				onClick={onDeactivate}
+				onClick={isExitDisabled ? undefined : onDeactivate}
+				disabled={isExitDisabled}
 				className={cn(
 					baseStyles,
-					'cursor-pointer',
 					'bg-[color-mix(in_srgb,var(--primary)12%,var(--card))]',
 					'border-[color-mix(in_srgb,var(--primary)45%,transparent)]',
 					'text-primary',
-					'hover:bg-[color-mix(in_srgb,var(--primary)18%,var(--card))]',
 					// Light mode active state: slightly more punchy/recessed
 					'[:root:not(.dark)_&]:bg-[color-mix(in_srgb,var(--primary)8%,#ffffff)]',
 					'[:root:not(.dark)_&]:border-[color-mix(in_srgb,var(--primary)60%,transparent)]',
-					'[:root:not(.dark)_&]:shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]'
+					'[:root:not(.dark)_&]:shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]',
+					isExitDisabled
+						? disabledStyles
+						: 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--primary)18%,var(--card))]'
 				)}
-				title={`Salir de Scroll Infinito (página ${currentPage}/${totalPages})`}
+				title={
+					isExitDisabled
+						? 'Auto-activación habilitada (desactívala en ajustes)'
+						: `Salir de Scroll Infinito (página ${currentPage}/${totalPages})`
+				}
 				aria-label="Salir de Scroll Infinito"
 			>
 				<SquareX className="h-4 w-4 stroke-[2.5px]" />

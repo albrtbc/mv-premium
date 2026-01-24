@@ -22,7 +22,7 @@ import {
 	isFeatureMounted,
 	updateFeature,
 } from '@/lib/content-modules/utils/react-helpers'
-import { isThreadPage } from '@/lib/content-modules/utils/page-detection'
+import { isThreadPage, isNativeLiveThreadPage } from '@/lib/content-modules/utils/page-detection'
 import { MV_SELECTORS, FEATURE_IDS, DEBOUNCE, INTERSECTION } from '@/constants'
 import { DOM_MARKERS } from '@/constants/dom-markers'
 import { getStatusActionsRow } from '@/lib/content-modules/utils/extra-actions-row'
@@ -52,6 +52,7 @@ let visiblePage = 1
 let isLoading = false
 let isScrollActive = false
 let isLiveModeActive = false
+let isAutoMode = false
 let observer: IntersectionObserver | null = null
 let topObserver: IntersectionObserver | null = null
 let scrollTimeout: ReturnType<typeof setTimeout> | null = null
@@ -569,6 +570,7 @@ function getButtonElement() {
 			<InfiniteScrollButton
 				isActive={isScrollActive}
 				isDisabled={isLiveModeActive}
+				isAutoMode={isAutoMode}
 				onActivate={startInfiniteScroll}
 				onDeactivate={stopInfiniteScroll}
 				currentPage={visiblePage}
@@ -783,8 +785,17 @@ export async function injectInfiniteScroll(_ctx?: unknown): Promise<void> {
 		statusRow.appendChild(container)
 	}
 
+	// Set auto mode based on settings (affects button disabled state)
+	isAutoMode = settings.autoInfiniteScrollEnabled === true && !isNativeLiveThreadPage()
+
 	setupModeExclusionListeners()
 	mountFeature(BUTTON_FEATURE_ID, container, getButtonElement())
+
+	// Auto-activate if auto mode is enabled
+	if (isAutoMode) {
+		logger.debug('InfiniteScroll: auto-activating (autoInfiniteScrollEnabled=true)')
+		startInfiniteScroll()
+	}
 }
 
 // =============================================================================
