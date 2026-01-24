@@ -140,22 +140,30 @@ export function DistributedEditorToolbar({ textarea, toolbarContainer }: Distrib
 			const clipboardData = e.clipboardData
 			if (!clipboardData) return
 
-			// Extract image files from clipboard
-			const imageFiles: File[] = []
+			// Helper to check if a string contains an image URL
+			const IMAGE_URL_REGEX = /https?:\/\/[^\s"'<>]+\.(jpg|jpeg|png|gif)(\?[^\s"'<>]*)?/i
 
-			// Method 1: Check clipboardData.files (files copied from Explorer/Finder)
-			if (clipboardData.files && clipboardData.files.length > 0) {
-				for (const file of Array.from(clipboardData.files)) {
-					if (file.type.startsWith('image/')) {
-						imageFiles.push(file)
-					}
-				}
+			// Check ALL possible sources for image URLs - if found, don't intercept
+			// This handles: pasted URLs, copied images from web, etc.
+			const textPlain = clipboardData.getData('text/plain')
+			const textHtml = clipboardData.getData('text/html')
+			const textUriList = clipboardData.getData('text/uri-list')
+
+			const hasImageUrl =
+				IMAGE_URL_REGEX.test(textPlain) || IMAGE_URL_REGEX.test(textHtml) || IMAGE_URL_REGEX.test(textUriList)
+
+			if (hasImageUrl) {
+				return // Let native paste + autotag system handle it
 			}
 
-			// Method 2: Check clipboardData.items (screenshots, images from editors)
-			if (imageFiles.length === 0 && clipboardData.items) {
+			// Only process if this is a pure local image (screenshot, file from disk)
+			// with NO associated URL in the clipboard
+			const imageFiles: File[] = []
+
+			// Check clipboardData.items for image files (screenshots, copied files)
+			if (clipboardData.items) {
 				for (const item of Array.from(clipboardData.items)) {
-					if (item.type.startsWith('image/')) {
+					if (item.type.startsWith('image/') && item.kind === 'file') {
 						const file = item.getAsFile()
 						if (file) {
 							imageFiles.push(file)
@@ -164,7 +172,7 @@ export function DistributedEditorToolbar({ textarea, toolbarContainer }: Distrib
 				}
 			}
 
-			// If we found images, upload them
+			// If we found local images (no URL), upload them
 			if (imageFiles.length > 0) {
 				e.preventDefault()
 				setShowDropzone(true)
