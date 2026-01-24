@@ -215,6 +215,53 @@ export function DraftEditorView({ docType = 'draft' }: DraftEditorViewProps) {
 	// Drag & Drop handlers
 	const handleDragLeave = useCallback((e: React.DragEvent) => upload.handleDragLeave(e, editorContainerRef), [upload])
 
+	// Combined paste handler: images from clipboard + URL auto-tagging
+	const handlePaste = useCallback(
+		async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+			if (upload.isUploading) return
+
+			const clipboardData = e.clipboardData
+			if (!clipboardData) return
+
+			// Extract image files from clipboard
+			const imageFiles: File[] = []
+
+			// Method 1: Check clipboardData.files (files copied from Explorer/Finder)
+			if (clipboardData.files && clipboardData.files.length > 0) {
+				for (const file of Array.from(clipboardData.files)) {
+					if (file.type.startsWith('image/')) {
+						imageFiles.push(file)
+					}
+				}
+			}
+
+			// Method 2: Check clipboardData.items (screenshots, images from editors)
+			if (imageFiles.length === 0 && clipboardData.items) {
+				for (const item of Array.from(clipboardData.items)) {
+					if (item.type.startsWith('image/')) {
+						const file = item.getAsFile()
+						if (file) {
+							imageFiles.push(file)
+						}
+					}
+				}
+			}
+
+			// If we found images, upload them
+			if (imageFiles.length > 0) {
+				e.preventDefault()
+				dialogs.open('dropzone')
+				await new Promise(resolve => setTimeout(resolve, 50))
+				await upload.handleFilesSelect(imageFiles)
+				return
+			}
+
+			// No images found, delegate to URL handler
+			handlers.handlePaste(e)
+		},
+		[upload, dialogs, handlers]
+	)
+
 	// Copy handler
 	const handleCopy = async () => {
 		if (!content.trim()) return
@@ -457,7 +504,7 @@ export function DraftEditorView({ docType = 'draft' }: DraftEditorViewProps) {
 									lastTypedValueRef.current = target.value
 									form.setValue('content', target.value, { shouldDirty: true })
 								}}
-								onPaste={handlers.handlePaste}
+								onPaste={handlePaste}
 								onClick={() => {
 									checkActiveFormats()
 									setIsTableAtCursor(handlers.checkTableAtCursor())

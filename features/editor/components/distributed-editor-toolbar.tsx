@@ -132,6 +132,52 @@ export function DistributedEditorToolbar({ textarea, toolbarContainer }: Distrib
 		return () => document.removeEventListener('dragenter', handleGlobalDragEnter)
 	}, [imageUpload.isUploading])
 
+	// Clipboard paste listener for images (Ctrl+V with screenshots or copied files)
+	useEffect(() => {
+		const handlePaste = async (e: ClipboardEvent) => {
+			if (imageUpload.isUploading) return
+
+			const clipboardData = e.clipboardData
+			if (!clipboardData) return
+
+			// Extract image files from clipboard
+			const imageFiles: File[] = []
+
+			// Method 1: Check clipboardData.files (files copied from Explorer/Finder)
+			if (clipboardData.files && clipboardData.files.length > 0) {
+				for (const file of Array.from(clipboardData.files)) {
+					if (file.type.startsWith('image/')) {
+						imageFiles.push(file)
+					}
+				}
+			}
+
+			// Method 2: Check clipboardData.items (screenshots, images from editors)
+			if (imageFiles.length === 0 && clipboardData.items) {
+				for (const item of Array.from(clipboardData.items)) {
+					if (item.type.startsWith('image/')) {
+						const file = item.getAsFile()
+						if (file) {
+							imageFiles.push(file)
+						}
+					}
+				}
+			}
+
+			// If we found images, upload them
+			if (imageFiles.length > 0) {
+				e.preventDefault()
+				setShowDropzone(true)
+				await new Promise(resolve => setTimeout(resolve, 50))
+				await imageUpload.uploadFiles(imageFiles)
+				setShowDropzone(false)
+			}
+		}
+
+		textarea.addEventListener('paste', handlePaste)
+		return () => textarea.removeEventListener('paste', handlePaste)
+	}, [textarea, imageUpload])
+
 	// Table detection
 	useEffect(() => {
 		const checkTableAtCursor = () => {
