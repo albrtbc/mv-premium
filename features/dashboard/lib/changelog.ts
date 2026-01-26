@@ -21,7 +21,51 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
 	{
-		version: browser.runtime.getManifest().version,
+		version: '1.2.0',
+		date: '2025-01-26',
+		title: 'Mejoras en el Editor',
+		summary:
+			'Nuevas formas de subir imágenes, mejoras en el scroll infinito y más opciones de personalización.',
+		changes: [
+			{
+				type: 'feature',
+				description: 'Copia cualquier imagen de tu ordenador o haz una captura de pantalla y pégala directamente en el editor (Ctrl+V) para subirla.',
+				category: 'Editor',
+			},
+			{
+				type: 'feature',
+				description: 'El scroll infinito ahora puede activarse automáticamente al entrar en un hilo.',
+				category: 'Navegación',
+			},
+			{
+				type: 'feature',
+				description: 'Los enlaces de YouTube Shorts se convierten automáticamente al formato estándar y se insertan con el auto-tag de media.',
+				category: 'Editor',
+			},
+			{
+				type: 'feature',
+				description: 'Personaliza el icono del dashboard en la barra de navegación.',
+				category: 'Diseño',
+			},
+			{
+				type: 'fix',
+				description: 'El color del texto en negrita ahora se aplica correctamente.',
+				category: 'Diseño',
+			},
+			{
+				type: 'fix',
+				description: 'Giphy y TMDB vuelven a funcionar correctamente (solucionado problema con las API keys).',
+				category: 'Multimedia',
+			},
+			{
+				type: 'fix',
+				description: 'Mejorada la compatibilidad del scroll infinito con Firefox.',
+				category: 'Navegación',
+			},
+		],
+	},
+	{
+		version: '1.1.0',
 		date: '2025-01-09',
 		title: 'Lanzamiento Oficial',
 		summary:
