@@ -111,6 +111,29 @@ describe('media-detector', () => {
 			})
 		})
 
+		describe('Reddit', () => {
+			it('should detect Reddit post URLs', () => {
+				expect(isMediaUrl('https://www.reddit.com/r/gaming/comments/abc123/post_title')).toBe(true)
+				expect(isMediaUrl('https://reddit.com/r/gaming/comments/abc123/post_title')).toBe(true)
+			})
+
+			it('should detect old.reddit.com URLs', () => {
+				expect(isMediaUrl('https://old.reddit.com/r/gaming/comments/abc123/post_title')).toBe(true)
+			})
+
+			it('should detect new.reddit.com URLs', () => {
+				expect(isMediaUrl('https://new.reddit.com/r/gaming/comments/abc123/post_title')).toBe(true)
+			})
+
+			it('should detect redd.it short URLs', () => {
+				expect(isMediaUrl('https://redd.it/abc123')).toBe(true)
+			})
+
+			it('should detect Reddit URLs without trailing title', () => {
+				expect(isMediaUrl('https://www.reddit.com/r/gaming/comments/abc123')).toBe(true)
+			})
+		})
+
 		describe('edge cases', () => {
 			it('should return false for non-media URLs', () => {
 				expect(isMediaUrl('https://example.com')).toBe(false)
@@ -144,6 +167,11 @@ describe('media-detector', () => {
 
 		it('should return spotify for Spotify URLs', () => {
 			expect(getMediaType('https://open.spotify.com/track/abc')).toBe('spotify')
+		})
+
+		it('should return reddit for Reddit URLs', () => {
+			expect(getMediaType('https://www.reddit.com/r/gaming/comments/abc123/title')).toBe('reddit')
+			expect(getMediaType('https://redd.it/abc123')).toBe('reddit')
 		})
 
 		it('should return null for non-media URLs', () => {
