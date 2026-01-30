@@ -11,6 +11,7 @@ import Layout from 'lucide-react/dist/esm/icons/layout'
 import List from 'lucide-react/dist/esm/icons/list'
 import FolderHeart from 'lucide-react/dist/esm/icons/folder-heart'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
+import Search from 'lucide-react/dist/esm/icons/search'
 import { browser } from 'wxt/browser'
 import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
@@ -22,6 +23,7 @@ import { useSettingsStore } from '@/store/settings-store'
 export function FeaturesContent() {
 	const {
 		setSetting,
+		navbarSearchEnabled,
 		cinemaButtonEnabled,
 		gifPickerEnabled,
 		draftsButtonEnabled,
@@ -50,6 +52,7 @@ export function FeaturesContent() {
 	const withToastAndReload =
 		(
 			key:
+				| 'navbarSearchEnabled'
 				| 'cinemaButtonEnabled'
 				| 'gifPickerEnabled'
 				| 'draftsButtonEnabled'
@@ -78,6 +81,22 @@ export function FeaturesContent() {
 
 	return (
 		<SettingsSection title="Funcionalidades" description="Activa o desactiva las características de la extensión.">
+			{/* Navigation Section */}
+			<div className="space-y-1 mb-4">
+				<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Navegación</h3>
+				<p className="text-xs text-muted-foreground">Estos cambios requieren recargar las pestañas de Mediavida.</p>
+			</div>
+
+			<SettingRow
+				icon={<Search className="h-4 w-4" />}
+				label="Super Buscador en Navbar"
+				description="Reemplaza el buscador nativo de Mediavida con el Super Buscador. Si lo desactivas, el buscador nativo se mostrará pero Ctrl+K seguirá funcionando."
+			>
+				<Switch checked={navbarSearchEnabled} onCheckedChange={withToastAndReload('navbarSearchEnabled', true)} />
+			</SettingRow>
+
+			<Separator className="my-6" />
+
 			{/* Editor Section */}
 			<div className="space-y-1 mb-4">
 				<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Editor</h3>

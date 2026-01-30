@@ -10,6 +10,7 @@
  */
 
 import { DOM_MARKERS, FEATURE_IDS, MV_SELECTORS } from '@/constants'
+import { getSettings } from '@/store/settings-store'
 
 const FEATURE_ID = FEATURE_IDS.COMMAND_MENU
 const CONTAINER_ID = DOM_MARKERS.IDS.COMMAND_MENU
@@ -82,7 +83,7 @@ async function openCommandMenu(): Promise<void> {
  * Main entry point for the Command Menu.
  * Sets up lightweight global listeners for keyboard shortcuts and external triggers.
  */
-export function injectCommandMenu(): void {
+export async function injectCommandMenu(): Promise<void> {
 	if (initialized) return
 	initialized = true
 
@@ -104,8 +105,13 @@ export function injectCommandMenu(): void {
 
 	window.addEventListener(EVENT_TRIGGER, triggerHandler)
 
-	// 3. Replace native search with our trigger button
-	injectHeaderSearchTrigger()
+	// 3. Replace native search with our trigger button (only if enabled)
+	const settings = await getSettings()
+	const navbarSearchEnabled = settings.navbarSearchEnabled ?? true
+
+	if (navbarSearchEnabled) {
+		injectHeaderSearchTrigger()
+	}
 }
 
 /**

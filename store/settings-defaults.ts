@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	liveThreadEnabled: false,
 	nativeLiveDelayEnabled: true,
 	galleryButtonEnabled: true,
+	navbarSearchEnabled: true,
 
 	// Feature Toggles - Editor
 	cinemaButtonEnabled: true,

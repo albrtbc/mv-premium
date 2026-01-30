@@ -50,6 +50,7 @@ export interface Settings {
 	liveThreadEnabled: boolean
 	galleryButtonEnabled: boolean
 	nativeLiveDelayEnabled: boolean
+	navbarSearchEnabled: boolean
 
 	// Feature Toggles - Editor
 	cinemaButtonEnabled: boolean
