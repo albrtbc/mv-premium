@@ -100,6 +100,12 @@ function getCurrentPageNumber(): number {
 	return 1
 }
 
+function getCurrentThreadId(): string | null {
+	// Extract thread ID from URL: /foro/category/thread-title-123 or /foro/category/thread-title-123/2
+	const urlMatch = window.location.pathname.match(/\/foro\/[^/]+\/(?:[^/]*-)?(\d+)(?:\/\d+)?$/)
+	return urlMatch?.[1] || null
+}
+
 function detectTotalPages(): number {
 	const bottomProgress = document.querySelector(MV_SELECTORS.THREAD.BOTTOM_PROGRESS)
 	if (bottomProgress) {
@@ -209,6 +215,9 @@ async function injectPosts(posts: Element[], pageNum: number): Promise<void> {
 		</ShadowWrapper>
 	)
 
+	// Get current thread ID from URL for fixing like button handlers
+	const currentThreadId = getCurrentThreadId()
+
 	// Insert posts
 	posts.forEach(post => {
 		const clonedPost = post.cloneNode(true) as HTMLElement
@@ -216,6 +225,24 @@ async function injectPosts(posts: Element[], pageNum: number): Promise<void> {
 		clonedPost.setAttribute('data-mv-page', String(pageNum))
 		clonedPost.style.contentVisibility = 'auto'
 		clonedPost.style.containIntrinsicSize = 'auto 300px'
+
+		// Fix like buttons - store href in data attribute and remove href to prevent navigation
+		// The click will be handled by event delegation
+		const likeButtons = clonedPost.querySelectorAll<HTMLAnchorElement>('a.btnmola[href]')
+		likeButtons.forEach(btn => {
+			let href = btn.getAttribute('href')
+			if (href) {
+				// Fix thread ID if needed
+				if (currentThreadId) {
+					href = href.replace(/tid=\d+/, `tid=${currentThreadId}`)
+				}
+				// Store original href and prevent navigation
+				btn.setAttribute('data-mvp-likes-href', href)
+				btn.removeAttribute('href')
+				btn.style.cursor = 'pointer'
+			}
+		})
+
 		pageBlockContainer.appendChild(clonedPost)
 	})
 
@@ -622,6 +649,110 @@ function showSidePages(): void {
 }
 
 // =============================================================================
+// LIKE BUTTON DELEGATION
+// =============================================================================
+
+let likeButtonDelegationSetup = false
+
+/**
+ * Shows a simple modal with the likes content
+ */
+function showLikesModal(html: string): void {
+	// Remove existing modal if any
+	const existing = document.getElementById('mvp-likes-modal')
+	if (existing) existing.remove()
+
+	// Create modal with styling similar to native Mediavida modal
+	const modal = document.createElement('div')
+	modal.id = 'mvp-likes-modal'
+	modal.innerHTML = `
+		<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;">
+			<div style="background:#2d2d2d;border-radius:8px;max-width:500px;width:90%;max-height:80vh;overflow:auto;position:relative;box-shadow:0 4px 20px rgba(0,0,0,0.5);">
+				<button id="mvp-likes-modal-close" style="position:absolute;top:12px;right:12px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;padding:4px 8px;line-height:1;">&times;</button>
+				<div style="padding:20px 24px;" class="mvp-likes-content">${html}</div>
+			</div>
+		</div>
+	`
+
+	// Add styles for the content inside
+	const style = document.createElement('style')
+	style.textContent = `
+		#mvp-likes-modal .mvp-likes-content > *:first-child {
+			margin-bottom: 16px !important;
+			padding-bottom: 12px !important;
+			border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+		}
+		#mvp-likes-modal .mvp-likes-content img {
+			margin: 2px !important;
+		}
+	`
+	modal.appendChild(style)
+
+	document.body.appendChild(modal)
+
+	// Close handlers
+	const closeBtn = document.getElementById('mvp-likes-modal-close')
+	closeBtn?.addEventListener('click', () => modal.remove())
+	modal.addEventListener('click', e => {
+		if (e.target === modal.firstElementChild) modal.remove()
+	})
+	document.addEventListener('keydown', function handler(e) {
+		if (e.key === 'Escape') {
+			modal.remove()
+			document.removeEventListener('keydown', handler)
+		}
+	})
+}
+
+/**
+ * Sets up event delegation for like buttons in dynamically loaded posts.
+ */
+function setupLikeButtonDelegation(): void {
+	if (likeButtonDelegationSetup) return
+	likeButtonDelegationSetup = true
+
+	document.addEventListener(
+		'click',
+		async e => {
+			const target = e.target as HTMLElement
+			const likeButton = target.closest('a.btnmola[data-mvp-likes-href]') as HTMLAnchorElement | null
+
+			if (!likeButton) return
+
+			e.preventDefault()
+			e.stopPropagation()
+
+			const href = likeButton.getAttribute('data-mvp-likes-href')
+			if (!href) return
+
+			// Firefox extensions require absolute URLs for fetch
+			const url = href.startsWith('/') ? `${window.location.origin}${href}` : href
+
+			try {
+				const response = await fetch(url, {
+					credentials: 'include',
+					headers: {
+						Accept: 'text/html',
+						'X-Requested-With': 'XMLHttpRequest',
+					},
+				})
+
+				if (!response.ok) {
+					logger.error('Failed to fetch likes:', response.status)
+					return
+				}
+
+				const html = await response.text()
+				showLikesModal(html)
+			} catch (error) {
+				logger.error('Error fetching likes:', error)
+			}
+		},
+		true
+	)
+}
+
+// =============================================================================
 // START / STOP INFINITE SCROLL
 // =============================================================================
 
@@ -633,6 +764,10 @@ function startInfiniteScroll(): void {
 
 	// Set up global listener for embed resize messages (Twitter, etc.)
 	setupGlobalEmbedListener()
+
+	// Set up click handler for like buttons in dynamically loaded posts
+	// Using event delegation because cloneNode doesn't copy jQuery event handlers
+	setupLikeButtonDelegation()
 
 	window.dispatchEvent(
 		new CustomEvent(DOM_MARKERS.EVENTS.INFINITE_SCROLL_MODE_CHANGED, {
