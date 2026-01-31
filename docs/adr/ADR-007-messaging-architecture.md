@@ -1,11 +1,11 @@
 # ADR-007: Cross-Context Messaging Architecture
 
-| Metadata      | Value              |
-| ------------- | ------------------ |
-| **Status**    | ✅ Accepted        |
-| **Date**      | January 2026       |
-| **Authors**   | MVP Team           |
-| **Reviewers** | —                  |
+| Metadata      | Value        |
+| ------------- | ------------ |
+| **Status**    | ✅ Accepted  |
+| **Date**      | January 2026 |
+| **Authors**   | MVP Team     |
+| **Reviewers** | —            |
 
 ---
 
@@ -54,11 +54,11 @@ Use **@webext-core/messaging** for typed RPC-style messaging.
 // lib/messaging.ts - Define the protocol
 
 interface ProtocolMap {
-// Each key is an "RPC method"
-uploadImage: (data: { base64: string; filename: string }) => UploadResult
-highlightCode: (data: { code: string; language: string }) => string
-fetchTMDB: (data: { type: string; id: string }) => TMDBResult
-// ... more methods
+	// Each key is an "RPC method"
+	uploadImage: (data: { base64: string; filename: string }) => UploadResult
+	highlightCode: (data: { code: string; language: string }) => string
+	fetchTMDB: (data: { type: string; id: string }) => TMDBResult
+	// ... more methods
 }
 
 export const { sendMessage, onMessage } = defineExtensionMessaging<ProtocolMap>()
@@ -92,16 +92,16 @@ onMessage('highlightCode', async ({ data }) => {
 import { sendMessage } from '@/lib/messaging'
 
 async function uploadImage(file: File) {
-// Fully typed - IDE autocompletes params and return
-const result = await sendMessage('uploadImage', {
-base64: await fileToBase64(file),
-filename: file.name,
-})
+	// Fully typed - IDE autocompletes params and return
+	const result = await sendMessage('uploadImage', {
+		base64: await fileToBase64(file),
+		filename: file.name,
+	})
 
-if (result.success) {
-return result.url
-}
-throw new Error(result.error)
+	if (result.success) {
+		return result.url
+	}
+	throw new Error(result.error)
 }
 ```
 
@@ -111,14 +111,14 @@ throw new Error(result.error)
 
 Everything below **MUST** go through background:
 
-| Service               | Reason                               |
-| --------------------- | ------------------------------------ |
-| **Image upload**      | Imgur/Catbox API keys                |
-| **TMDB API**          | API key + centralized rate limiting  |
-| **Steam API**         | Proxy to avoid CORS                  |
-| **Prism highlighting**| Bundle size (see ADR-004)            |
-| **Gemini AI**         | Google API key                       |
-| **OpenRouter AI**     | API key                              |
+| Service                | Reason                              |
+| ---------------------- | ----------------------------------- |
+| **Image upload**       | Imgur/Freeimage API keys            |
+| **TMDB API**           | API key + centralized rate limiting |
+| **Steam API**          | Proxy to avoid CORS                 |
+| **Prism highlighting** | Bundle size (see ADR-004)           |
+| **Gemini AI**          | Google API key                      |
+| **OpenRouter AI**      | API key                             |
 
 ### Flow Diagram
 

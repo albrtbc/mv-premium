@@ -74,7 +74,7 @@ export function useImageUpload(textarea: HTMLTextAreaElement, options: UseImageU
 	 * Updates the overall progress and provides feedback via toasts.
 	 */
 	const uploadFiles = async (files: File[]) => {
-		// No more API key check - Catbox works without it
+		// No more API key check - freeimage.host works without it
 		if (files.length === 0) return
 
 		setIsUploading(true)
@@ -142,7 +142,7 @@ export function useImageUpload(textarea: HTMLTextAreaElement, options: UseImageU
 
 	// This is now purely for the hidden input trigger if needed outside dropzone
 	const triggerImageUpload = () => {
-		// No more API key check - Catbox works without it
+		// No more API key check - freeimage.host works without it
 		requestAnimationFrame(() => {
 			fileInputRef.current?.click()
 		})

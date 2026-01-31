@@ -146,5 +146,12 @@ export const API_URLS = {
 	TMDB_BASE: 'https://api.themoviedb.org/3',
 	TMDB_IMAGE: 'https://image.tmdb.org/t/p',
 	IMGBB: 'https://api.imgbb.com/1/upload',
+	FREEIMAGE: 'https://freeimage.host/api/1/upload',
 	GIPHY: 'https://api.giphy.com/v1/gifs',
 } as const
+
+/**
+ * Public API key for freeimage.host (used by ShareX and other tools)
+ * This is an officially shared key for anonymous uploads
+ */
+export const FREEIMAGE_PUBLIC_KEY = '6d207e02198a847aa98d0a2a901485a5'

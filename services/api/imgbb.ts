@@ -1,12 +1,12 @@
 /**
- * ImgBB Image Upload Service
+ * Image Upload Service
  *
  * ARCHITECTURE: This is a pure RPC facade. All network requests
  * are made via the background script to avoid CORS issues and
  * keep API keys secure.
  *
  * PROVIDERS:
- * - Catbox.moe: Default, no API key required, 200MB limit
+ * - freeimage.host: Default, uses public API key, permanent storage, 64MB limit
  * - ImgBB: Optional, requires user-configured API key, 32MB limit
  *
  * API Documentation: https://api.imgbb.com/
@@ -23,7 +23,7 @@ export type { UploadResult } from '@/lib/messaging'
 // =============================================================================
 
 const MAX_FILE_SIZE_IMGBB = 32 * 1024 * 1024 // 32MB (ImgBB limit)
-const MAX_FILE_SIZE_CATBOX = 200 * 1024 * 1024 // 200MB (Catbox limit)
+const MAX_FILE_SIZE_FREEIMAGE = 64 * 1024 * 1024 // 64MB (freeimage.host limit)
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif']
 
 // =============================================================================
@@ -55,11 +55,11 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
 		}
 	}
 
-	// Use Catbox limit as default (larger)
-	if (file.size > MAX_FILE_SIZE_CATBOX) {
+	// Use freeimage.host limit as default
+	if (file.size > MAX_FILE_SIZE_FREEIMAGE) {
 		return {
 			valid: false,
-			error: 'La imagen es demasiado grande. Máximo 200MB.',
+			error: 'La imagen es demasiado grande. Máximo 64MB.',
 		}
 	}
 
@@ -96,7 +96,7 @@ function fileToBase64(file: File | Blob): Promise<string> {
  *
  * STRATEGY:
  * - If user has configured ImgBB API key AND file is under 32MB → Use ImgBB
- * - Otherwise → Use Catbox (no config needed, 200MB limit)
+ * - Otherwise → Use freeimage.host (permanent storage, 64MB limit)
  *
  * @param file - File or Blob to upload
  * @returns Upload result with URL or error
@@ -117,8 +117,8 @@ export async function uploadImage(file: File | Blob): Promise<UploadResult> {
 			// Use ImgBB (user-configured)
 			result = await sendMessage('uploadImageToImgbb', { base64, fileName })
 		} else {
-			// Use Catbox (default, no config needed)
-			result = await sendMessage('uploadImageToCatbox', { base64, fileName })
+			// Use freeimage.host (default, permanent storage)
+			result = await sendMessage('uploadImageToFreeimage', { base64, fileName })
 		}
 
 		return result

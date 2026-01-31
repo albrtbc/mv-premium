@@ -1,11 +1,11 @@
 /**
  * Upload Handlers Module
- * Handles image uploads to ImgBB and Catbox services
+ * Handles image uploads to ImgBB and freeimage.host services
  */
 
 import { storage } from '#imports'
 import { logger } from '@/lib/logger'
-import { STORAGE_KEYS, API_URLS } from '@/constants'
+import { STORAGE_KEYS, API_URLS, FREEIMAGE_PUBLIC_KEY } from '@/constants'
 import { onMessage, type UploadResult } from '@/lib/messaging'
 
 // =============================================================================
@@ -21,7 +21,6 @@ const imgbbApiKeyStorage = storage.defineItem<string | null>(`local:${STORAGE_KE
 // =============================================================================
 
 const IMGBB_API_URL = API_URLS.IMGBB
-const CATBOX_API_URL = 'https://catbox.moe/user/api.php'
 
 // =============================================================================
 // Upload Handlers
@@ -107,75 +106,70 @@ export function setupImgbbHandler(): void {
 }
 
 /**
- * Setup Catbox upload message handler
- * No API key required - anonymous uploads
+ * Setup freeimage.host upload message handler
+ * Uses public API key - permanent storage for free
  */
-export function setupCatboxHandler(): void {
-	onMessage('uploadImageToCatbox', async ({ data }): Promise<UploadResult> => {
+export function setupFreeimageHandler(): void {
+	onMessage('uploadImageToFreeimage', async ({ data }): Promise<UploadResult> => {
 		const fileName = data.fileName || `image_${Date.now()}.png`
-		logger.debug(`Catbox upload starting: ${fileName}`)
+		logger.debug(`Freeimage upload starting: ${fileName}`)
 		const startTime = Date.now()
 
 		try {
-			// Convert base64 to Blob
-			logger.debug(`Converting base64 to blob...`)
-			const byteCharacters = atob(data.base64)
-			const byteNumbers = new Array(byteCharacters.length)
-			for (let i = 0; i < byteCharacters.length; i++) {
-				byteNumbers[i] = byteCharacters.charCodeAt(i)
-			}
-			const byteArray = new Uint8Array(byteNumbers)
-
-			// Determine MIME type from filename or default to image/png
-			let mimeType = 'image/png'
-			if (data.fileName) {
-				const ext = data.fileName.split('.').pop()?.toLowerCase()
-				if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg'
-				else if (ext === 'png') mimeType = 'image/png'
-				else if (ext === 'gif') mimeType = 'image/gif'
-			}
-
-			const blob = new Blob([byteArray], { type: mimeType })
-			logger.debug(`Blob created: ${(blob.size / 1024).toFixed(1)}KB, type: ${mimeType}`)
-
-			// Create FormData for Catbox API
 			const formData = new FormData()
-			formData.append('reqtype', 'fileupload')
-			formData.append('fileToUpload', blob, fileName)
+			formData.append('key', FREEIMAGE_PUBLIC_KEY)
+			formData.append('source', data.base64)
+			formData.append('format', 'json')
 
-			logger.debug(`Sending to Catbox...`)
-			const response = await fetch(CATBOX_API_URL, {
+			if (data.fileName) {
+				const name = data.fileName.replace(/\.[^/.]+$/, '')
+				formData.append('name', name)
+			}
+
+			logger.debug(`Sending to freeimage.host...`)
+			const response = await fetch(API_URLS.FREEIMAGE, {
 				method: 'POST',
 				body: formData,
 			})
 			const elapsed = Date.now() - startTime
-			logger.debug(`Catbox response received in ${elapsed}ms, status: ${response.status}`)
+			logger.debug(`Freeimage response received in ${elapsed}ms, status: ${response.status}`)
 
-			if (!response.ok) {
-				throw new Error(`Catbox error: ${response.status}`)
+			const result = (await response.json()) as {
+				status_code: number
+				success?: {
+					message: string
+					code: number
+				}
+				image?: {
+					url: string
+					display_url: string
+					size: number
+					delete_url?: string
+				}
+				error?: {
+					message: string
+					code: number
+				}
 			}
 
-			// Catbox returns the URL as plain text
-			const url = await response.text()
-			logger.debug(`Catbox response body:`, url.substring(0, 100))
-
-			if (url.startsWith('https://')) {
-				logger.debug(`Upload successful: ${url.trim()}`)
+			if (result.status_code === 200 && result.image) {
+				logger.debug(`Upload successful: ${result.image.display_url}`)
 				return {
 					success: true,
-					url: url.trim(),
-					size: blob.size,
+					url: result.image.display_url,
+					deleteUrl: result.image.delete_url,
+					size: result.image.size,
 				}
 			} else {
-				logger.error(`Catbox returned error:`, url)
+				logger.error(`Freeimage returned error:`, result.error)
 				return {
 					success: false,
-					error: url || 'Upload failed',
+					error: result.error?.message || 'Upload failed',
 				}
 			}
 		} catch (error) {
 			const elapsed = Date.now() - startTime
-			logger.error(`Catbox upload error after ${elapsed}ms:`, error)
+			logger.error(`Freeimage upload error after ${elapsed}ms:`, error)
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : 'Network error',
@@ -189,5 +183,5 @@ export function setupCatboxHandler(): void {
  */
 export function setupUploadHandlers(): void {
 	setupImgbbHandler()
-	setupCatboxHandler()
+	setupFreeimageHandler()
 }

@@ -75,12 +75,12 @@ interface ProtocolMap {
 	uploadImageToImgbb: (data: { base64: string; fileName?: string }) => UploadResult
 
 	/**
-	 * Upload image to Catbox.moe via background script
-	 * No API key required - completely anonymous uploads
-	 * @param data - File blob and optional filename
+	 * Upload image to freeimage.host via background script
+	 * Uses public API key - permanent storage, no user config needed
+	 * @param data - Base64 image data and optional filename
 	 * @returns Upload result with URL or error
 	 */
-	uploadImageToCatbox: (data: { base64: string; fileName?: string }) => UploadResult
+	uploadImageToFreeimage: (data: { base64: string; fileName?: string }) => UploadResult
 
 	/**
 	 * Check if TMDB API key is configured in the background script

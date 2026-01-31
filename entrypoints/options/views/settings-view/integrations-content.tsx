@@ -72,7 +72,7 @@ export function IntegrationsContent() {
 						<Image className="h-5 w-5 mt-0.5" />
 						<div>
 							<h4 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-								Alojamiento de Imágenes (Base: Catbox)
+								Alojamiento de Imágenes (Base: freeimage.host)
 							</h4>
 							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
 								{imgbbApiKey ? (
@@ -83,14 +83,14 @@ export function IntegrationsContent() {
 									<>
 										Servicio base activo:{' '}
 										<a
-											href="https://catbox.moe/"
+											href="https://freeimage.host/"
 											target="_blank"
 											rel="noopener noreferrer"
 											className="font-bold decoration-primary/30 hover:decoration-primary transition-colors text-primary"
 										>
-											Catbox.moe
+											freeimage.host
 										</a>{' '}
-										(hasta 200MB)
+										(hasta 64MB, permanente)
 									</>
 								)}
 							</p>
@@ -110,7 +110,7 @@ export function IntegrationsContent() {
 						<ApiKeyInput
 							value={imgbbApiKey}
 							onChange={setImgbbApiKey}
-							placeholder="Dejar vacío para usar Catbox"
+							placeholder="Dejar vacío para usar freeimage.host"
 							label="ImgBB"
 						/>
 					</div>
@@ -121,15 +121,15 @@ export function IntegrationsContent() {
 						<p>
 							<strong>Por defecto</strong>, las imágenes se suben a{' '}
 							<a
-								href="https://catbox.moe/"
+								href="https://freeimage.host/"
 								target="_blank"
 								rel="noopener noreferrer"
 								className="text-primary hover:underline inline-flex items-center gap-0.5"
 							>
-								Catbox.moe
+								freeimage.host
 								<ExternalLink className="h-3 w-3" />
 							</a>{' '}
-							de forma anónima. Es rápido y no requiere configuración.
+							de forma automática. Almacenamiento permanente y gratuito.
 						</p>
 						<p>
 							<strong>Si prefieres ImgBB:</strong>
@@ -155,7 +155,7 @@ export function IntegrationsContent() {
 						</ol>
 						<p className="text-amber-500 dark:text-amber-400 mt-2 flex items-center gap-1">
 							<AlertCircle className="h-3 w-3" />
-							ImgBB tiene un límite de 32MB. Catbox permite hasta 200MB.
+							ImgBB tiene un límite de 32MB. freeimage.host permite hasta 64MB.
 						</p>
 					</div>
 				)}

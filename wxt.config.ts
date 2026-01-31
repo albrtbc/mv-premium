@@ -13,20 +13,21 @@ export default defineConfig({
 			'*://store.steampowered.com/*',
 			'https://api.giphy.com/*',
 			'https://generativelanguage.googleapis.com/*',
-			'https://catbox.moe/*',
 			'https://api.imgbb.com/*',
+			'https://freeimage.host/*',
 		],
 		name: 'MV Premium',
-		description: 'La experiencia definitiva para Mediavida. Potencia el foro con herramientas modernas, navegación fluida y personalización total.',
-    "browser_specific_settings": {
-    "gecko": {
-      "id": "mv-premium@adan-dev",
-      // @ts-ignore: Esta propiedad es nueva en Firefox y WXT aún no la tiene tipada
-      "data_collection_permissions": {
-        "required": ["none"]
-      }
-    }
-   },
+		description:
+			'La experiencia definitiva para Mediavida. Potencia el foro con herramientas modernas, navegación fluida y personalización total.',
+		browser_specific_settings: {
+			gecko: {
+				id: 'mv-premium@adan-dev',
+				// @ts-ignore: Esta propiedad es nueva en Firefox y WXT aún no la tiene tipada
+				data_collection_permissions: {
+					required: ['none'],
+				},
+			},
+		},
 		web_accessible_resources: [
 			{
 				resources: ['icon/*.png', 'assets/*.css'],
@@ -35,11 +36,11 @@ export default defineConfig({
 		],
 		// --- CSP (hardened) ---
 		content_security_policy: {
-			extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://*.mediavida.com https://api.giphy.com https://generativelanguage.googleapis.com https://store.steampowered.com https://api.imgbb.com https://catbox.moe https://api.themoviedb.org https://image.tmdb.org ${
+			extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://*.mediavida.com https://api.giphy.com https://generativelanguage.googleapis.com https://store.steampowered.com https://api.imgbb.com https://freeimage.host https://api.themoviedb.org https://image.tmdb.org ${
 				process.env.NODE_ENV === 'development'
 					? 'ws://localhost:3000 http://localhost:3000 ws://localhost:3001 http://localhost:3001'
 					: ''
-			}; img-src 'self' data: blob: https://*.mediavida.com https://giphy.com https://*.giphy.com https://image.tmdb.org https://www.themoviedb.org https://i.ytimg.com https://store.steampowered.com https://catbox.moe https://files.catbox.moe https://api.imgbb.com https://i.ibb.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;`,
+			}; img-src 'self' data: blob: https://*.mediavida.com https://giphy.com https://*.giphy.com https://image.tmdb.org https://www.themoviedb.org https://i.ytimg.com https://store.steampowered.com https://freeimage.host https://*.freeimage.host https://api.imgbb.com https://i.ibb.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;`,
 		},
 	},
 	webExt: {
@@ -76,10 +77,7 @@ export default defineConfig({
 					// Remove console.* calls in production?
 					// NO: We use pure_funcs to only remove specific ones, keeping console.table/group for mvpDebug
 					drop_console: false,
-					pure_funcs:
-						process.env.NODE_ENV === 'production'
-							? ['console.log', 'console.debug']
-							: [],
+					pure_funcs: process.env.NODE_ENV === 'production' ? ['console.log', 'console.debug'] : [],
 					// Remove debugger statements
 					drop_debugger: true,
 					// Multiple compression passes

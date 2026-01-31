@@ -9,7 +9,7 @@
  *
  * Module Structure:
  * - context-menus.ts     → Context menu creation and click handlers
- * - upload-handlers.ts   → ImgBB and Catbox image uploads
+ * - upload-handlers.ts   → ImgBB and Freimage image uploads
  * - api-handlers.ts      → Steam, TMDB API proxies
  * - ai-handlers.ts       → Gemini AI generation
  * - prism-highlighter.ts → Code syntax highlighting
@@ -31,10 +31,7 @@ import { clearCache } from '@/services/media/cache'
  */
 async function cleanupLegacyApiCache(): Promise<void> {
 	// Clean caches that use the format "prefix:key"
-	await Promise.all([
-		clearCache({ prefix: 'mv-resolver' }),
-		clearCache({ prefix: 'mv-tmdb-v2' }),
-	])
+	await Promise.all([clearCache({ prefix: 'mv-resolver' }), clearCache({ prefix: 'mv-tmdb-v2' })])
 
 	// Clean Steam cache which uses format "steam-game-{id}" directly
 	try {
@@ -73,7 +70,7 @@ export default defineBackground(() => {
 	setupContextMenuListener()
 	initContextMenuWatcher()
 
-	// Upload handlers (ImgBB, Catbox)
+	// Upload handlers (ImgBB, Freeimage)
 	setupUploadHandlers()
 
 	// API handlers (Steam, TMDB, options page)

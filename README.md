@@ -45,7 +45,7 @@ Mediavida Premium is a browser extension that enhances the [Mediavida.com](https
 | **TMDB Integration**  | Hover cards with movie/TV show info from TMDB when hovering over links in the Cinema forum |
 | **Media Hover Cards** | Preview YouTube, Twitch, and Steam links without leaving the page                          |
 | **Gallery Mode**      | View all images in a thread in a beautiful gallery layout                                  |
-| **Image Upload**      | Upload images directly to ImgBB/Catbox from the editor                                     |
+| **Image Upload**      | Upload images directly to freeimage.host/ImgBB from the editor                             |
 
 ### ✍️ Editor Enhancements
 

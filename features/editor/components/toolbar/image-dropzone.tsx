@@ -508,7 +508,7 @@ export function ImageDropzone({ isOpen, onClose, onFilesSelect, isUploading, upl
 							lineHeight: 1.4,
 						}}
 					>
-						<span style={{ color: '#6b7280' }}>Máx. {hasImgbbKey ? '32MB' : '200MB'}</span> · Evita imágenes muy pesadas
+						<span style={{ color: '#6b7280' }}>Máx. {hasImgbbKey ? '32MB' : '64MB'}</span> · Evita imágenes muy pesadas
 						para no saturar la web
 					</div>
 
