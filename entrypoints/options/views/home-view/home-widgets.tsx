@@ -5,6 +5,7 @@ import { memo, useEffect, lazy, Suspense } from 'react'
 import Send from 'lucide-react/dist/esm/icons/send'
 import MessageSquare from 'lucide-react/dist/esm/icons/message-square'
 import Clock from 'lucide-react/dist/esm/icons/clock'
+import History from 'lucide-react/dist/esm/icons/history'
 import Database from 'lucide-react/dist/esm/icons/database'
 import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
 import Eye from 'lucide-react/dist/esm/icons/eye'
@@ -118,6 +119,8 @@ export function HomeWidgets() {
 		percent: Math.round((s.timeMs / maxVal) * 100),
 	}))
 
+	const totalTimeMs = Object.values(timeStats).reduce((acc, curr) => acc + curr, 0)
+
 	const activeSubforum = {
 		name: sortedSubforums[0]?.name || '-',
 		timeMs: sortedSubforums[0]?.timeMs || 0,
@@ -136,6 +139,7 @@ export function HomeWidgets() {
 				storageStats={storageStats}
 				username={username}
 				navigate={navigate}
+				totalTimeMs={totalTimeMs}
 			/>
 		)
 	}
@@ -143,7 +147,7 @@ export function HomeWidgets() {
 	return (
 		<>
 			{/* Main Stats Grid */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 				{/* Posts Card */}
 				<StatCard icon={Send} label="Posts" value={totalPosts} subtext={`en ${currentYear}`} />
 
@@ -153,9 +157,18 @@ export function HomeWidgets() {
 				{/* Active Time Card */}
 				<StatCard
 					icon={Clock}
-					label="Más Activo"
+					label="Subforo Más Activo"
 					value={formatPreciseTime(activeSubforum.timeMs)}
 					subtext={`en ${activeSubforum.name}`}
+				/>
+
+				{/* Total Time Card */}
+				<StatCard
+					icon={History}
+					label="Tiempo Total"
+					value={formatPreciseTime(totalTimeMs)}
+					subtext=""
+					variant="featured"
 				/>
 			</div>
 
@@ -189,18 +202,41 @@ interface StatCardProps {
 	label: string
 	value: string | number
 	subtext: string
+	variant?: 'default' | 'featured'
 }
 
-const StatCard = memo(function StatCard({ icon: Icon, label, value, subtext }: StatCardProps) {
+const StatCard = memo(function StatCard({ icon: Icon, label, value, subtext, variant = 'default' }: StatCardProps) {
 	// Format numeric values with locale-aware thousands separators
 	const displayValue = typeof value === 'number' ? value.toLocaleString('es-ES') : value
 
+	const isFeatured = variant === 'featured'
+	const styles = isFeatured
+		? {
+				wrapper:
+					'bg-gradient-to-br from-secondary/80 via-accent/30 to-card/40 border-primary/40 shadow-md backdrop-blur-sm hover:from-secondary hover:via-accent/40 hover:border-primary/60 transition-all duration-300',
+				text: 'bg-gradient-to-br from-foreground via-primary to-primary bg-clip-text text-transparent font-black tracking-tight drop-shadow-sm',
+				label: 'text-primary font-bold tracking-widest',
+				subtext: 'text-muted-foreground font-normal',
+		  }
+		: {
+				wrapper:
+					'bg-gradient-to-br from-primary/25 via-primary/5 to-transparent border-primary/40 hover:bg-primary/10 hover:border-primary/50 hover:shadow-primary/10',
+				text: 'text-primary',
+				label: 'text-primary/80',
+				subtext: 'text-muted-foreground/60 font-bold',
+		  }
+
 	return (
-		<div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/25 via-primary/5 to-transparent border border-primary/40 p-5 shadow-lg shadow-primary/5 transition-all duration-300 hover:shadow-primary/10 hover:bg-primary/10 hover:border-primary/50 group">
+		<div
+			className={cn(
+				'relative overflow-hidden rounded-xl border p-5 shadow-lg shadow-primary/5 transition-all duration-300 group',
+				styles.wrapper
+			)}
+		>
 			<div className="flex flex-col gap-1 relative z-10">
-				<span className="text-xs font-bold text-primary/80 uppercase tracking-widest">{label}</span>
-				<span className="text-4xl font-black text-primary tabular-nums tracking-tight">{displayValue}</span>
-				<span className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider line-clamp-1">
+				<span className={cn('text-xs font-bold uppercase tracking-widest', styles.label)}>{label}</span>
+				<span className={cn('text-4xl font-black tabular-nums tracking-tight', styles.text)}>{displayValue}</span>
+				<span className={cn('text-[10px] uppercase tracking-wider line-clamp-1', styles.subtext)}>
 					{subtext}
 				</span>
 			</div>
@@ -355,6 +391,7 @@ interface DisabledActivityViewProps {
 	storageStats: StorageCardProps['storageStats']
 	username: string
 	navigate: (path: string) => void
+	totalTimeMs: number
 }
 
 function DisabledActivityView({
@@ -363,11 +400,12 @@ function DisabledActivityView({
 	storageStats,
 	username,
 	navigate,
+	totalTimeMs,
 }: DisabledActivityViewProps) {
 	return (
 		<>
 			{/* Main Stats Grid */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 				{/* Posts Card - Disabled */}
 				<div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-muted/25 via-muted/5 to-transparent border border-muted/40 p-5 opacity-50 blur-[1.5px]">
 					<div className="flex flex-col gap-1 relative z-10">
@@ -393,9 +431,18 @@ function DisabledActivityView({
 				{/* Active Time Card - STAYS VISIBLE (uses timeStats, not activityData) */}
 				<StatCard
 					icon={Clock}
-					label="Más Activo"
+					label="Subforo Más Activo"
 					value={formatPreciseTime(activeSubforum.timeMs)}
 					subtext={`en ${activeSubforum.name}`}
+				/>
+
+				{/* Total Time Card - STAYS VISIBLE */}
+				<StatCard
+					icon={History}
+					label="Tiempo Total"
+					value={formatPreciseTime(totalTimeMs)}
+					subtext=""
+					variant="featured"
 				/>
 			</div>
 
