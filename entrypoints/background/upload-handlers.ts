@@ -73,6 +73,7 @@ export function setupImgbbHandler(): void {
 			const result = (await response.json()) as {
 				success: boolean
 				data?: {
+					url: string
 					display_url: string
 					delete_url: string
 					size: number
@@ -85,7 +86,7 @@ export function setupImgbbHandler(): void {
 			if (result.success && result.data) {
 				return {
 					success: true,
-					url: result.data.display_url,
+					url: result.data.url || result.data.display_url,
 					deleteUrl: result.data.delete_url,
 					size: result.data.size,
 				}
@@ -156,7 +157,7 @@ export function setupFreeimageHandler(): void {
 				logger.debug(`Upload successful: ${result.image.display_url}`)
 				return {
 					success: true,
-					url: result.image.display_url,
+					url: result.image.url || result.image.display_url,
 					deleteUrl: result.image.delete_url,
 					size: result.image.size,
 				}
