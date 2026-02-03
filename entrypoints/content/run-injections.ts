@@ -156,9 +156,10 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 			initPostitToggle()
 		})
 
-		// Check for pending thread creation (captures URL after redirect from new thread page)
-		import('@/features/stats').then(({ completePendingThreadCreation }) => {
+		// Check for pending thread creation or post edit (captures context after redirect)
+		import('@/features/stats').then(({ completePendingThreadCreation, completePendingPostEdit }) => {
 			completePendingThreadCreation()
+			completePendingPostEdit()
 		})
 
 		// Parallel load thread features using allSettled to prevent single failure from breaking all

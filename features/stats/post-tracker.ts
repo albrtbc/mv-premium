@@ -26,6 +26,13 @@ interface PendingThreadCreation {
 	timestamp: number
 }
 
+// Pending post edit data structure (for edits from post.php)
+interface PendingPostEdit {
+	subforum: string
+	url: string
+	timestamp: number
+}
+
 /**
  * Computes the normalized base URL for the current thread, excluding anchors and pagination.
  */
@@ -261,25 +268,26 @@ export function setupPostTracker(): void {
 				if (isPostPhpEdit) {
 					const info = getEditPageInfo()
 
-					// Fetch real title async, then track
-					if (info.needsTitleFetch && info.url) {
-						fetchRealThreadTitle(info.url).then(realTitle => {
+					// Save pending edit to be completed on the redirected thread page
+					// This avoids the async fetch issue where the page navigates before the fetch completes
+					if (info.url) {
+						const pending: PendingPostEdit = {
+							subforum: info.subforum,
+							url: info.url,
+							timestamp: Date.now(),
+						}
+						try {
+							sessionStorage.setItem(STORAGE_KEYS.PENDING_POST_EDIT, JSON.stringify(pending))
+						} catch {
+							// If sessionStorage fails, track immediately without title
 							trackActivity({
 								type: 'post',
 								action: 'update',
-								title: realTitle || '',
+								title: '',
 								context: info.subforum || '',
 								url: info.url,
 							}).catch(() => {})
-						})
-					} else {
-						trackActivity({
-							type: 'post',
-							action: 'update',
-							title: '',
-							context: info.subforum || '',
-							url: info.url,
-						}).catch(() => {})
+						}
 					}
 				} else {
 					// Inline edit button - we already have thread info
@@ -367,3 +375,59 @@ export function completePendingThreadCreation(): void {
 		} catch {}
 	}
 }
+
+/**
+ * Checks for and completes any pending post edit tracking.
+ * Should be called on thread page load.
+ * 
+ * This handles the case where a user edits from post.php - we couldn't get the
+ * thread title there because the page only shows "Editar mensaje", so we save
+ * the pending edit and complete it here where we have access to the real title.
+ */
+export function completePendingPostEdit(): void {
+	try {
+		const pendingJson = sessionStorage.getItem(STORAGE_KEYS.PENDING_POST_EDIT)
+		if (!pendingJson) return
+
+		const pending: PendingPostEdit = JSON.parse(pendingJson)
+
+		// Only complete if within 30 seconds (to avoid stale data)
+		const MAX_AGE_MS = 30000
+		if (Date.now() - pending.timestamp > MAX_AGE_MS) {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_POST_EDIT)
+			return
+		}
+
+		// Check if we're on the same thread that was edited
+		const currentUrl = getThreadBaseUrl()
+		const pendingUrl = pending.url.replace(/\/\d+$/, '').replace(/\/$/, '') // Normalize
+		const normalizedCurrent = currentUrl.replace(/\/\d+$/, '').replace(/\/$/, '')
+
+		// Only complete if we're on the edited thread
+		if (!normalizedCurrent.includes(pendingUrl.split('/foro/')[1]?.split('/')[1] || '')) {
+			// Not on the same thread, don't complete yet
+			return
+		}
+
+		// Get the thread title from the current page
+		const threadInfo = getThreadInfo()
+
+		// Complete the tracking with the real title
+		trackActivity({
+			type: 'post',
+			action: 'update',
+			title: threadInfo.title || '',
+			context: pending.subforum || threadInfo.subforum,
+			url: pending.url,
+		}).catch(() => {})
+
+		// Clear the pending flag
+		sessionStorage.removeItem(STORAGE_KEYS.PENDING_POST_EDIT)
+	} catch {
+		// Clear if any error
+		try {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_POST_EDIT)
+		} catch {}
+	}
+}
+
