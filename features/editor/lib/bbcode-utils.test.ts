@@ -4,7 +4,7 @@
  * Tests BBCode detection and manipulation functions.
  */
 import { describe, it, expect } from 'vitest'
-import { FORMAT_TAGS, getActiveFormats } from '@/features/editor/lib/bbcode-utils'
+import { FORMAT_TAGS, getActiveFormats, needsMultilineCenter } from '@/features/editor/lib/bbcode-utils'
 
 describe('bbcode-utils', () => {
 	describe('FORMAT_TAGS', () => {
@@ -84,6 +84,53 @@ describe('bbcode-utils', () => {
 			const text = '[spoiler]hidden text[/spoiler]'
 			const active = getActiveFormats(text, 12)
 			expect(active).toContain('spoiler')
+		})
+	})
+
+	describe('needsMultilineCenter', () => {
+		it('should return true for h1 heading', () => {
+			expect(needsMultilineCenter('# Title')).toBe(true)
+		})
+
+		it('should return true for h2 heading', () => {
+			expect(needsMultilineCenter('## Title')).toBe(true)
+		})
+
+		it('should return true for h3 heading', () => {
+			expect(needsMultilineCenter('### Title')).toBe(true)
+		})
+
+		it('should return true for h4 heading', () => {
+			expect(needsMultilineCenter('#### Title')).toBe(true)
+		})
+
+		it('should return true for [bar] tag', () => {
+			expect(needsMultilineCenter('[bar]Barecito[/bar]')).toBe(true)
+		})
+
+		it('should return true for [bar] tag case insensitive', () => {
+			expect(needsMultilineCenter('[Bar]Text[/Bar]')).toBe(true)
+		})
+
+		it('should return false for plain text', () => {
+			expect(needsMultilineCenter('just some text')).toBe(false)
+		})
+
+		it('should return false for empty string', () => {
+			expect(needsMultilineCenter('')).toBe(false)
+		})
+
+		it('should return false for hash without space (not a heading)', () => {
+			expect(needsMultilineCenter('#hashtag')).toBe(false)
+		})
+
+		it('should return true for multiline text containing a heading', () => {
+			expect(needsMultilineCenter('some text\n## Heading\nmore text')).toBe(true)
+		})
+
+		it('should return false for other bbcode tags', () => {
+			expect(needsMultilineCenter('[b]bold[/b]')).toBe(false)
+			expect(needsMultilineCenter('[i]italic[/i]')).toBe(false)
 		})
 	})
 })

@@ -62,6 +62,10 @@ const IMAGE_DOMAINS = [
 	'image.prntscr.com',
 	// Gyazo
 	'i.gyazo.com',
+	// Image Proxies
+	'wsrv.nl',
+	'images.weserv.nl',
+	'illi.io',
 ]
 
 // ============================================================================

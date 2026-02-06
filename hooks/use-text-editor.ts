@@ -10,6 +10,7 @@
  */
 import { useRef, useCallback, useEffect } from 'react'
 import type { ToolbarButtonConfig, KeyboardShortcut } from '@/types/editor'
+import { needsMultilineCenter } from '@/features/editor/lib/bbcode-utils'
 
 import { useEditorHistory } from './editor/use-editor-history'
 import { useEditorSelection } from './editor/use-editor-selection'
@@ -185,9 +186,19 @@ export function useTextEditor(options: UseTextEditorOptions = {}): UseTextEditor
 			const { action } = button
 
 			switch (action.type) {
-				case 'wrap':
-					wrapSelection(action.prefix, action.suffix)
+				case 'wrap': {
+					let { prefix, suffix } = action
+					// Headings and [bar] need [center] on separate lines to render on Mediavida
+					if (prefix === '[center]' && suffix === '[/center]') {
+						const sel = getSelection()
+						if (sel.text && needsMultilineCenter(sel.text)) {
+							prefix = '[center]\n'
+							suffix = '\n[/center]'
+						}
+					}
+					wrapSelection(prefix, suffix)
 					break
+				}
 				case 'insert':
 					insertAtCursor(action.template)
 					break
