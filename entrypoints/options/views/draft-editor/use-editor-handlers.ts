@@ -40,6 +40,7 @@ interface UseEditorHandlersReturn {
 	handleInsertGif: (bbcode: string) => void
 	handleInsertUrl: (url: string, displayText: string) => void
 	handleInsertMovieTemplate: (template: string) => void
+	handleInsertGameTemplate: (template: string) => void
 	handleInsertIndex: (bbcode: string) => void
 
 	// Other handlers
@@ -48,7 +49,7 @@ interface UseEditorHandlersReturn {
 }
 
 export function useEditorHandlers({
-	form,
+	onChange,
 	textareaRef,
 	previewRef,
 	editor,
@@ -108,7 +109,7 @@ export function useEditorHandlers({
 				const result = unwrapBBCode(text, cursorPos, format)
 
 				if (result) {
-					form.setValue('content', result.newText, { shouldDirty: true })
+					onChange(result.newText)
 
 					requestAnimationFrame(() => {
 						if (textareaRef.current) {
@@ -128,7 +129,7 @@ export function useEditorHandlers({
 				checkActiveFormats()
 			})
 		},
-		[form, textareaRef, editor, checkActiveFormats]
+		[onChange, textareaRef, editor, checkActiveFormats]
 	)
 
 	const handleInsertSnippet = useCallback(
@@ -212,6 +213,9 @@ export function useEditorHandlers({
 				case 'movie-template':
 					dialogs.open('movie')
 					return null
+				case 'game-template':
+					dialogs.open('game')
+					return null
 				case 'index':
 					dialogs.open('index')
 					return null
@@ -238,13 +242,13 @@ export function useEditorHandlers({
 				textareaRef.current.selectionEnd = newPosition
 				textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }))
 				textareaRef.current.focus()
-				form.setValue('content', textareaRef.current.value)
+				onChange(textareaRef.current.value)
 			} else {
 				editor.insertAtCursor(markdown)
 			}
 			dialogs.close()
 		},
-		[textareaRef, form, editor, dialogs]
+		[textareaRef, onChange, editor, dialogs]
 	)
 
 	const handleInsertPoll = useCallback(
@@ -280,6 +284,14 @@ export function useEditorHandlers({
 	)
 
 	const handleInsertMovieTemplate = useCallback(
+		(template: string) => {
+			editor.insertAtCursor(template + '\n')
+			dialogs.close()
+		},
+		[editor, dialogs]
+	)
+
+	const handleInsertGameTemplate = useCallback(
 		(template: string) => {
 			editor.insertAtCursor(template + '\n')
 			dialogs.close()
@@ -342,6 +354,7 @@ export function useEditorHandlers({
 		handleInsertGif,
 		handleInsertUrl,
 		handleInsertMovieTemplate,
+		handleInsertGameTemplate,
 		handleInsertIndex,
 		handlePaste,
 		handleSyncScroll,

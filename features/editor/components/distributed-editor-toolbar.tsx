@@ -25,6 +25,7 @@ import { FormattingToolbarButtons } from './toolbar/formatting-toolbar-buttons'
 import { HeaderToolbarButton } from './toolbar/header-toolbar-button'
 import { HistoryToolbarButtons } from './toolbar/history-toolbar-buttons'
 import { CineToolbarButton } from './toolbar/cine-toolbar-button'
+import { GameToolbarButton } from './toolbar/game-toolbar-button'
 import { ApiKeyDialog, ImageDropzone } from './toolbar'
 
 // Portal utilities
@@ -49,6 +50,7 @@ import {
 
 // Dialog components
 import { MovieTemplateDialog } from '@/features/cine/components/movie-template-dialog'
+import { GameTemplateDialog } from '@/features/games/components/game-template-dialog'
 import { TableEditorDialog } from '@/features/table-editor/components/table-editor-dialog'
 import { LivePreviewPanel } from './live-preview-panel'
 import { InsertTemplateDialog } from '@/features/drafts/components/insert-template-dialog'
@@ -68,6 +70,7 @@ interface DistributedEditorToolbarProps {
 export function DistributedEditorToolbar({ textarea, toolbarContainer }: DistributedEditorToolbarProps) {
 	// Dialog states
 	const [showMovieDialog, setShowMovieDialog] = useState(false)
+	const [showGameDialog, setShowGameDialog] = useState(false)
 	const [showTableDialog, setShowTableDialog] = useState(false)
 	const [showPollDialog, setShowPollDialog] = useState(false)
 	const [showDropzone, setShowDropzone] = useState(false)
@@ -84,15 +87,19 @@ export function DistributedEditorToolbar({ textarea, toolbarContainer }: Distrib
 		gifPickerEnabled: true,
 		draftsButtonEnabled: true,
 		templateButtonEnabled: true,
+		gameButtonEnabled: true,
 	})
 
 	useEffect(() => {
 		getSettings().then(settings => {
+			console.log('DistributedEditorToolbar settings loaded:', settings)
+			console.log('gameButtonEnabled from settings:', settings.gameButtonEnabled)
 			setFeatureToggles({
 				cinemaButtonEnabled: settings.cinemaButtonEnabled ?? true,
 				gifPickerEnabled: settings.gifPickerEnabled ?? true,
 				draftsButtonEnabled: settings.draftsButtonEnabled ?? true,
 				templateButtonEnabled: settings.templateButtonEnabled ?? true,
+				gameButtonEnabled: settings.gameButtonEnabled ?? true,
 			})
 		})
 	}, [])
@@ -330,12 +337,15 @@ export function DistributedEditorToolbar({ textarea, toolbarContainer }: Distrib
 			{/* GROUP 3: Media */}
 			{ReactDOM.createPortal(
 				<>
+					{/* Log to verify render attempt */}
+					{(() => { console.log('Rendering Media Group. gameButtonEnabled:', featureToggles.gameButtonEnabled); return null; })()}
 					<ImageToolbarButton
 						isUploading={imageUpload.isUploading}
 						onTriggerUpload={() => setShowDropzone(prev => !prev)}
 					/>
 					{featureToggles.gifPickerEnabled && <GifPicker onInsert={insertText} variant="native" />}
 					{featureToggles.cinemaButtonEnabled && <CineToolbarButton onFullSheet={() => setShowMovieDialog(true)} />}
+					{featureToggles.gameButtonEnabled && <GameToolbarButton onClick={() => setShowGameDialog(true)} />}
 				</>,
 				containers.media
 			)}
@@ -472,6 +482,14 @@ export function DistributedEditorToolbar({ textarea, toolbarContainer }: Distrib
 				<MovieTemplateDialog
 					isOpen={showMovieDialog}
 					onClose={() => setShowMovieDialog(false)}
+					onInsert={(template: string) => insertText(template)}
+				/>
+			)}
+
+			{showGameDialog && (
+				<GameTemplateDialog
+					isOpen={showGameDialog}
+					onClose={() => setShowGameDialog(false)}
 					onInsert={(template: string) => insertText(template)}
 				/>
 			)}

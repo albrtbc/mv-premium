@@ -15,6 +15,7 @@ import Users from 'lucide-react/dist/esm/icons/users'
 import VolumeX from 'lucide-react/dist/esm/icons/volume-x'
 import StickyNote from 'lucide-react/dist/esm/icons/sticky-note'
 import Layout from 'lucide-react/dist/esm/icons/layout'
+import Brush from 'lucide-react/dist/esm/icons/brush'
 import { getDrafts, draftsStorage } from '@/features/drafts/storage'
 import { useSettingsStore } from '@/store/settings-store'
 import { CommandMenu } from '@/features/command-menu/components/command-menu'
@@ -68,6 +69,7 @@ const platformItems: NavItem[] = [
 		icon: Layout,
 		badgeKey: 'templates',
 	},
+
 	{
 		title: 'Ranking Subforos',
 		path: '/subforums',

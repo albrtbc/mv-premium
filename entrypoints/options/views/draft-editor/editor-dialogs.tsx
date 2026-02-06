@@ -18,6 +18,7 @@ import { UrlDialog } from '@/features/editor/components/url-dialog'
 import { PollCreatorDialog } from '@/features/editor/components/poll-creator-dialog'
 import { TableEditorDialog, type TableInitialData } from '@/features/table-editor/components/table-editor-dialog'
 import { MovieTemplateDialog } from '@/features/cine/components/movie-template-dialog'
+import { GameTemplateDialog } from '@/features/games/components/game-template-dialog'
 import { IndexCreatorDialog } from '@/features/editor/components/index-creator-dialog'
 import { CreateFolderDialog } from '@/features/drafts/components/create-folder-dialog'
 import { InsertTemplateDialog } from '@/features/drafts/components/insert-template-dialog'
@@ -46,6 +47,8 @@ interface EditorDialogsProps {
 	onInsertPoll: (bbcode: string) => void
 	// Movie dialog
 	onInsertMovieTemplate: (template: string) => void
+	// Game dialog
+	onInsertGameTemplate: (template: string) => void
 	// Index dialog
 	onInsertIndex: (bbcode: string) => void
 	// Folder dialog
@@ -70,6 +73,7 @@ export function EditorDialogs({
 	onInsertUrl,
 	onInsertPoll,
 	onInsertMovieTemplate,
+	onInsertGameTemplate,
 	onInsertIndex,
 	onCreateFolder,
 	onClearConfirm,
@@ -141,6 +145,9 @@ export function EditorDialogs({
 
 			{/* Movie Template Dialog */}
 			<MovieTemplateDialog isOpen={dialogs.isOpen('movie')} onClose={dialogs.close} onInsert={onInsertMovieTemplate} />
+
+			{/* Game Template Dialog */}
+			<GameTemplateDialog isOpen={dialogs.isOpen('game')} onClose={dialogs.close} onInsert={onInsertGameTemplate} />
 
 			{/* Index Creator Dialog */}
 			<IndexCreatorDialog isOpen={dialogs.isOpen('index')} onClose={dialogs.close} onInsert={onInsertIndex} />

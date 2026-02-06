@@ -184,6 +184,19 @@ td { padding: 6px 13px; border: 1px solid var(--mv-table-border); color: var(--m
 tr:nth-child(even) td { background: rgba(255, 255, 255, 0.03); }
 :host(.light) tr:nth-child(even) td { background: rgba(0, 0, 0, 0.02); }
 
+.center .table-wrap {
+    display: inline-block;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.center .table-wrap table,
+.center table {
+    margin-left: auto;
+    margin-right: auto;
+}
+
 code.inline { 
     background: var(--mv-inline-code-bg); 
     color: var(--mv-inline-code-text); 
@@ -481,19 +494,18 @@ ul ul, ol ul, ul ol {
 /* Header Image */
 .steam-card-image {
     flex: 0 0 auto;
-    width: 184px;
+    width: 230px;
     height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     overflow: hidden;
     background: #171a21;
 }
 
 .steam-card-image img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center;
 }
 
 .steam-card-info {

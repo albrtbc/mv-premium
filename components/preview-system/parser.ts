@@ -229,7 +229,7 @@ function parseMediaTag(url: string): string {
 	const cleanUrl = url.trim()
 
 	// 1. YOUTUBE
-	const ytMatch = cleanUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{11})/)
+	const ytMatch = cleanUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([\w-]{11})/)
 	if (ytMatch) {
 		const id = ytMatch[1]
 		return `
@@ -655,9 +655,6 @@ export async function parseBBCode(input: string): Promise<string> {
 		return match
 	})
 
-	// 7.5. Center
-	html = html.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '<div class="center"><p>$1</p></div>\n\n')
-
 	// 7.6. Media (videos, tweets, etc.)
 	html = html.replace(
 		/\[media\]([\s\S]*?)\[\/media\]/gi,
@@ -698,6 +695,20 @@ export async function parseBBCode(input: string): Promise<string> {
 
 	// Markdown Tables
 	html = parseMarkdownTables(html)
+
+	// 10.5. Center
+	html = html.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, (_, content) => {
+		const trimmed = content.trim()
+		const isBlockContent =
+			/^<(div|table|ul|ol|li|blockquote|pre|hr|h[2-5]|style|script)\b/i.test(trimmed) ||
+			trimmed.startsWith('__CODE_BLOCK_') ||
+			trimmed.startsWith('__INLINE_CODE_') ||
+			trimmed.startsWith('__MEDIA_BLOCK_')
+		if (isBlockContent) {
+			return `<div class="center">${content}</div>\n\n`
+		}
+		return `<div class="center"><p>${content}</p></div>\n\n`
+	})
 
 	// ========================================================================
 	// 11. PARAGRAPHS (IMPROVED)

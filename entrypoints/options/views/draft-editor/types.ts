@@ -55,6 +55,8 @@ export interface PreviewPanelProps {
 	theme?: 'light' | 'dark'
 	showPreview: boolean
 	previewRef: React.RefObject<HTMLDivElement | null>
+	/** Optional badge text to display instead of "Estilo Mediavida" (e.g., "Datos de ejemplo") */
+	badgeText?: string
 }
 
 // ============================================================================
@@ -67,7 +69,7 @@ export interface UseDraftEditorOptions {
 }
 
 export interface UseEditorHandlersOptions {
-	form: UseFormReturn<DraftFormData>
+	onChange: (content: string) => void
 	textareaRef: React.RefObject<HTMLTextAreaElement | null>
 	previewRef: React.RefObject<HTMLDivElement | null>
 	editor: {
