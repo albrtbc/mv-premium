@@ -77,6 +77,7 @@ export interface Settings {
 
 	// UI State
 	settingsActiveTab: string
+	variablesSidebarExpandedGroups: string[]
 
 	// Layout
 	ultrawideMode: UltrawideMode

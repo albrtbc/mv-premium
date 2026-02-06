@@ -5,6 +5,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useSettingsStore } from '@/store/settings-store'
+import { selectVariablesSidebarExpandedGroups } from '@/store/settings-selectors'
 import Search from 'lucide-react/dist/esm/icons/search'
 import X from 'lucide-react/dist/esm/icons/x'
 import Variable from 'lucide-react/dist/esm/icons/variable'
@@ -28,8 +30,9 @@ export function VariablesSidebar({
 }: VariablesSidebarProps) {
 	// Sidebar state
 	const [variableFilter, setVariableFilter] = useState('')
-	const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 	const [showHelp, setShowHelp] = useState(false)
+	const expandedGroups = useSettingsStore(selectVariablesSidebarExpandedGroups)
+	const setExpandedGroups = useSettingsStore(s => s.setVariablesSidebarExpandedGroups)
 
 	// Filter fields
 	const filteredFields = useMemo(() => {
@@ -51,21 +54,29 @@ export function VariablesSidebar({
 		return groups
 	}, [filteredFields])
 
+	const categoryList = useMemo(() => (groupedFields ? Array.from(groupedFields.keys()) : []), [groupedFields])
+	const expandedGroupSet = useMemo(() => new Set(expandedGroups), [expandedGroups])
+	const collapsedGroups = useMemo(() => {
+		const collapsed = new Set<string>()
+		for (const category of categoryList) {
+			if (!expandedGroupSet.has(category)) collapsed.add(category)
+		}
+		return collapsed
+	}, [categoryList, expandedGroupSet])
+
 	const toggleGroup = (category: string) => {
-		setCollapsedGroups(prev => {
-			const next = new Set(prev)
-			if (next.has(category)) next.delete(category)
-			else next.add(category)
-			return next
-		})
+		const next = new Set(expandedGroups)
+		if (next.has(category)) next.delete(category)
+		else next.add(category)
+		setExpandedGroups(Array.from(next))
 	}
 
 	// The inner content of the sidebar (shared between div and Sheet)
 	const SidebarContent = (
-		<div className={cn('flex flex-col bg-card', isSheetMode ? 'flex-1 min-h-0 overflow-hidden' : 'h-full')}>
+		<div className={cn('flex flex-col', isSheetMode ? 'bg-card flex-1 min-h-0 overflow-hidden' : 'bg-muted/20 h-full')}>
 			{/* Header (Desktop only) */}
 			{!isSheetMode && (
-				<div className="flex items-center justify-between h-9 px-2 border-b border-border bg-muted/30 shrink-0">
+				<div className="flex items-center justify-between h-9 px-2 border-b border-border bg-muted/40 shrink-0">
 					<div className="flex items-center gap-2">
 						<Variable className="h-3.5 w-3.5 text-muted-foreground" />
 						<span className="text-xs font-semibold text-foreground">Variables</span>
@@ -83,7 +94,7 @@ export function VariablesSidebar({
 
 			{/* Help panel */}
 			{showHelp && (
-				<div className="px-3 py-2.5 border-b border-border bg-blue-500/5 space-y-2 text-[10px] text-muted-foreground leading-relaxed shrink-0">
+				<div className="px-3 py-2.5 border-b border-border bg-primary/5 space-y-2 text-[10px] text-muted-foreground leading-relaxed shrink-0">
 					<div>
 						<span className="font-semibold text-foreground">Sintaxis</span>
 						<p className="mt-0.5">
@@ -203,7 +214,7 @@ export function VariablesSidebar({
 	}
 
 	return (
-		<div className="w-52 h-full border border-border rounded-l-lg bg-card shadow-sm shrink-0 hidden 2xl:block">
+		<div className="w-52 h-full border border-border rounded-l-lg bg-muted/20 shadow-sm shrink-0 hidden 2xl:block">
 			{SidebarContent}
 		</div>
 	)
@@ -229,14 +240,14 @@ function VariableButton({ field, onInsert }: { field: FieldDefinition; onInsert:
 							</span>
 						)}
 						{field.source === 'igdb+steam' && (
-							<span className="shrink-0 text-[9px] font-semibold px-1 py-px rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 leading-none">
+							<span className="shrink-0 text-[9px] font-semibold px-1 py-px rounded bg-primary/10 text-primary leading-none">
 								IGDB/S
 							</span>
 						)}
 					</div>
 				</button>
 			</TooltipTrigger>
-			<TooltipContent side="right" className="p-0 max-w-[240px] overflow-hidden">
+			<TooltipContent side="left" className="p-0 max-w-[240px] overflow-hidden">
 				<div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/50 border-b border-border">
 					<span className="text-xs font-semibold text-foreground truncate">{field.label}</span>
 					{field.source && (
@@ -245,7 +256,7 @@ function VariableButton({ field, onInsert }: { field: FieldDefinition; onInsert:
 								'shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none',
 								field.source === 'steam' && 'bg-[#1b2838] text-[#66c0f4]',
 								field.source === 'igdb' && 'bg-[#9147ff]/15 text-[#9147ff] dark:text-[#bf94ff]',
-								field.source === 'igdb+steam' && 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+								field.source === 'igdb+steam' && 'bg-primary/10 text-primary'
 							)}
 						>
 							{field.source === 'igdb' && 'IGDB'}
@@ -258,7 +269,7 @@ function VariableButton({ field, onInsert }: { field: FieldDefinition; onInsert:
 					<p className="text-[11px] text-muted-foreground leading-relaxed">{field.description}</p>
 					{field.source === 'igdb+steam' && (
 						<div className="flex items-start gap-1.5 pt-0.5">
-							<span className="text-[10px] text-amber-500 mt-px">*</span>
+							<span className="text-[10px] text-primary mt-px">*</span>
 							<p className="text-[10px] text-muted-foreground/70 leading-snug">
 								Se usa la versión en español de Steam si está disponible, si no, la de IGDB (en inglés)
 							</p>

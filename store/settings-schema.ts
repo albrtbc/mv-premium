@@ -28,12 +28,7 @@ const positiveIntSchema = z.number().int().min(0)
 // AI MODEL SCHEMA
 // =============================================================================
 
-export const aiModelSchema = z.enum([
-	'gemini-2.5-flash',
-	'gemini-2.0-flash',
-	'gemini-1.5-flash',
-	'gemini-1.5-pro',
-])
+export const aiModelSchema = z.enum(['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'])
 
 // =============================================================================
 // ULTRAWIDE MODE SCHEMA
@@ -80,6 +75,7 @@ export const settingsSchema = z.object({
 
 	// UI State
 	settingsActiveTab: z.string().default('integrations'),
+	variablesSidebarExpandedGroups: z.array(z.string()).default([]),
 
 	// Layout
 	ultrawideMode: ultrawideSchema.default('off'),
@@ -123,10 +119,7 @@ export function safeValidateSettings(data: unknown): Settings | null {
 /**
  * Validates a single setting value.
  */
-export function validateSettingValue<K extends SettingsKey>(
-	key: K,
-	value: unknown
-): Settings[K] | null {
+export function validateSettingValue<K extends SettingsKey>(key: K, value: unknown): Settings[K] | null {
 	const shape = settingsSchema.shape[key]
 	const result = shape.safeParse(value)
 	return result.success ? (result.data as Settings[K]) : null

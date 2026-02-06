@@ -68,6 +68,7 @@ export const selectMutedWords = (state: SettingsStoreState) => state.mutedWords
 // =============================================================================
 
 export const selectSettingsActiveTab = (state: SettingsStoreState) => state.settingsActiveTab
+export const selectVariablesSidebarExpandedGroups = (state: SettingsStoreState) => state.variablesSidebarExpandedGroups
 
 // =============================================================================
 // ADVANCED SELECTORS
@@ -98,7 +99,3 @@ export const selectApiKeys = (state: SettingsStoreState) => ({
 export function useTheme() {
 	return useSettingsStore(selectTheme)
 }
-
-
-
-

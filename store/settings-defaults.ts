@@ -60,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 	// UI State
 	settingsActiveTab: 'integrations',
+	variablesSidebarExpandedGroups: [],
 
 	// Layout
 	ultrawideMode: 'off',

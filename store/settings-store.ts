@@ -64,6 +64,7 @@ interface SettingsActions {
 
 	// UI State
 	setSettingsActiveTab: (tab: string) => void
+	setVariablesSidebarExpandedGroups: (groups: string[]) => void
 
 	// Layout
 	setUltrawideMode: (mode: Settings['ultrawideMode']) => void
@@ -152,10 +153,10 @@ export const useSettingsStore = create<SettingsState>()(
 			// Theme & Appearance
 			setTheme: theme => set({ theme }),
 			setBoldColor: color => {
-			set({ boldColor: color })
-			// Also write to the separate key that content script watches
-			storage.setItem(`local:${STORAGE_KEYS.BOLD_COLOR}`, color)
-		},
+				set({ boldColor: color })
+				// Also write to the separate key that content script watches
+				storage.setItem(`local:${STORAGE_KEYS.BOLD_COLOR}`, color)
+			},
 			setBoldColorEnabled: enabled => {
 				set({ boldColorEnabled: enabled })
 				// Also write to separate key for content script
@@ -187,6 +188,7 @@ export const useSettingsStore = create<SettingsState>()(
 
 			// UI State
 			setSettingsActiveTab: tab => set({ settingsActiveTab: tab }),
+			setVariablesSidebarExpandedGroups: groups => set({ variablesSidebarExpandedGroups: groups }),
 
 			// Layout
 			setUltrawideMode: mode => set({ ultrawideMode: mode }),
