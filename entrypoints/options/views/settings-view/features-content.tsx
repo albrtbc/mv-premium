@@ -12,6 +12,7 @@ import List from 'lucide-react/dist/esm/icons/list'
 import FolderHeart from 'lucide-react/dist/esm/icons/folder-heart'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import Search from 'lucide-react/dist/esm/icons/search'
+import Gamepad2 from 'lucide-react/dist/esm/icons/gamepad-2'
 import { browser } from 'wxt/browser'
 import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
@@ -25,6 +26,7 @@ export function FeaturesContent() {
 		setSetting,
 		navbarSearchEnabled,
 		cinemaButtonEnabled,
+		gameButtonEnabled,
 		gifPickerEnabled,
 		draftsButtonEnabled,
 		templateButtonEnabled,
@@ -54,6 +56,7 @@ export function FeaturesContent() {
 			key:
 				| 'navbarSearchEnabled'
 				| 'cinemaButtonEnabled'
+				| 'gameButtonEnabled'
 				| 'gifPickerEnabled'
 				| 'draftsButtonEnabled'
 				| 'templateButtonEnabled'
@@ -109,6 +112,14 @@ export function FeaturesContent() {
 				description="Añade un botón en el editor para buscar e insertar fichas de películas y series desde TMDB."
 			>
 				<Switch checked={cinemaButtonEnabled} onCheckedChange={withToastAndReload('cinemaButtonEnabled', true)} />
+			</SettingRow>
+
+			<SettingRow
+				icon={<Gamepad2 className="h-4 w-4" />}
+				label="Botón de Videojuegos"
+				description="Añade un botón en el editor para buscar e insertar fichas de videojuegos desde IGDB."
+			>
+				<Switch checked={gameButtonEnabled} onCheckedChange={withToastAndReload('gameButtonEnabled', true)} />
 			</SettingRow>
 
 			<SettingRow

@@ -12,6 +12,11 @@
  */
 import { sendMessage } from '@/lib/messaging'
 import { cachedFetch, createCacheKey, CACHE_TTL } from '@/services/media'
+import { renderTemplate } from '@/lib/template-engine'
+import { getDefaultTemplate } from '@/features/templates'
+import { useSettingsStore } from '@/store'
+import { formatDateLong } from '@/lib/date-utils'
+import type { MediaTemplate } from '@/types/templates'
 
 // Re-export types for consumers
 export type {
@@ -101,7 +106,11 @@ async function fetchTMDB<T>(
 	const persist = typeof options === 'number' ? false : options.persist ?? false
 
 	const cacheKey = createCacheKey(endpoint, JSON.stringify(params))
-	return cachedFetch(cacheKey, () => fetchTMDBViaBackground<T>(endpoint, params), { prefix: CACHE_PREFIX, ttl, persist })
+	return cachedFetch(cacheKey, () => fetchTMDBViaBackground<T>(endpoint, params), {
+		prefix: CACHE_PREFIX,
+		ttl,
+		persist,
+	})
 }
 
 // =============================================================================
@@ -204,6 +213,7 @@ export interface MovieTemplateData {
 	originalTitle: string
 	year: string
 	director: string
+	screenplay: string[]
 	cast: string[]
 	genres: string[]
 	runtime: number
@@ -224,6 +234,16 @@ export async function getMovieTemplateData(movieId: number): Promise<MovieTempla
 
 	const director = credits.crew.find(c => c.job === 'Director')?.name || 'Desconocido'
 
+	// Prioritize "Screenplay", "Writer", "Scenario" jobs
+	let writers = credits.crew.filter(c => ['Screenplay', 'Writer', 'Scenario'].includes(c.job)).map(c => c.name)
+
+	// Fallback to Writing department if empty
+	if (writers.length === 0) {
+		writers = credits.crew.filter(c => c.department === 'Writing').map(c => c.name)
+	}
+
+	const screenplay = writers.filter((name, i, arr) => arr.indexOf(name) === i).slice(0, 5)
+
 	const cast = credits.cast
 		.sort((a, b) => a.order - b.order)
 		.slice(0, 5)
@@ -240,55 +260,31 @@ export async function getMovieTemplateData(movieId: number): Promise<MovieTempla
 		originalTitle: details.original_title,
 		year: details.release_date?.split('-')[0] || '',
 		director,
+		screenplay,
 		cast,
 		genres: details.genres.map(g => GENRE_TRANSLATIONS[g.name] || g.name),
 		runtime: details.runtime,
 		overview: details.overview,
 		posterUrl: getPosterUrl(details.poster_path, 'w500'),
 		trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
-		releaseDate: spainReleaseDate || details.release_date,
+		releaseDate: formatDateLong(spainReleaseDate || details.release_date),
 		voteAverage: details.vote_average,
 	}
 }
 
+/**
+ * Get the active template for a given type.
+ * Returns the user's custom template if set, otherwise the default.
+ */
+function getActiveTemplate(type: 'movie' | 'tvshow' | 'season'): MediaTemplate {
+	const { mediaTemplates } = useSettingsStore.getState()
+	const customTemplate = mediaTemplates[type]
+	return customTemplate || getDefaultTemplate(type)
+}
+
 export function generateTemplate(data: MovieTemplateData): string {
-	const lines: string[] = []
-
-	if (data.posterUrl) {
-		lines.push('[center]')
-		lines.push(`[img]${data.posterUrl}[/img]`)
-		lines.push('[/center]')
-		lines.push('')
-	}
-
-	lines.push(`[b]Director:[/b] ${data.director}`)
-	lines.push(`[b]Reparto:[/b] ${data.cast.join(', ')}`)
-	lines.push(`[b]Duración:[/b] ${data.runtime} min`)
-	const genreLabel = data.genres.length === 1 ? 'Género' : 'Géneros'
-	lines.push(`[b]${genreLabel}:[/b] ${data.genres.join(', ')}`)
-	lines.push('')
-
-	lines.push('[bar]SINOPSIS[/bar]')
-	lines.push('')
-	lines.push(data.overview)
-	lines.push('')
-
-	if (data.trailerUrl) {
-		lines.push('[bar]TRAILER[/bar]')
-		lines.push('')
-		lines.push(`[media]${data.trailerUrl}[/media]`)
-		lines.push('')
-	}
-
-	if (data.releaseDate) {
-		lines.push('[bar]ESTRENO[/bar]')
-		lines.push('')
-		const date = new Date(data.releaseDate)
-		const formatted = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-		lines.push(`${formatted}`)
-	}
-
-	return lines.join('\n')
+	const template = getActiveTemplate('movie')
+	return renderTemplate(template, data)
 }
 
 // =============================================================================
@@ -462,96 +458,16 @@ export async function getTVShowTemplateData(tvId: number): Promise<TVShowTemplat
 		overview: details.overview,
 		posterUrl: getPosterUrl(details.poster_path, 'w500'),
 		trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
-		firstAirDate: details.first_air_date,
-		lastAirDate: details.last_air_date,
+		firstAirDate: formatDateLong(details.first_air_date),
+		lastAirDate: formatDateLong(details.last_air_date),
 		voteAverage: details.vote_average,
 		seasons,
 	}
 }
 
 export function generateTVTemplate(data: TVShowTemplateData): string {
-	const lines: string[] = []
-
-	if (data.posterUrl) {
-		lines.push('[center]')
-		lines.push(`[img]${data.posterUrl}[/img]`)
-		lines.push('[/center]')
-		lines.push('')
-	}
-
-	// Basic info
-	if (data.creators.length > 0) {
-		const creatorLabel = data.creators.length === 1 ? 'Creador' : 'Creadores'
-		lines.push(`[b]${creatorLabel}:[/b] ${data.creators.join(', ')}`)
-	}
-	lines.push(`[b]Reparto:[/b] ${data.cast.join(', ')}`)
-
-	const genreLabel = data.genres.length === 1 ? 'Género' : 'Géneros'
-	lines.push(`[b]${genreLabel}:[/b] ${data.genres.join(', ')}`)
-
-	lines.push(`[b]Estado:[/b] ${data.status}`)
-
-	if (data.episodeRunTime > 0) {
-		lines.push(`[b]Duración por episodio:[/b] ${data.episodeRunTime} min`)
-	}
-
-	const seasonLabel = data.numberOfSeasons === 1 ? 'Temporada' : 'Temporadas'
-	lines.push(`[b]${seasonLabel}:[/b] ${data.numberOfSeasons}`)
-	const episodeLabel = data.numberOfEpisodes === 1 ? 'Episodio' : 'Episodios'
-	lines.push(`[b]${episodeLabel}:[/b] ${data.numberOfEpisodes}`)
-	lines.push('')
-
-	// Synopsis
-	lines.push('[bar]SINOPSIS[/bar]')
-	lines.push('')
-	lines.push(data.overview)
-	lines.push('')
-
-	// Seasons breakdown
-	if (data.seasons.length > 0 && data.seasons.length <= 10) {
-		lines.push('[bar]TEMPORADAS[/bar]')
-		lines.push('')
-		data.seasons.forEach(season => {
-			const airYear = season.airDate ? ` (${season.airDate.split('-')[0]})` : ''
-			lines.push(`[b]Temporada ${season.number}[/b]${airYear}: ${season.episodeCount} episodios`)
-		})
-		lines.push('')
-	}
-
-	// Trailer
-	if (data.trailerUrl) {
-		lines.push('[bar]TRAILER[/bar]')
-		lines.push('')
-		lines.push(`[media]${data.trailerUrl}[/media]`)
-		lines.push('')
-	}
-
-	// Premiere date
-	if (data.firstAirDate) {
-		lines.push('[bar]ESTRENO[/bar]')
-		lines.push('')
-		const date = new Date(data.firstAirDate)
-		const formatted = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-		lines.push(formatted)
-		lines.push('')
-	}
-
-	// Networks/Channels at the end
-	if (data.networks.length > 0) {
-		lines.push('[bar]CADENA[/bar]')
-		lines.push('')
-		lines.push('[center]')
-		data.networks.forEach(network => {
-			if (network.logoUrl) {
-				lines.push(`[img]${network.logoUrl}[/img]`)
-			} else {
-				lines.push(network.name)
-			}
-		})
-		lines.push('[/center]')
-	}
-
-	return lines.join('\n')
+	const template = getActiveTemplate('tvshow')
+	return renderTemplate(template, data)
 }
 
 // =============================================================================
@@ -604,7 +520,7 @@ export async function getSeasonTemplateData(
 	const episodes = seasonDetails.episodes.map(ep => ({
 		number: ep.episode_number,
 		name: ep.name,
-		airDate: ep.air_date || null,
+		airDate: formatDateLong(ep.air_date),
 	}))
 
 	return {
@@ -617,7 +533,7 @@ export async function getSeasonTemplateData(
 		averageRuntime,
 		posterUrl,
 		trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
-		airDate: seasonDetails.air_date,
+		airDate: formatDateLong(seasonDetails.air_date),
 		voteAverage: seasonDetails.vote_average,
 		networks: seriesData.networks,
 		episodes,
@@ -629,80 +545,6 @@ export async function getSeasonTemplateData(
 }
 
 export function generateSeasonTemplate(data: SeasonTemplateData): string {
-	const lines: string[] = []
-
-	if (data.posterUrl) {
-		lines.push('[center]')
-		lines.push(`[img]${data.posterUrl}[/img]`)
-		lines.push('[/center]')
-		lines.push('')
-	}
-
-	// Basic info
-	if (data.seriesCreators.length > 0) {
-		const creatorLabel = data.seriesCreators.length === 1 ? 'Creador' : 'Creadores'
-		lines.push(`[b]${creatorLabel}:[/b] ${data.seriesCreators.join(', ')}`)
-	}
-	lines.push(`[b]Reparto:[/b] ${data.seriesCast.join(', ')}`)
-
-	const genreLabel = data.seriesGenres.length === 1 ? 'Género' : 'Géneros'
-	lines.push(`[b]${genreLabel}:[/b] ${data.seriesGenres.join(', ')}`)
-
-	lines.push(`[b]Episodios:[/b] ${data.episodeCount}`)
-
-	if (data.averageRuntime > 0) {
-		lines.push(`[b]Duración por episodio:[/b] ${data.averageRuntime} min`)
-	}
-	lines.push('')
-
-	// Synopsis
-	lines.push('[bar]SINOPSIS[/bar]')
-	lines.push('')
-	lines.push(data.overview)
-	lines.push('')
-
-	// Episode list
-	if (data.episodes.length > 0 && data.episodes.length <= 30) {
-		lines.push('[bar]EPISODIOS[/bar]')
-		lines.push('')
-		data.episodes.forEach(ep => {
-			lines.push(`[b]${ep.number}.[/b] ${ep.name}`)
-		})
-		lines.push('')
-	}
-
-	// Trailer
-	if (data.trailerUrl) {
-		lines.push('[bar]TRAILER[/bar]')
-		lines.push('')
-		lines.push(`[media]${data.trailerUrl}[/media]`)
-		lines.push('')
-	}
-
-	// Premiere date
-	if (data.airDate) {
-		lines.push('[bar]ESTRENO[/bar]')
-		lines.push('')
-		const date = new Date(data.airDate)
-		const formatted = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-		lines.push(formatted)
-		lines.push('')
-	}
-
-	// Networks/Channels at the end
-	if (data.networks.length > 0) {
-		lines.push('[bar]CADENA[/bar]')
-		lines.push('')
-		lines.push('[center]')
-		data.networks.forEach(network => {
-			if (network.logoUrl) {
-				lines.push(`[img]${network.logoUrl}[/img]`)
-			} else {
-				lines.push(network.name)
-			}
-		})
-		lines.push('[/center]')
-	}
-
-	return lines.join('\n')
+	const template = getActiveTemplate('season')
+	return renderTemplate(template, data)
 }

@@ -75,4 +75,31 @@ export type {
 	GeminiGenerationResult,
 } from './ai'
 
+// Template Types
+export type {
+	TemplateType,
+	TemplateBlockType,
+	FieldBlock,
+	SectionBlock,
+	RawBlock,
+	TemplateBlock,
+	MediaTemplate,
+	FieldDefinition,
+	UserTemplates,
+	MovieTemplateDataInput,
+	TVShowTemplateDataInput,
+	SeasonTemplateDataInput,
+	GameTemplateDataInput,
+	TemplateDataInput,
+} from './templates'
+
+export {
+	MOVIE_FIELDS,
+	TVSHOW_FIELDS,
+	SEASON_FIELDS,
+	GAME_FIELDS,
+	getFieldsForType,
+	DEFAULT_USER_TEMPLATES,
+} from './templates'
+
 // Note: MutedWord and PinnedPost are already exported from './storage'

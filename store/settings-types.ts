@@ -7,6 +7,8 @@
  * IMPORTANT: Keep in sync with settings-schema.ts
  */
 
+import type { UserTemplates } from '@/types/templates'
+
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
@@ -54,6 +56,7 @@ export interface Settings {
 
 	// Feature Toggles - Editor
 	cinemaButtonEnabled: boolean
+	gameButtonEnabled: boolean
 	gifPickerEnabled: boolean
 	draftsButtonEnabled: boolean
 	templateButtonEnabled: boolean
@@ -82,6 +85,9 @@ export interface Settings {
 
 	// Keyboard Shortcuts
 	shortcuts: Record<string, string | null>
+
+	// Media Templates (null = use default)
+	mediaTemplates: UserTemplates
 }
 
 /** Partial settings for updates */
