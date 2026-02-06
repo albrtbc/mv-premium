@@ -117,7 +117,7 @@ describe('IGDB API Service', () => {
 			// Second call: wildcard fallback
 			expect(mockSendMessage).toHaveBeenCalledWith('igdbRequest', {
 				endpoint: '/games',
-				body: expect.stringContaining('where name ~ *"expanse osir"*'),
+				body: expect.stringContaining('where name ~ *"expanse"* & name ~ *"osir"*'),
 			})
 			expect(result).toEqual(mockGames)
 		})
@@ -602,13 +602,6 @@ describe('IGDB API Service', () => {
 				websites: [],
 				externalGames: [],
 				steamStoreUrl: 'https://store.steampowered.com/app/292030',
-				externalSteam: null,
-				externalGog: null,
-				externalEpic: null,
-				externalItch: null,
-				externalPlaystation: null,
-				externalXbox: null,
-				externalNintendo: null,
 				languageSupports: [],
 				rating: 85,
 				aggregatedRating: null,
@@ -670,13 +663,6 @@ describe('IGDB API Service', () => {
 				websites: [],
 				externalGames: [],
 				steamStoreUrl: null,
-				externalSteam: null,
-				externalGog: null,
-				externalEpic: null,
-				externalItch: null,
-				externalPlaystation: null,
-				externalXbox: null,
-				externalNintendo: null,
 				languageSupports: [],
 				rating: null,
 				aggregatedRating: null,

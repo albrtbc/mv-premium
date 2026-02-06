@@ -349,14 +349,8 @@ export async function getGameTemplateData(
 		})) || []
 
 	// External games (store/service links)
-	const externalLinkByStore: Record<string, string | null> = {
+	const externalLinkByStore: Record<'steam', string | null> = {
 		steam: null,
-		gog: null,
-		epic: null,
-		itch: null,
-		playstation: null,
-		xbox: null,
-		nintendo: null,
 	}
 
 	const externalGames =
@@ -494,13 +488,6 @@ export async function getGameTemplateData(
 		websites,
 		externalGames,
 		steamStoreUrl: steamAppId ? `https://store.steampowered.com/app/${steamAppId}` : null,
-		externalSteam: externalLinkByStore.steam,
-		externalGog: externalLinkByStore.gog,
-		externalEpic: externalLinkByStore.epic,
-		externalItch: externalLinkByStore.itch,
-		externalPlaystation: externalLinkByStore.playstation,
-		externalXbox: externalLinkByStore.xbox,
-		externalNintendo: externalLinkByStore.nintendo,
 		languageSupports,
 		rating: game.rating ? Math.round(game.rating) : null,
 		aggregatedRating: game.aggregated_rating ? Math.round(game.aggregated_rating) : null,
@@ -509,17 +496,9 @@ export async function getGameTemplateData(
 	}
 }
 
-function normalizeExternalSourceKey(
-	source: string
-): 'steam' | 'gog' | 'epic' | 'itch' | 'playstation' | 'xbox' | 'nintendo' | null {
+function normalizeExternalSourceKey(source: string): 'steam' | null {
 	const normalized = source.toLowerCase()
 	if (normalized.includes('steam')) return 'steam'
-	if (normalized.includes('gog')) return 'gog'
-	if (normalized.includes('epic')) return 'epic'
-	if (normalized.includes('itch')) return 'itch'
-	if (normalized.includes('playstation')) return 'playstation'
-	if (normalized.includes('xbox') || normalized.includes('microsoft')) return 'xbox'
-	if (normalized.includes('nintendo')) return 'nintendo'
 	return null
 }
 
