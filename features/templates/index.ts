@@ -15,11 +15,3 @@ export {
 	getDefaultTemplate,
 } from './default-templates'
 
-// Sample data for preview
-export {
-	SAMPLE_MOVIE_DATA,
-	SAMPLE_TVSHOW_DATA,
-	SAMPLE_SEASON_DATA,
-	SAMPLE_GAME_DATA,
-	getSampleData,
-} from './sample-data'
