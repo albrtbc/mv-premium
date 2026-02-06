@@ -26,6 +26,14 @@ interface PendingThreadCreation {
 	timestamp: number
 }
 
+// Pending reply data structure
+interface PendingReply {
+	title: string
+	subforum: string
+	url: string
+	timestamp: number
+}
+
 // Pending post edit data structure (for edits from post.php)
 interface PendingPostEdit {
 	subforum: string
@@ -59,7 +67,7 @@ function isPostPhpEditPage(): boolean {
  * Matches both /nuevo-hilo and /foro/{subforum}/nuevo-hilo
  */
 function isNewThreadPage(): boolean {
-	return window.location.pathname.includes(MV_URLS.NEW_THREAD)
+	return window.location.pathname.includes('/nuevo-hilo')
 }
 
 /**
@@ -301,16 +309,27 @@ export function setupPostTracker(): void {
 					}).catch(() => {})
 				}
 			} else {
-				// Reply: get thread info
+				// Reply: use deferred tracking to survive page navigation
 				const threadInfo = getThreadInfo()
 
-				trackActivity({
-					type: 'post',
-					action: 'publish',
+				const pending: PendingReply = {
 					title: threadInfo.title,
-					context: threadInfo.subforum,
+					subforum: threadInfo.subforum,
 					url: threadInfo.url,
-				}).catch(() => {})
+					timestamp: Date.now(),
+				}
+				try {
+					sessionStorage.setItem(STORAGE_KEYS.PENDING_REPLY, JSON.stringify(pending))
+				} catch {
+					// If sessionStorage fails, track immediately (best effort)
+					trackActivity({
+						type: 'post',
+						action: 'publish',
+						title: threadInfo.title,
+						context: threadInfo.subforum,
+						url: threadInfo.url,
+					}).catch(() => {})
+				}
 			}
 		}
 
@@ -427,6 +446,42 @@ export function completePendingPostEdit(): void {
 		// Clear if any error
 		try {
 			sessionStorage.removeItem(STORAGE_KEYS.PENDING_POST_EDIT)
+		} catch {}
+	}
+}
+
+/**
+ * Checks for and completes any pending reply tracking.
+ * Should be called on thread page load to finalize deferred reply tracking.
+ */
+export function completePendingReply(): void {
+	try {
+		const pendingJson = sessionStorage.getItem(STORAGE_KEYS.PENDING_REPLY)
+		if (!pendingJson) return
+
+		const pending: PendingReply = JSON.parse(pendingJson)
+
+		// Only complete if within 30 seconds (to avoid stale data)
+		const MAX_AGE_MS = 30000
+		if (Date.now() - pending.timestamp > MAX_AGE_MS) {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_REPLY)
+			return
+		}
+
+		trackActivity({
+			type: 'post',
+			action: 'publish',
+			title: pending.title,
+			context: pending.subforum,
+			url: pending.url,
+		}).catch(() => {})
+
+		// Clear the pending flag
+		sessionStorage.removeItem(STORAGE_KEYS.PENDING_REPLY)
+	} catch {
+		// Clear if any error
+		try {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_REPLY)
 		} catch {}
 	}
 }

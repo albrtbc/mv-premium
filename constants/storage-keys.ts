@@ -33,6 +33,7 @@ export const STORAGE_KEYS = {
 	ACTIVITY: 'mvp-activity',
 	PENDING_THREAD_CREATION: 'mvp-pending-thread-creation',
 	PENDING_POST_EDIT: 'mvp-pending-post-edit',
+	PENDING_REPLY: 'mvp-pending-reply',
 	LAST_SEEN_VERSION: 'mvp-last-seen-version',
 	DRAFTS: 'mvp-drafts',
 	EDITOR_PRESERVE: 'mvp-editor-preserve',

@@ -156,10 +156,11 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 			initPostitToggle()
 		})
 
-		// Check for pending thread creation or post edit (captures context after redirect)
-		import('@/features/stats').then(({ completePendingThreadCreation, completePendingPostEdit }) => {
+		// Check for pending thread creation, post edit, or reply (captures context after redirect)
+		import('@/features/stats').then(({ completePendingThreadCreation, completePendingPostEdit, completePendingReply }) => {
 			completePendingThreadCreation()
 			completePendingPostEdit()
+			completePendingReply()
 		})
 
 		// Parallel load thread features using allSettled to prevent single failure from breaking all
