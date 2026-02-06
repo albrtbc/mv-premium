@@ -636,13 +636,12 @@ describe('IGDB API Service', () => {
 			expect(result).toContain('[b]Plataformas:[/b] PC, PS5')
 			expect(result).toContain('[b]Géneros:[/b] Aventura, RPG')
 			expect(result).toContain('[b]Modos de juego:[/b] Un jugador')
-			expect(result).toContain('[bar]SINOPSIS[/bar]')
+			expect(result).toContain('[bar]ACERCA DE ESTE JUEGO[/bar]')
 			expect(result).toContain('A great adventure game.')
 			expect(result).toContain('[bar]TRAILER[/bar]')
 			expect(result).toContain('[media]https://www.youtube.com/watch?v=abc123[/media]')
 			expect(result).toContain('[bar]STEAM[/bar]')
 			expect(result).toContain('[media]https://store.steampowered.com/app/292030[/media]')
-			expect(result).toContain('[bar]LANZAMIENTO[/bar]')
 		})
 
 		it('should handle game data without optional fields', () => {

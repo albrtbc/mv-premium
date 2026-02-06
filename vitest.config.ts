@@ -19,6 +19,7 @@ export default defineConfig({
 		},
 		alias: {
 			'@': resolve(__dirname, './'),
+			'#imports': resolve(__dirname, './tests/mocks/wxt-imports.ts'),
 		},
 		// Timeouts
 		testTimeout: 10000,

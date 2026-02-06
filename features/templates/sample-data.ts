@@ -147,6 +147,13 @@ export const SAMPLE_GAME_DATA: GameTemplateDataInput = {
 	storyline:
 		'La historia sigue a Geralt de Rivia mientras busca a Ciri, su hija adoptiva que está siendo perseguida por la Cacería Salvaje, un grupo de espectros que busca usar sus poderes para sus propios fines oscuros. A lo largo del camino, Geralt deberá enfrentarse a monstruos, tomar decisiones morales difíciles y navegar por las intrigas políticas de los reinos del Norte.',
 	coverUrl: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1wyy.jpg',
+	steamLibraryHeaderUrl: 'https://cdn.akamai.steamstatic.com/steam/apps/292030/library_header_2x.jpg',
+	detailedDescription:
+		'The Witcher 3: Wild Hunt es un RPG de mundo abierto galardonado, ambientado en un universo de fantasía oscura donde cada elección tiene consecuencias. Explora un vasto mundo, lucha contra criaturas mortales y toma decisiones que darán forma a la historia.',
+	steamScreenshots: [
+		'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/292030/ss_107600c1337accc09104f7a8aa7f275f23cad096.jpg',
+		'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/292030/ss_64eb760f9a2b67f6731a71c1e3b65c1e52b6b5f3.jpg',
+	],
 	screenshots: [
 		'https://images.igdb.com/igdb/image/upload/t_1080p/em1y2ugcwy2myuhvb9db.jpg',
 		'https://images.igdb.com/igdb/image/upload/t_1080p/qhazjvisxtqnhnzxj7xz.jpg',
