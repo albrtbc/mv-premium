@@ -140,16 +140,27 @@ export async function searchGames(query: string, limit = 50): Promise<IGDBGame[]
 	// If search found results, return them
 	if (results.length > 0) return results
 
-	// Fallback: wildcard name match (more tolerant of partial/special chars)
-	const wildcardBody = `
+	// Fallback strategy:
+	// If the query has multiple terms (e.g. "resident evil bio"), splitting them allows
+	// finding "Resident Evil 7: Biohazard" where the terms are not contiguous.
+	const terms = escapedQuery.split(/\s+/).filter(t => t.length > 0)
+	let whereClause = `name ~ *"${escapedQuery}"*` // Default: exact phrase substring
+
+	if (terms.length > 1) {
+		// Create AND condition: name ~ *"term1"* & name ~ *"term2"*
+		whereClause = terms.map(t => `name ~ *"${t}"*`).join(' & ')
+	}
+
+	// Fallback query construction
+	const fallbackBody = `
 		fields name, cover.image_id, first_release_date, platforms.name, platforms.abbreviation,
 			   genres.name, rating, summary;
-		where name ~ *"${escapedQuery}"*;
+		where ${whereClause};
 		sort rating desc;
 		limit ${limit};
 	`
 
-	return fetchIGDB<IGDBGame[]>('/games', wildcardBody, CACHE_TTL.SHORT)
+	return fetchIGDB<IGDBGame[]>('/games', fallbackBody, CACHE_TTL.SHORT)
 }
 
 /**
