@@ -64,18 +64,6 @@ jobs:
       - name: Run tests
         run: npm run test -- --run
 
-      - name: Run tests with coverage
-        run: npm run test:coverage -- --run
-        continue-on-error: true
-
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-        continue-on-error: true
-
   build:
     name: Build Extension
     runs-on: ubuntu-latest
