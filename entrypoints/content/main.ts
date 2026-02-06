@@ -7,7 +7,7 @@
 
 import { browser } from 'wxt/browser'
 
-import { useSettingsStore, waitForHydration } from '@/store/settings-store'
+import { useSettingsStore, waitForHydration, initCrossTabSync } from '@/store/settings-store'
 import { detectAndSaveCurrentUser } from '@/entrypoints/options/lib/current-user'
 import { initGlobalFontListener, initGlobalThemeListener } from '@/lib/theme-sync'
 import { initThemes } from '@/features/editor/lib/themes'
@@ -64,9 +64,7 @@ export async function runContentMain(ctx: unknown): Promise<void> {
 				if (SENSITIVE_KEYS.some(s => k.includes(s) || k.includes('api-key'))) {
 					// Show only first 4 and last 3 chars
 					value =
-						typeof value === 'string' && value.length > 10
-							? `${value.slice(0, 4)}...${value.slice(-3)}`
-							: '********'
+						typeof value === 'string' && value.length > 10 ? `${value.slice(0, 4)}...${value.slice(-3)}` : '********'
 				}
 
 				return [k, value]
@@ -90,10 +88,11 @@ export async function runContentMain(ctx: unknown): Promise<void> {
 	})
 
 	// =====================================================================
-	// 1. HYDRATE SETTINGS
+	// 1. HYDRATE SETTINGS + CROSS-TAB SYNC
 	// =====================================================================
 	useSettingsStore.persist.rehydrate()
 	await waitForHydration()
+	initCrossTabSync()
 
 	// =====================================================================
 	// 2. DETECT AND SAVE CURRENT USER
