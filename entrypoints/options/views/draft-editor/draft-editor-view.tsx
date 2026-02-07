@@ -73,7 +73,7 @@ export function DraftEditorView({ docType = 'draft' }: DraftEditorViewProps) {
 		value: content,
 		onChange: newContent => {
 			form.setValue('content', newContent, { shouldDirty: true })
-		}
+		},
 	})
 
 	// Slash command hook for /shortcut template insertion
@@ -195,7 +195,12 @@ export function DraftEditorView({ docType = 'draft' }: DraftEditorViewProps) {
 						<div className="flex items-center gap-2">
 							{draftEditor.error && <span className="text-sm text-destructive">{draftEditor.error}</span>}
 
-							<Button variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)} className="gap-2 px-3 h-9">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setShowPreview(!showPreview)}
+								className="gap-2 px-3 h-9"
+							>
 								{showPreview ? (
 									<>
 										<EyeOff className="h-4 w-4" />
@@ -281,7 +286,7 @@ export function DraftEditorView({ docType = 'draft' }: DraftEditorViewProps) {
 							folders={draftEditor.folders}
 							onOpenFolderDialog={() => dialogs.open('folder')}
 						/>
-						
+
 						<SharedEditorStack
 							toolbar={
 								<SharedEditorToolbar
@@ -366,6 +371,7 @@ export function DraftEditorView({ docType = 'draft' }: DraftEditorViewProps) {
 						theme={theme === 'system' ? undefined : theme}
 						showPreview={true}
 						previewRef={refs.preview}
+						badgeTone="neutral"
 					/>
 				}
 			/>

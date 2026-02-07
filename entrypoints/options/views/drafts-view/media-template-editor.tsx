@@ -113,6 +113,7 @@ export function MediaTemplateEditor() {
 	const [previewData, setPreviewData] = useState<TemplateDataInput | null>(() => generatePlaceholderData(mediaType))
 	const [isDirty, setIsDirty] = useState(false)
 	const [showPreview, setShowPreview] = useState(true)
+	const [templateOrigin, setTemplateOrigin] = useState<'default' | 'custom'>('default')
 
 	// Refactored Hooks
 	const gameSelection = useGameSelection({
@@ -180,6 +181,7 @@ export function MediaTemplateEditor() {
 
 		let newContent: string
 		if (template && template.blocks.length > 0) {
+			setTemplateOrigin('custom')
 			// Custom template saved — load the raw BBCode
 			const rawBlock = template.blocks.find(b => b.type === 'raw')
 			if (rawBlock && rawBlock.type === 'raw') {
@@ -189,6 +191,7 @@ export function MediaTemplateEditor() {
 				newContent = defaultTemplateToRawBBCode(template)
 			}
 		} else {
+			setTemplateOrigin('default')
 			// No custom template — load the default as editable raw BBCode
 			const defaultTemplate = getDefaultTemplate(mediaType)
 			newContent = defaultTemplateToRawBBCode(defaultTemplate)
@@ -234,6 +237,7 @@ export function MediaTemplateEditor() {
 
 		setSetting('mediaTemplates', updatedTemplates)
 		setIsDirty(false)
+		setTemplateOrigin('custom')
 		toast.success(`Plantilla de ${getTypeName(mediaType)} guardada`)
 	}, [content, mediaType, mediaTemplates, setSetting])
 
@@ -258,11 +262,12 @@ export function MediaTemplateEditor() {
 		const defaultTemplate = getDefaultTemplate(mediaType)
 		const rawBBCode = defaultTemplateToRawBBCode(defaultTemplate)
 		setContent(rawBBCode)
+		setTemplateOrigin('default')
 		// Hook handles ref syncing via useEffect on value change
 
 		setIsDirty(false)
 		dialogs.close()
-		toast.success(`Plantilla de ${getTypeName(mediaType)} restablecida a la versión por defecto`)
+		toast.success(`Plantilla personalizada de ${getTypeName(mediaType)} eliminada`)
 	}
 
 	// Handle load default template as base
@@ -270,11 +275,25 @@ export function MediaTemplateEditor() {
 		const defaultTemplate = getDefaultTemplate(mediaType)
 		const rawBBCode = defaultTemplateToRawBBCode(defaultTemplate)
 		setContent(rawBBCode)
+		setTemplateOrigin('default')
 		// Hook handles ref syncing
 
 		setIsDirty(true)
 		toast.success('Plantilla por defecto cargada como base')
 	}, [mediaType])
+
+	const handleLoadSaved = useCallback(() => {
+		const template = mediaTemplates?.[mediaType]
+		if (!template || template.blocks.length === 0) return
+
+		const rawBlock = template.blocks.find(b => b.type === 'raw')
+		const rawBBCode = rawBlock && rawBlock.type === 'raw' ? rawBlock.rawText : defaultTemplateToRawBBCode(template)
+
+		setContent(rawBBCode)
+		setTemplateOrigin('custom')
+		setIsDirty(false)
+		toast.success('Plantilla personalizada cargada')
+	}, [mediaTemplates, mediaType])
 
 	// Keyboard shortcuts
 	useEffect(() => {
@@ -804,10 +823,27 @@ export function MediaTemplateEditor() {
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end">
+								{hasCustomTemplate && (
+									<DropdownMenuItem onClick={handleLoadSaved}>
+										<FileDown className="h-4 w-4 mr-2" />
+										Cargar plantilla guardada
+									</DropdownMenuItem>
+								)}
 								<DropdownMenuItem onClick={handleLoadDefault}>
 									<FileDown className="h-4 w-4 mr-2" />
-									Restablecer plantilla por defecto
+									Cargar plantilla por defecto
 								</DropdownMenuItem>
+								{hasCustomTemplate && (
+									<DropdownMenuItem
+										onSelect={event => {
+											event.preventDefault()
+											handleReset()
+										}}
+									>
+										<Trash2 className="h-4 w-4 mr-2" />
+										Eliminar plantilla personalizada
+									</DropdownMenuItem>
+								)}
 							</DropdownMenuContent>
 						</DropdownMenu>
 
@@ -935,7 +971,16 @@ export function MediaTemplateEditor() {
 									  (tmdbSelection.selectedSeasonNumber !== null ? ` — T${tmdbSelection.selectedSeasonNumber}` : '')
 									: gameSelection.selectedGameTitle
 									? gameSelection.selectedGameTitle
-									: 'Plantilla'
+									: templateOrigin === 'custom'
+									? 'Plantilla personalizada'
+									: 'Plantilla por defecto'
+							}
+							badgeTone={
+								tmdbSelection.selectedMovieTitle || tmdbSelection.selectedTVTitle || gameSelection.selectedGameTitle
+									? 'neutral'
+									: templateOrigin === 'custom'
+									? 'custom'
+									: 'default'
 							}
 						/>
 						{/* Loading overlay — game (with step detail) */}
@@ -995,13 +1040,14 @@ export function MediaTemplateEditor() {
 			<AlertDialog
 				open={dialogs.isOpen('clear')}
 				onOpenChange={open => (open ? dialogs.open('clear') : dialogs.close())}
+				modal={true}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>¿Restablecer plantilla por defecto?</AlertDialogTitle>
+						<AlertDialogTitle>¿Eliminar plantilla personalizada?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Se eliminará tu plantilla personalizada de {getTypeName(mediaType).toLowerCase()} y se cargará la
-							plantilla por defecto. Esta acción no se puede deshacer.
+							Se eliminará tu plantilla personalizada de {getTypeName(mediaType).toLowerCase()}. Esta acción no se puede
+							deshacer.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -1010,7 +1056,7 @@ export function MediaTemplateEditor() {
 							onClick={handleClearConfirm}
 							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 						>
-							Restablecer
+							Eliminar
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

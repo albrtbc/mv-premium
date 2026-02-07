@@ -57,6 +57,8 @@ export interface PreviewPanelProps {
 	previewRef: React.RefObject<HTMLDivElement | null>
 	/** Optional badge text to display instead of "Estilo Mediavida" (e.g., "Datos de ejemplo") */
 	badgeText?: string
+	/** Optional tone for the badge when a label is present */
+	badgeTone?: 'neutral' | 'default' | 'custom'
 }
 
 // ============================================================================

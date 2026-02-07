@@ -8,7 +8,22 @@ import { MVPreview } from '@/components/preview-system'
 import { cn } from '@/lib/utils'
 import type { PreviewPanelProps } from './types'
 
-export function PreviewPanel({ content, boldColor, theme, showPreview, previewRef, badgeText }: PreviewPanelProps) {
+export function PreviewPanel({
+	content,
+	boldColor,
+	theme,
+	showPreview,
+	previewRef,
+	badgeText,
+	badgeTone = 'neutral',
+}: PreviewPanelProps) {
+	const badgeToneClass =
+		badgeTone === 'custom'
+			? 'border-primary/30 bg-primary/10 text-primary'
+			: badgeTone === 'default'
+			? 'border-border/60 bg-muted/50 text-muted-foreground'
+			: 'border-border/50 bg-muted/30 text-foreground/80'
+
 	return (
 		<div
 			className={cn(
@@ -27,7 +42,7 @@ export function PreviewPanel({ content, boldColor, theme, showPreview, previewRe
 					Vista Previa
 				</span>
 				{badgeText ? (
-					<Badge variant="outline" className="font-mono text-xs">
+					<Badge variant="outline" className={cn('font-mono text-xs', badgeToneClass)}>
 						{badgeText}
 					</Badge>
 				) : (
