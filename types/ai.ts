@@ -42,14 +42,12 @@ export interface AIService {
 export type RewriteStyle = 'formal' | 'casual' | 'concise' | 'detailed' | 'friendly'
 
 /**
- * Available Gemini models
+ * Available Gemini models (free tier)
  */
 export type AIModel =
-	| 'gemini-2.5-flash' // Newest stable - Recommended
-	| 'gemini-2.5-pro' // More powerful
+	| 'gemini-2.5-flash' // Recommended
 	| 'gemini-2.5-flash-lite' // Lite version
-	| 'gemini-3-flash' // Next gen preview
-	| 'gemini-2.0-flash' // Fast and stable
+	| 'gemini-3-flash-preview' // Next gen preview
 
 /**
  * AI Service configuration stored in settings

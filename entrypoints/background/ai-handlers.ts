@@ -12,14 +12,14 @@ import type { GeminiAPIResponse, GeminiRequestBody, GeminiResponsePart } from '@
 // =============================================================================
 
 /**
- * Fallback models in order of preference (from user's Google AI console)
+ * Fallback models in order of preference.
+ * The 3 free-tier models come first; older models serve as silent last-resort.
  */
 const FALLBACK_MODELS = [
-	'gemini-2.5-flash', // Primary (20 RPD limit)
-	'gemini-2.5-flash-lite', // Lite version (20 RPD)
-	'models/gemini-3-flash', // Need full path for newer models
-	'gemini-2.0-flash', // Older but stable
-	'gemini-1.5-flash', // Fallback - widely available
+	'gemini-2.5-flash',
+	'gemini-2.5-flash-lite',
+	'gemini-3-flash-preview',
+	'gemini-2.0-flash', // Silent fallback (deprecated 31/03/2026)
 ] as const
 
 /**
@@ -114,6 +114,7 @@ export function setupGeminiHandler(): void {
 						success: true,
 						text,
 						functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
+						modelUsed: currentModel,
 					}
 				}
 

@@ -17,7 +17,7 @@ import type { UserTemplates } from '@/types/templates'
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 /** AI Model options */
-export type AIModel = 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-pro'
+export type AIModel = 'gemini-2.5-flash' | 'gemini-2.5-flash-lite' | 'gemini-3-flash-preview'
 
 /** Ultrawide mode levels */
 export type UltrawideMode = 'off' | 'wide' | 'extra-wide' | 'full'

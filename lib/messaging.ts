@@ -33,6 +33,8 @@ export interface GeminiResult {
 	text?: string
 	functionCalls?: GeminiFunctionCall[]
 	error?: string
+	/** The actual model that processed the request (may differ from requested due to fallback) */
+	modelUsed?: string
 }
 
 // =============================================================================

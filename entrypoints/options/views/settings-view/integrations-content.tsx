@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SettingsSection } from '../../components/settings/settings-section'
 import { SettingRow, ApiKeyInput } from '../../components/settings'
 import { useSettingsStore } from '@/store/settings-store'
-import { getAvailableModels } from '@/services/ai/gemini-service'
+import { getAvailableModels, testGeminiConnection } from '@/services/ai/gemini-service'
 
 export function IntegrationsContent() {
 	const { imgbbApiKey, setImgbbApiKey } = useSettingsStore()
@@ -28,19 +28,31 @@ export function IntegrationsContent() {
 	const [testingGemini, setTestingGemini] = useState(false)
 	const [geminiExpanded, setGeminiExpanded] = useState(false)
 
-	// Test Gemini connection
+	// Test Gemini connection and validate selected model
 	const handleTestGemini = async () => {
 		if (!geminiApiKey) return
 		setTestingGemini(true)
 		try {
-			const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`)
-			if (response.ok) {
-				const data = await response.json()
-				const modelCount = data.models?.length || 0
-				toast.success('Conexión exitosa', { description: `${modelCount} modelos disponibles.` })
+			const result = await testGeminiConnection(geminiApiKey)
+
+			if (result.success) {
+				toast.success('Conexión exitosa', { description: result.message })
+
+				// Check if the currently selected model is available
+				if (result.availableModelIds && aiModel) {
+					const isModelAvailable = result.availableModelIds.some(
+						id => id === aiModel || id.startsWith(aiModel)
+					)
+					if (!isModelAvailable) {
+						const modelLabel = availableModels.find(m => m.value === aiModel)?.label || aiModel
+						toast.warning(`Modelo "${modelLabel}" no encontrado`, {
+							description: 'Este modelo no está disponible en tu cuenta. Considera cambiar a otro.',
+							duration: 8000,
+						})
+					}
+				}
 			} else {
-				const error = await response.json()
-				toast.error('Error de conexión', { description: error.error?.message || 'API Key inválida' })
+				toast.error('Error de conexión', { description: result.message })
 			}
 		} catch {
 			toast.error('Error de red', { description: 'No se pudo conectar con Google AI' })

@@ -157,11 +157,13 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		})
 
 		// Check for pending thread creation, post edit, or reply (captures context after redirect)
-		import('@/features/stats').then(({ completePendingThreadCreation, completePendingPostEdit, completePendingReply }) => {
-			completePendingThreadCreation()
-			completePendingPostEdit()
-			completePendingReply()
-		})
+		import('@/features/stats').then(
+			({ completePendingThreadCreation, completePendingPostEdit, completePendingReply }) => {
+				completePendingThreadCreation()
+				completePendingPostEdit()
+				completePendingReply()
+			}
+		)
 
 		// Parallel load thread features using allSettled to prevent single failure from breaking all
 		const results = await Promise.allSettled([
@@ -207,6 +209,7 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 
 		if (threadSummarizer.status === 'fulfilled' && isFeatureEnabled(FeatureFlag.ThreadSummarizer)) {
 			threadSummarizer.value.injectSummarizerButton()
+			threadSummarizer.value.injectMultiPageSummarizerButton()
 		}
 
 		if (postSummary.status === 'fulfilled' && isFeatureEnabled(FeatureFlag.PostSummary)) {

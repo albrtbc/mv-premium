@@ -175,7 +175,7 @@ export function FeaturesContent() {
 				label="Resumidor de Hilos (IA)"
 				description={
 					<span>
-						Añade un botón para generar resúmenes de cada página del hilo usando inteligencia artificial.{' '}
+						Permite resúmenes de 1 página con el botón de resumir o hasta 20 páginas con el botón de Resumir+.{' '}
 						<span className="text-destructive font-bold block mt-1">
 							⚠️ Requiere configurar una Gemini API Key
 						</span>

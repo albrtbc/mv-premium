@@ -120,6 +120,8 @@ export const DOM_MARKERS = {
 		USER_CUSTOMIZATIONS_STYLES: 'mvp-user-customizations-styles',
 		SUMMARIZER_BTN: 'mvp-summarizer-btn',
 		SUMMARIZER_MODAL: 'mvp-summarizer-modal-container',
+		MULTI_PAGE_SUMMARIZER_BTN: 'mvp-multi-page-summarizer-btn',
+		MULTI_PAGE_SUMMARIZER_MODAL: 'mvp-multi-page-summarizer-modal-container',
 		BOOKMARKS_MANAGER: 'mvp-bookmarks-manager',
 		SAVE_THREAD_CONTAINER: 'mvp-save-thread-container',
 		SAVED_THREADS_TAB: 'mvp-saved-threads-tab',

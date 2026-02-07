@@ -4,7 +4,7 @@
  * Displays the thread summary in a modal overlay.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import X from 'lucide-react/dist/esm/icons/x'
 import Copy from 'lucide-react/dist/esm/icons/copy'
 import Loader2 from 'lucide-react/dist/esm/icons/loader-2'
@@ -15,11 +15,18 @@ import MessageSquare from 'lucide-react/dist/esm/icons/message-square'
 import Check from 'lucide-react/dist/esm/icons/check'
 import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Settings from 'lucide-react/dist/esm/icons/settings'
+import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw'
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
 import { ShadowWrapper } from '@/components/shadow-wrapper'
 import { Button } from '@/components/ui/button'
 import { summarizeCurrentThread, type ThreadSummary } from '../logic/summarize'
+import { getCurrentPageNumber } from '../logic/extract-posts'
+import { getCachedSingleSummary, setCachedSingleSummary } from '../logic/summary-cache'
 import { cn } from '@/lib/utils'
 import { sendMessage } from '@/lib/messaging'
+import { useSettingsStore } from '@/store/settings-store'
+import { getAvailableModels, getLastModelUsed } from '@/services/ai/gemini-service'
+import { renderInlineMarkdown, markdownToBBCode } from '../logic/render-inline-markdown'
 
 interface SummaryModalProps {
 	isOpen: boolean
@@ -30,33 +37,65 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 	const [summary, setSummary] = useState<ThreadSummary | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
 	const [copied, setCopied] = useState(false)
+	const [actualModel, setActualModel] = useState<string | null>(null)
+	const { aiModel } = useSettingsStore()
+	const models = getAvailableModels()
+	const displayModel = actualModel || aiModel
+	const modelLabel = models.find(m => m.value === displayModel)?.label || displayModel
+
+	const generateSummary = useCallback(async () => {
+		setIsLoading(true)
+		setSummary(null)
+		setActualModel(null)
+
+		const result = await summarizeCurrentThread()
+
+		if (!result.error) {
+			setCachedSingleSummary(result.pageNumber, result)
+		}
+
+		setActualModel(getLastModelUsed())
+		setSummary(result)
+		setIsLoading(false)
+	}, [])
 
 	useEffect(() => {
 		if (isOpen) {
-			setIsLoading(true)
-			setSummary(null)
+			setCopied(false)
 
-			summarizeCurrentThread().then(result => {
-				setSummary(result)
+			// Check cache first
+			const pageNumber = getCurrentPageNumber()
+			const cached = getCachedSingleSummary(pageNumber)
+
+			if (cached) {
+				setSummary(cached)
 				setIsLoading(false)
-			})
+			} else {
+				generateSummary()
+			}
 		}
-	}, [isOpen])
+	}, [isOpen, generateSummary])
 
 	const handleCopy = () => {
 		if (summary) {
 			const text = [
-				`📋 Resumen del Hilo (Pág. ${summary.pageNumber})`,
+				`[center][b]✨ Resumen del Hilo (Pág. ${summary.pageNumber})[/b][/center]`,
 				'',
-				`🔹 TEMA: ${summary.topic}`,
+				`[b]🤖 TEMA:[/b] ${markdownToBBCode(summary.topic)}`,
 				'',
-				'🔹 PUNTOS CLAVE:',
-				...summary.keyPoints.map(p => `• ${p}`),
+				'[bar]PUNTOS CLAVE[/bar]',
+				'[list]',
+				...summary.keyPoints.map(p => `[*] ${markdownToBBCode(p)}`),
+				'[/list]',
 				'',
-				'🔹 PARTICIPANTES:',
-				...summary.participants.map(p => `• ${p.name}: ${p.contribution}`),
+				'[bar]PARTICIPANTES DESTACADOS[/bar]',
+				'[list]',
+				...summary.participants.map(p => `[*] [b]${p.name}[/b]: ${markdownToBBCode(p.contribution)}`),
+				'[/list]',
 				'',
-				`🔹 ESTADO: ${summary.status}`,
+				`[quote][b]📝 ESTADO DEL DEBATE:[/b] [i]"${markdownToBBCode(summary.status)}"[/i][/quote]`,
+				'',
+				'[i]Generado con Resumidor IA de Mediavida Premium[/i]',
 			].join('\n')
 
 			navigator.clipboard.writeText(text)
@@ -98,6 +137,17 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 							<h2 className="text-lg font-semibold text-foreground">
 								Resumen {summary?.pageNumber && summary.pageNumber > 1 ? `(Pag. ${summary.pageNumber})` : ''}
 							</h2>
+							<span
+								className={cn(
+									'text-[10px] px-1.5 py-0.5 rounded font-medium',
+									actualModel && actualModel !== aiModel
+										? 'text-amber-600 bg-amber-500/10'
+										: 'text-muted-foreground bg-muted'
+								)}
+								title={actualModel && actualModel !== aiModel ? `Modelo configurado: ${aiModel}` : undefined}
+							>
+								{modelLabel}
+							</span>
 						</div>
 						<button
 							onClick={onClose}
@@ -113,7 +163,7 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 							<div className="flex flex-col items-center justify-center py-12 gap-4">
 								<Loader2 className="w-10 h-10 animate-spin text-primary" />
 								<div className="text-center">
-									<p className="text-sm font-medium text-foreground">Analizando hilo...</p>
+									<p className="text-sm font-medium text-foreground">Resumiendo página...</p>
 									<p className="text-xs text-muted-foreground mt-1">Esto puede tardar unos segundos</p>
 								</div>
 							</div>
@@ -155,7 +205,9 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 									<h3 className="text-xs font-bold text-primary mb-1 uppercase tracking-wider flex items-center gap-1.5">
 										<Bot className="w-3.5 h-3.5" /> Tema Principal
 									</h3>
-									<p className="text-sm font-medium text-foreground leading-relaxed">{summary.topic}</p>
+									<p className="text-sm font-medium text-foreground leading-relaxed">
+										{renderInlineMarkdown(summary.topic)}
+									</p>
 								</div>
 
 								{/* Key Points */}
@@ -165,9 +217,12 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 									</h3>
 									<ul className="grid gap-2">
 										{summary.keyPoints?.map((point, i) => (
-											<li key={i} className="text-sm text-foreground/90 bg-muted/30 rounded-md p-2.5 flex gap-3 items-start border border-border/50">
+											<li
+												key={i}
+												className="text-sm text-foreground/90 bg-muted/30 rounded-md p-2.5 flex gap-3 items-start border border-border/50"
+											>
 												<span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-												<span className="leading-relaxed">{point}</span>
+												<span className="leading-relaxed">{renderInlineMarkdown(point)}</span>
 											</li>
 										))}
 									</ul>
@@ -180,7 +235,10 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 									</h3>
 									<div className="grid gap-2">
 										{summary.participants?.map((p, i) => (
-											<div key={i} className="flex gap-3 text-sm border border-border/40 rounded-md p-2 hover:bg-muted/20 transition-colors">
+											<div
+												key={i}
+												className="flex gap-3 text-sm border border-border/40 rounded-md p-2 hover:bg-muted/20 transition-colors"
+											>
 												<div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary flex items-center justify-center font-bold text-xs text-secondary-foreground uppercase overflow-hidden">
 													{p.avatarUrl ? (
 														<img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
@@ -190,17 +248,21 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 												</div>
 												<div className="space-y-0.5">
 													<div className="font-semibold text-foreground">{p.name}</div>
-													<div className="text-muted-foreground text-xs leading-relaxed">{p.contribution}</div>
+													<div className="text-muted-foreground text-xs leading-relaxed">
+														{renderInlineMarkdown(p.contribution)}
+													</div>
 												</div>
 											</div>
 										))}
 									</div>
 								</div>
 
-                {/* Status */}
+								{/* Status */}
 								<div className="bg-muted/50 rounded-lg p-3 border-l-2 border-primary">
-									<h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Estado del Debate</h3>
-									<p className="text-sm text-foreground/80 italic">"{summary.status}"</p>
+									<h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+										Estado del Debate
+									</h3>
+									<p className="text-sm text-foreground/80 italic">{renderInlineMarkdown(summary.status)}</p>
 								</div>
 
 								{/* Metadata Clean Stats - No border top here, keep flow */}
@@ -217,30 +279,47 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 										<Users className="w-3.5 h-3.5" />
 										<span>{summary.uniqueAuthors} autores</span>
 									</div>
-								</div>
+									</div>
+
+								{/* AI Studio link */}
+								<a
+									href="https://aistudio.google.com/"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors pt-1"
+								>
+									<ExternalLink className="w-3 h-3" />
+									Consulta tu uso en AI Studio &gt; Dashboard &gt; Uso y facturación &gt; Límite de frecuencia
+								</a>
 							</div>
 						) : null}
 					</div>
 
 					{/* Footer */}
 					{!isLoading && summary && !summary.error && (
-						<div className="flex items-center justify-end gap-2 p-4 border-t border-border bg-muted/10">
-							<Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
-								{copied ? (
-									<>
-										<Check className="w-4 h-4" />
-										Copiado
-									</>
-								) : (
-									<>
-										<Copy className="w-4 h-4" />
-										Copiar
-									</>
-								)}
+						<div className="flex items-center justify-between gap-2 p-4 border-t border-border bg-muted/10">
+							<Button variant="ghost" size="sm" onClick={generateSummary} className="gap-1.5 text-muted-foreground">
+								<RefreshCw className="w-3.5 h-3.5" />
+								Regenerar
 							</Button>
-							<Button size="sm" onClick={onClose}>
-								Cerrar
-							</Button>
+							<div className="flex items-center gap-2">
+								<Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
+									{copied ? (
+										<>
+											<Check className="w-4 h-4" />
+											Copiado
+										</>
+									) : (
+										<>
+											<Copy className="w-4 h-4" />
+											Copiar
+										</>
+									)}
+								</Button>
+								<Button size="sm" onClick={onClose}>
+									Cerrar
+								</Button>
+							</div>
 						</div>
 					)}
 				</div>

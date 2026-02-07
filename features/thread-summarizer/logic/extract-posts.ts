@@ -30,6 +30,7 @@ export interface ExtractedPost {
 	timestamp?: string
 	charCount: number // Track size for smart truncation
 	avatarUrl?: string // URL of the user's avatar
+	votes?: number // Thumbs up count (manitas)
 }
 
 // =============================================================================
@@ -104,6 +105,10 @@ function extractSinglePost(postEl: HTMLElement): ExtractedPost | null {
 	const timeEl = postEl.querySelector(`${MV_SELECTORS.THREAD.POST_TIME}, ${MV_SELECTORS.THREAD.POST_TIME_ALT}`)
 	const timestamp = timeEl?.getAttribute('datetime') || timeEl?.textContent?.trim()
 
+	// 6. Votes (manitas / thumbs up)
+	const votesEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_LIKE_COUNT)
+	const votes = votesEl?.textContent?.trim() ? parseInt(votesEl.textContent.trim(), 10) : 0
+
 	return {
 		number,
 		author,
@@ -111,6 +116,7 @@ function extractSinglePost(postEl: HTMLElement): ExtractedPost | null {
 		timestamp,
 		charCount: content.length,
 		avatarUrl,
+		votes: votes || undefined,
 	}
 }
 
@@ -254,7 +260,8 @@ export function formatPostsForPrompt(posts: ExtractedPost[]): string {
 	return posts
 		.map(p => {
 			const authorLabel = p.number === 1 ? `${p.author} (OP)` : p.author
-			return `#${p.number} ${authorLabel}: ${p.content}`
+			const votesLabel = p.votes ? ` [👍${p.votes}]` : ''
+			return `#${p.number} ${authorLabel}${votesLabel}: ${p.content}`
 		})
 		.join('\n\n')
 }

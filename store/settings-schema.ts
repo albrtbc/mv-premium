@@ -28,7 +28,11 @@ const positiveIntSchema = z.number().int().min(0)
 // AI MODEL SCHEMA
 // =============================================================================
 
-export const aiModelSchema = z.enum(['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'])
+export const aiModelSchema = z.enum([
+	'gemini-2.5-flash',
+	'gemini-2.5-flash-lite',
+	'gemini-3-flash-preview',
+])
 
 // =============================================================================
 // ULTRAWIDE MODE SCHEMA

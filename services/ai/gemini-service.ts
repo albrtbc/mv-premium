@@ -8,6 +8,13 @@ import { logger } from '@/lib/logger'
 import { getSettings } from '@/store/settings-store'
 import { sendMessage } from '@/lib/messaging'
 
+// --- LAST MODEL TRACKING ---
+/** Tracks the actual model used in the last AI call (may differ from configured due to fallback) */
+let _lastModelUsed: string | null = null
+export function getLastModelUsed(): string | null {
+	return _lastModelUsed
+}
+
 // --- GEMINI SERVICE ---
 class GeminiService implements AIService {
 	constructor(private apiKey: string, private model: string) {}
@@ -61,6 +68,9 @@ class GeminiService implements AIService {
 		})
 
 		if (!result.success) throw new Error(result.error || 'Error de conexión IA')
+
+		// Track which model actually processed the request
+		if (result.modelUsed) _lastModelUsed = result.modelUsed
 
 		// Parse response
 		const modelParts: ChatPart[] = []
@@ -227,20 +237,32 @@ export async function getAIService(): Promise<AIService | null> {
  * @param apiKey - API key to test
  * @returns Success status and descriptive message
  */
-export async function testGeminiConnection(apiKey: string): Promise<{ success: boolean; message: string }> {
+export async function testGeminiConnection(
+	apiKey: string
+): Promise<{ success: boolean; message: string; availableModelIds?: string[] }> {
 	try {
 		const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
 
 		if (response.ok) {
 			const data = await response.json()
-			const modelCount = data.models?.length || 0
-			return { success: true, message: `✓ Connection successful. ${modelCount} models available.` }
+			const models: { name: string }[] = data.models || []
+
+			// Extract short model IDs (strip "models/" prefix) for Gemini models only
+			const geminiIds = models
+				.map(m => m.name.replace(/^models\//, ''))
+				.filter(id => id.startsWith('gemini'))
+
+			return {
+				success: true,
+				message: `Conexion correcta. ${models.length} modelos disponibles (${geminiIds.length} Gemini).`,
+				availableModelIds: geminiIds,
+			}
 		}
 
 		const error = await response.json()
 		return { success: false, message: error.error?.message || 'Invalid API Key' }
 	} catch {
-		return { success: false, message: 'Connection error' }
+		return { success: false, message: 'Error de conexion' }
 	}
 }
 
@@ -252,8 +274,6 @@ export function getAvailableModels() {
 	return [
 		{ value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Recomendado (Default)' },
 		{ value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', description: 'Versión ligera' },
-		{ value: 'gemini-3-flash', label: 'Gemini 3.0 Flash', description: 'Preview Última Generación' },
-		{ value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Más potente' },
-		{ value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Rápido y estable' },
+		{ value: 'gemini-3-flash-preview', label: 'Gemini 3.0 Flash', description: 'Preview Última Generación' },
 	]
 }
