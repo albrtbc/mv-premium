@@ -68,6 +68,7 @@ export function VariablesSidebar({
 			id: label,
 			label,
 			fields: groupFields,
+			note: undefined as string | undefined,
 		}))
 	}, [customGroups, filteredFields, variableFilter])
 
