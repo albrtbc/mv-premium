@@ -12,10 +12,12 @@ function NewsItem({ url, forumSlug, title, thumbnail, createdAt }: HomepageThrea
 		<div
 			className="flex flex-col justify-end h-44 w-full rounded shadow overflow-hidden relative"
 			style={{
-				backgroundImage: `url(${thumbnail})`,
-				backgroundSize: 'cover',
-				backgroundPosition: 'center',
-				backgroundRepeat: 'no-repeat',
+				...(thumbnail && {
+					backgroundImage: `url(${thumbnail})`,
+					backgroundSize: 'cover',
+					backgroundPosition: 'center',
+					backgroundRepeat: 'no-repeat',
+				}),
 			}}
 		>
 			<div className="bg-mv-surface w-full p-2" style={{ minHeight: '48px' }}>
@@ -51,7 +53,7 @@ function NewsItemList({
 			{loading
 				? [...Array(maxThreads).keys()].map(i => <NewsItemSkeleton key={i} />)
 				: threads
-						?.filter((_, i) => i < maxThreads)
+						?.slice(0, maxThreads)
 						.map(thread => <NewsItem key={thread.url} {...thread} />)}
 		</>
 	)

@@ -93,7 +93,7 @@ export function FeaturesContent() {
 			<SettingRow
 				icon={<HomeIcon className="h-4 w-4" />}
 				label="Nueva Homepage"
-				description="Reemplaza la pagina de inicio de Mediavida con un dashboard personalizado mostrando noticias, hilos recientes, tus ultimos posts y favoritos."
+				description="Reemplaza la página de inicio de Mediavida con un dashboard personalizado mostrando noticias, hilos recientes, tus últimos posts y favoritos."
 			>
 				<Switch checked={newHomepageEnabled} onCheckedChange={withToastAndReload('newHomepageEnabled', true)} />
 			</SettingRow>

@@ -33,7 +33,7 @@ function ThreadItem(props: HomepageThread) {
 		<div className="flex justify-between relative bg-mv-surface first:rounded-t last:rounded-b">
 			<div className="flex cursor-pointer flex-1 items-center gap-2 p-2 hover:bg-opacity-50 transition duration-150">
 				<a
-					href={`https://www.mediavida.com/foro/${forumSlug}`}
+					href={`/foro/${forumSlug}`}
 					title={`Ir a ${forumSlug}`}
 					className="hover:scale-125 transition duration-150"
 				>
@@ -52,38 +52,40 @@ function ThreadItem(props: HomepageThread) {
 					)}
 					<div
 						title="Total respuestas"
-						className={clsx(
-							'w-8 text-right',
-							totalResponsesAsInt < 100 && 'text-gray-400 dark:text-gray-600',
-							totalResponsesAsInt >= 100 && 'text-gray-600 dark:text-gray-400',
-							totalResponsesAsInt > 1000 && 'text-orange-500 dark:text-orange-500',
-							totalResponsesAsInt > 10000 && 'text-purple-500 dark:text-purple-500'
-						)}
+						className={clsx('w-8 text-right', {
+							'text-gray-400 dark:text-gray-600': totalResponsesAsInt < 100,
+							'text-gray-600 dark:text-gray-400':
+								totalResponsesAsInt >= 100 && totalResponsesAsInt <= 1000,
+							'text-orange-500': totalResponsesAsInt > 1000 && totalResponsesAsInt <= 10000,
+							'text-purple-500': totalResponsesAsInt > 10000,
+						})}
 					>
 						{totalResponses}
 					</div>
-					<div title="Tiempo desde el ultimo mensaje" className="w-8 text-right text-gray-500">
+					<div title="Tiempo desde el último mensaje" className="w-8 text-right text-gray-500">
 						{lastActivityAt}
 					</div>
 				</div>
 			</div>
 			{responsesSinceLastVisit && urlSinceLastVisit ? (
 				<a
-					title="Respuestas desde la ultima visita"
+					title="Respuestas desde la última visita"
 					href={urlSinceLastVisit}
 					className={clsx(
 						'w-10 cursor-pointer hover:bg-opacity-75 transition duration-200 text-white text-xs font-medium flex items-center justify-center',
-						responsesSinceLastVisit < 10 && 'bg-blue-400',
-						responsesSinceLastVisit >= 10 && 'bg-blue-500',
-						responsesSinceLastVisit > 30 && 'bg-orange-500',
-						responsesSinceLastVisit > 99 && 'bg-red-500'
+						{
+							'bg-blue-400': responsesSinceLastVisit < 10,
+							'bg-blue-500': responsesSinceLastVisit >= 10 && responsesSinceLastVisit <= 30,
+							'bg-orange-500': responsesSinceLastVisit > 30 && responsesSinceLastVisit <= 99,
+							'bg-red-500': responsesSinceLastVisit > 99,
+						}
 					)}
 				>
 					{responsesSinceLastVisit > 99 ? '+99' : responsesSinceLastVisit}
 				</a>
 			) : (
 				<div
-					title="Sin respuestas desde la ultima visita"
+					title="Sin respuestas desde la última visita"
 					className="bg-mv-surface-high w-10 text-gray-300 dark:text-gray-600 text-xs font-medium flex items-center justify-center"
 				>
 					/
@@ -111,7 +113,7 @@ function ThreadList({
 			{loading
 				? [...Array(maxThreads).keys()].map(i => <ThreadSkeleton key={i} />)
 				: threads
-						?.filter((_, i) => i < maxThreads)
+						?.slice(0, maxThreads)
 						.map(thread => <ThreadItem key={thread.url} {...thread} />)}
 		</>
 	)

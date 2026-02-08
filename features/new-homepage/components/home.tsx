@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { clsx } from 'clsx'
 import { getForumLastThreads, getUserLastPosts, getFavorites, getLastNews, getUsername } from '../logic/data'
@@ -15,7 +15,8 @@ const THREADS_REFETCH_INTERVAL = 30 * 1000
 const NEWS_REFETCH_INTERVAL = 60 * 10 * 1000
 
 export function Home({ onLoad }: { onLoad: () => void }) {
-	const lastVisitedForums = getLatestVisitedForums()
+	const username = useMemo(() => getUsername(), [])
+	const lastVisitedForums = useMemo(() => getLatestVisitedForums(), [])
 
 	const { data: lastThreads, isPending: lastThreadsPending } = useQuery({
 		queryKey: ['lastThreads'],
@@ -25,7 +26,7 @@ export function Home({ onLoad }: { onLoad: () => void }) {
 
 	const { data: userLastPosts, isPending: userLastPostsPending } = useQuery({
 		queryKey: ['userLastPosts'],
-		queryFn: () => getUserLastPosts(getUsername()),
+		queryFn: () => getUserLastPosts(username),
 		refetchInterval: THREADS_REFETCH_INTERVAL,
 	})
 
@@ -43,7 +44,7 @@ export function Home({ onLoad }: { onLoad: () => void }) {
 
 	useEffect(() => {
 		onLoad()
-	}, [])
+	}, [onLoad])
 
 	return (
 		<div className="pb-4">
@@ -58,20 +59,17 @@ export function Home({ onLoad }: { onLoad: () => void }) {
 				<div className="col-span-2">
 					<div className="flex items-end justify-between -mt-[0.3rem]">
 						<h1>Foro</h1>
-						<div className="flex items-center gap-2" title="Ultimos foros visitados">
-							{!!lastVisitedForums?.length &&
-								lastVisitedForums
-									.filter((_, i) => i < 8)
-									.map(forumSlug => (
-										<a
-											key={forumSlug}
-											className="hover:scale-125 duration-200 transition"
-											href={`/foro/${forumSlug}`}
-											title={forumSlug}
-										>
-											<i className={clsx('fid', getIconClassBySlug(forumSlug))} />
-										</a>
-									))}
+						<div className="flex items-center gap-2" title="Últimos foros visitados">
+							{lastVisitedForums.slice(0, 8).map(forumSlug => (
+								<a
+									key={forumSlug}
+									className="hover:scale-125 duration-200 transition"
+									href={`/foro/${forumSlug}`}
+									title={forumSlug}
+								>
+									<i className={clsx('fid', getIconClassBySlug(forumSlug))} />
+								</a>
+							))}
 						</div>
 					</div>
 					<Threads.Root className="mt-3">
@@ -80,8 +78,8 @@ export function Home({ onLoad }: { onLoad: () => void }) {
 				</div>
 				<div>
 					<div className="flex items-end justify-between">
-						<h2>Tus ultimos posts</h2>
-						<a href={`/id/${getUsername()}/posts`}>Todos</a>
+						<h2>Tus últimos posts</h2>
+						{username && <a href={`/id/${username}/posts`}>Todos</a>}
 					</div>
 					<Threads.Root className="mt-3">
 						<Threads.ThreadList
