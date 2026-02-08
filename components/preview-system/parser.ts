@@ -225,8 +225,33 @@ function countryCodeToFlagImg(code: string): string {
 	return `<img alt="${code}" class="emoji" draggable="false" src="https://www.mediavida.com/img/emoji/u/${hex1}-${hex2}.png">`
 }
 
+function isTemplatePlaceholder(value: string): boolean {
+	return /^\{\{[^{}]+\}\}$/.test(value.trim())
+}
+
+function toAbsoluteUrl(value: string): string {
+	return /^https?:\/\//i.test(value) ? value : `https://${value}`
+}
+
 function parseMediaTag(url: string): string {
 	const cleanUrl = url.trim()
+	const absoluteUrl = toAbsoluteUrl(cleanUrl)
+
+	// Template placeholders (e.g. {{trailerUrl}}) are not real URLs.
+	if (isTemplatePlaceholder(cleanUrl)) {
+		return `
+            <div class="embed-placeholder generic-card">
+                <div class="generic-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                </div>
+                <div class="generic-content">
+                    <div class="generic-domain">Variable de plantilla</div>
+                    <span class="generic-link">${cleanUrl}</span>
+                    <div class="generic-footer">Se reemplaza al insertar contenido real</div>
+                </div>
+            </div>
+        `
+	}
 
 	// 1. YOUTUBE
 	const ytMatch = cleanUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([\w-]{11})/)
@@ -264,7 +289,7 @@ function parseMediaTag(url: string): string {
                 </div>
                 <div class="generic-content">
                     <div class="generic-domain">Twitter / X</div>
-                    <a href="${cleanUrl}" target="_blank" class="generic-link">${cleanUrl}</a>
+                    <a href="${absoluteUrl}" target="_blank" class="generic-link">${cleanUrl}</a>
                     <div class="generic-footer">Tweet de @${username}</div>
                 </div>
             </div>
@@ -285,7 +310,7 @@ function parseMediaTag(url: string): string {
                 </div>
                 <div class="generic-content">
                     <div class="generic-domain">Instagram</div>
-                    <a href="${cleanUrl}" target="_blank" class="generic-link">${cleanUrl}</a>
+                    <a href="${absoluteUrl}" target="_blank" class="generic-link">${cleanUrl}</a>
                     <div class="generic-footer">Ver publicación en Instagram</div>
                 </div>
             </div>
@@ -329,7 +354,7 @@ function parseMediaTag(url: string): string {
             </div>
             <div class="generic-content">
                 <div class="generic-domain">${domain}</div>
-                <a href="${cleanUrl}" target="_blank" class="generic-link">${cleanUrl}</a>
+                <a href="${absoluteUrl}" target="_blank" class="generic-link">${cleanUrl}</a>
                 <div class="generic-footer">Contenido incrustado no disponible en vista previa</div>
             </div>
         </div>

@@ -13,7 +13,7 @@
  */
 import { defineExtensionMessaging } from '@webext-core/messaging'
 import type { SteamGameDetails } from '@/services/api/steam'
-import type { ChatMessage, GeminiFunctionCall } from '@/types/ai'
+import type { ChatMessage } from '@/types/ai'
 
 // =============================================================================
 // Response Types
@@ -31,7 +31,14 @@ export interface UploadResult {
 export interface GeminiResult {
 	success: boolean
 	text?: string
-	functionCalls?: GeminiFunctionCall[]
+	error?: string
+	/** The actual model that processed the request (may differ from requested due to fallback) */
+	modelUsed?: string
+}
+
+export interface GroqResult {
+	success: boolean
+	text?: string
 	error?: string
 	/** The actual model that processed the request (may differ from requested due to fallback) */
 	modelUsed?: string
@@ -99,16 +106,26 @@ interface ProtocolMap {
 	tmdbRequest: (data: { endpoint: string; params?: Record<string, string> }) => unknown
 
 	/**
-	 * Generate text or Function Calls with Gemini API via background script
-	 * Supports full chat history and tool definitions
+	 * Generate text with Gemini API via background script
+	 * Supports full chat history with model fallback on rate limits
 	 */
 	generateGemini: (data: {
 		apiKey: string
 		model: string
 		history?: ChatMessage[]
 		prompt?: string
-		tools?: unknown // Kept for API compatibility but not used
 	}) => GeminiResult
+
+	/**
+	 * Generate text with Groq API via background script
+	 * Supports full chat history (OpenAI-compatible format)
+	 */
+	generateGroq: (data: {
+		apiKey: string
+		model: string
+		history?: ChatMessage[]
+		prompt?: string
+	}) => GroqResult
 
 	/**
 	 * Syntax highlight code using PrismJS in background script
