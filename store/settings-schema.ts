@@ -34,6 +34,13 @@ export const aiModelSchema = z.enum([
 	'gemini-3-flash-preview',
 ])
 
+export const groqModelSchema = z.enum([
+	'moonshotai/kimi-k2-instruct',
+])
+
+export const aiProviderSchema = z.enum(['gemini', 'groq'
+])
+
 // =============================================================================
 // ULTRAWIDE MODE SCHEMA
 // =============================================================================
@@ -60,7 +67,10 @@ export const settingsSchema = z.object({
 
 	// AI Settings
 	geminiApiKey: apiKeySchema.default(''),
+	groqApiKey: apiKeySchema.default(''),
 	aiModel: aiModelSchema.default('gemini-2.5-flash'),
+	groqModel: groqModelSchema.default('moonshotai/kimi-k2-instruct'),
+	aiProvider: aiProviderSchema.default('gemini'),
 
 	// Sync
 	syncEnabled: z.boolean().default(false),

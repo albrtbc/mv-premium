@@ -175,9 +175,9 @@ export function FeaturesContent() {
 				label="Resumidor de Hilos (IA)"
 				description={
 					<span>
-						Permite resúmenes de 1 página con el botón de resumir o hasta 20 páginas con el botón de Resumir+.{' '}
+						Permite resúmenes de 1 página con el botón de resumir o hasta 30 páginas con el botón de Resumir+.{' '}
 						<span className="text-destructive font-bold block mt-1">
-							⚠️ Requiere configurar una Gemini API Key
+							⚠️ Requiere configurar una API Key de Gemini o Groq
 						</span>
 					</span>
 				}
@@ -191,7 +191,14 @@ export function FeaturesContent() {
 			<SettingRow
 				icon={<List className="h-4 w-4" />}
 				label="Resumen de Post (IA)"
-				description="Permite resumir posts individuales muy largos con un solo clic."
+        				description={
+					<span>
+						Permite resumir posts individuales muy largos con un solo clic.{' '}
+						<span className="text-destructive font-bold block mt-1">
+							⚠️ Requiere configurar una API Key de Gemini o Groq
+						</span>
+					</span>
+				}
 			>
 				<Switch checked={postSummaryEnabled} onCheckedChange={withToastAndReload('postSummaryEnabled', true)} />
 			</SettingRow>

@@ -25,7 +25,10 @@ export const DEFAULT_SETTINGS: Settings = {
 
 	// AI Settings
 	geminiApiKey: '',
+	groqApiKey: '',
 	aiModel: 'gemini-2.5-flash',
+	groqModel: 'moonshotai/kimi-k2-instruct',
+	aiProvider: 'gemini',
 
 	// Sync
 	syncEnabled: false,
