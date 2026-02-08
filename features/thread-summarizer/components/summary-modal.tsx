@@ -17,6 +17,7 @@ import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Settings from 'lucide-react/dist/esm/icons/settings'
 import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw'
 import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
+import Clock3 from 'lucide-react/dist/esm/icons/clock-3'
 import { ShadowWrapper } from '@/components/shadow-wrapper'
 import { Button } from '@/components/ui/button'
 import { summarizeCurrentThread, type ThreadSummary } from '../logic/summarize'
@@ -24,13 +25,23 @@ import { getCurrentPageNumber } from '../logic/extract-posts'
 import { getCachedSingleSummary, setCachedSingleSummary } from '../logic/summary-cache'
 import { cn } from '@/lib/utils'
 import { sendMessage } from '@/lib/messaging'
-import { useSettingsStore } from '@/store/settings-store'
-import { getAvailableModels, getLastModelUsed } from '@/services/ai/gemini-service'
+import { getLastModelUsed } from '@/services/ai/gemini-service'
+import { useAIModelLabel } from '@/hooks/use-ai-model-label'
 import { renderInlineMarkdown, markdownToBBCode } from '../logic/render-inline-markdown'
+import { useSettingsStore } from '@/store/settings-store'
+import { toast } from '@/lib/lazy-toast'
 
 interface SummaryModalProps {
 	isOpen: boolean
 	onClose: () => void
+}
+
+function formatDuration(ms: number): string {
+	const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+	const minutes = Math.floor(totalSeconds / 60)
+	const seconds = totalSeconds % 60
+	if (minutes > 0) return `${minutes}m ${seconds}s`
+	return `${seconds}s`
 }
 
 export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
@@ -38,43 +49,75 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 	const [isLoading, setIsLoading] = useState(true)
 	const [copied, setCopied] = useState(false)
 	const [actualModel, setActualModel] = useState<string | null>(null)
-	const { aiModel } = useSettingsStore()
-	const models = getAvailableModels()
-	const displayModel = actualModel || aiModel
-	const modelLabel = models.find(m => m.value === displayModel)?.label || displayModel
+	const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
+	const [elapsedSeconds, setElapsedSeconds] = useState(0)
+	const hasAnyAIKey = useSettingsStore(s => s.geminiApiKey.trim().length > 0 || s.groqApiKey.trim().length > 0)
+	const { modelLabel, isModelFallback, configuredModel, isProviderFallback, providerFallbackMessage } =
+		useAIModelLabel(actualModel)
 
 	const generateSummary = useCallback(async () => {
+		const startedAt = Date.now()
 		setIsLoading(true)
 		setSummary(null)
 		setActualModel(null)
+		setStartedAtMs(startedAt)
+		setElapsedSeconds(0)
 
 		const result = await summarizeCurrentThread()
+		const usedModel = getLastModelUsed()
+		const timedResult: ThreadSummary = { ...result, generationMs: Date.now() - startedAt, modelUsed: usedModel || undefined }
 
-		if (!result.error) {
-			setCachedSingleSummary(result.pageNumber, result)
+		if (!timedResult.error) {
+			setCachedSingleSummary(timedResult.pageNumber, timedResult)
 		}
 
-		setActualModel(getLastModelUsed())
-		setSummary(result)
+		setActualModel(usedModel)
+		setSummary(timedResult)
 		setIsLoading(false)
+		setStartedAtMs(null)
 	}, [])
 
 	useEffect(() => {
 		if (isOpen) {
 			setCopied(false)
+			setActualModel(null)
+			setStartedAtMs(null)
+			setElapsedSeconds(0)
 
 			// Check cache first
 			const pageNumber = getCurrentPageNumber()
 			const cached = getCachedSingleSummary(pageNumber)
 
 			if (cached) {
+				setActualModel(cached.modelUsed || null)
 				setSummary(cached)
 				setIsLoading(false)
+				setStartedAtMs(null)
+				setElapsedSeconds(0)
 			} else {
 				generateSummary()
 			}
 		}
 	}, [isOpen, generateSummary])
+
+	useEffect(() => {
+		if (!isLoading || startedAtMs === null) return
+
+		setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
+		const intervalId = window.setInterval(() => {
+			setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
+		}, 1000)
+
+		return () => window.clearInterval(intervalId)
+	}, [isLoading, startedAtMs])
+
+	// If API keys are removed while modal is open, auto-close to avoid stale UI.
+	useEffect(() => {
+		if (isOpen && !hasAnyAIKey) {
+			toast.error('No hay API Keys de IA configuradas. Cerrando resumen.')
+			onClose()
+		}
+	}, [isOpen, hasAnyAIKey, onClose])
 
 	const handleCopy = () => {
 		if (summary) {
@@ -118,6 +161,11 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 
 	// Check if error is about AI not configured
 	const isAINotConfigured = summary?.error?.includes('IA no configurada')
+	const badgeTitle = providerFallbackMessage
+		? providerFallbackMessage
+		: isModelFallback
+			? `Modelo configurado: ${configuredModel}`
+			: undefined
 
 	if (!isOpen) return null
 
@@ -140,11 +188,11 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 							<span
 								className={cn(
 									'text-[10px] px-1.5 py-0.5 rounded font-medium',
-									actualModel && actualModel !== aiModel
+									isProviderFallback || isModelFallback
 										? 'text-amber-600 bg-amber-500/10'
 										: 'text-muted-foreground bg-muted'
 								)}
-								title={actualModel && actualModel !== aiModel ? `Modelo configurado: ${aiModel}` : undefined}
+								title={badgeTitle}
 							>
 								{modelLabel}
 							</span>
@@ -159,12 +207,21 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 
 					{/* Content */}
 					<div className="flex-1 overflow-y-auto p-4">
+						{providerFallbackMessage && (
+							<div className="mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md p-2.5">
+								<AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+								<p className="text-xs text-amber-700 dark:text-amber-400">{providerFallbackMessage}</p>
+							</div>
+						)}
 						{isLoading ? (
 							<div className="flex flex-col items-center justify-center py-12 gap-4">
 								<Loader2 className="w-10 h-10 animate-spin text-primary" />
 								<div className="text-center">
 									<p className="text-sm font-medium text-foreground">Resumiendo página...</p>
 									<p className="text-xs text-muted-foreground mt-1">Esto puede tardar unos segundos</p>
+									<p className="text-xs text-muted-foreground/80 mt-1">
+										Tiempo transcurrido: {elapsedSeconds}s
+									</p>
 								</div>
 							</div>
 						) : summary?.error ? (
@@ -183,11 +240,11 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 								</div>
 								<div className="text-center space-y-2">
 									<p className={cn('text-sm font-medium', isAINotConfigured ? 'text-foreground' : 'text-destructive')}>
-										{isAINotConfigured ? 'API de Gemini no configurada' : 'Error'}
+										{isAINotConfigured ? 'IA no configurada' : 'Error'}
 									</p>
 									<p className="text-xs text-muted-foreground">
 										{isAINotConfigured
-											? 'Necesitas una API Key de Google Gemini para usar esta funcion.'
+											? 'Necesitas una API Key de Gemini o Groq para usar esta función.'
 											: summary.error}
 									</p>
 									{isAINotConfigured && (
@@ -279,18 +336,39 @@ export function SummaryModal({ isOpen, onClose }: SummaryModalProps) {
 										<Users className="w-3.5 h-3.5" />
 										<span>{summary.uniqueAuthors} autores</span>
 									</div>
+									<div className="flex items-center gap-1.5">
+										<Bot className="w-3.5 h-3.5" />
+										<span>{summary.modelUsed || modelLabel}</span>
+									</div>
+									{typeof summary.generationMs === 'number' && (
+										<div className="flex items-center gap-1.5">
+											<Clock3 className="w-3.5 h-3.5" />
+											<span>{formatDuration(summary.generationMs)}</span>
+										</div>
+									)}
 									</div>
 
-								{/* AI Studio link */}
-								<a
-									href="https://aistudio.google.com/"
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors pt-1"
-								>
-									<ExternalLink className="w-3 h-3" />
-									Consulta tu uso en AI Studio &gt; Dashboard &gt; Uso y facturación &gt; Límite de frecuencia
-								</a>
+								{/* API console links */}
+								<div className="flex flex-col gap-1 pt-1">
+									<a
+										href="https://aistudio.google.com/"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+									>
+										<ExternalLink className="w-3 h-3" />
+										Gemini: Consulta tu uso en AI Studio
+									</a>
+									<a
+										href="https://console.groq.com/"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+									>
+										<ExternalLink className="w-3 h-3" />
+										Groq: Consulta tu uso en Groq Console
+									</a>
+								</div>
 							</div>
 						) : null}
 					</div>

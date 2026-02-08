@@ -9,6 +9,8 @@ import { ShadowWrapper } from '@/components/shadow-wrapper'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { summarizePost, isPostLongEnough, getShortPostMessage, extractPostText } from '../logic/summarize-post'
+import { getLastModelUsed } from '@/services/ai/gemini-service'
+import { useAIModelLabel } from '@/hooks/use-ai-model-label'
 
 interface PostSummaryDialogProps {
 	postElement: HTMLElement
@@ -21,10 +23,19 @@ export function PostSummaryDialog({ postElement, onClose }: PostSummaryDialogPro
 	const [state, setState] = useState<DialogState>('loading')
 	const [content, setContent] = useState<{ summary: string; tone: string }>({ summary: '', tone: '' })
 	const [copied, setCopied] = useState(false)
+	const [actualModel, setActualModel] = useState<string | null>(null)
+	const { modelLabel, isModelFallback, configuredModel, isProviderFallback, providerFallbackMessage } =
+		useAIModelLabel(actualModel)
+	const badgeTitle = providerFallbackMessage
+		? providerFallbackMessage
+		: isModelFallback
+			? `Modelo configurado: ${configuredModel}`
+			: undefined
 
 	useEffect(() => {
 		// Prevent body scroll
 		document.body.style.overflow = 'hidden'
+		setActualModel(null)
         
         // Extract post content
 		const postBody = postElement.querySelector('.post-contents .body, .post-body, .cuerpo')
@@ -43,8 +54,11 @@ export function PostSummaryDialog({ postElement, onClose }: PostSummaryDialogPro
 		}
 
 		// Summarize with AI
+		// Summarize with AI
+		setActualModel(null)
 		summarizePost(text)
 			.then(result => {
+				setActualModel(getLastModelUsed())
 				setState('success')
 				setContent(result)
 			})
@@ -95,7 +109,22 @@ export function PostSummaryDialog({ postElement, onClose }: PostSummaryDialogPro
 							</div>
 							<div>
 								<h2 className="text-lg font-semibold text-foreground leading-none">Resumen de Post</h2>
-								<p className="text-xs text-muted-foreground mt-1">Generado por IA</p>
+								<div className="flex items-center gap-2 mt-1">
+									<p className="text-xs text-muted-foreground">Generado por IA</p>
+									{state === 'success' && (
+										<span
+											className={cn(
+												"text-[10px] px-1.5 py-0.5 rounded font-medium",
+												isProviderFallback || isModelFallback
+													? "text-amber-600 bg-amber-500/10"
+													: "text-muted-foreground bg-muted"
+											)}
+											title={badgeTitle}
+										>
+											{modelLabel}
+										</span>
+									)}
+								</div>
 							</div>
 						</div>
 						<Button variant="ghost" size="icon" onClick={onClose} className="rounded-full w-8 h-8 hover:bg-muted/50">
@@ -105,6 +134,11 @@ export function PostSummaryDialog({ postElement, onClose }: PostSummaryDialogPro
 
 					{/* Content */}
 					<div className="p-6 overflow-y-auto">
+						{providerFallbackMessage && state !== 'loading' && (
+							<div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md">
+								<p className="text-xs text-amber-700 dark:text-amber-400">{providerFallbackMessage}</p>
+							</div>
+						)}
 						{state === 'loading' ? (
 							<div className="flex flex-col items-center justify-center py-8 gap-4 text-center">
 								<Loader2 className="w-10 h-10 animate-spin text-primary" />

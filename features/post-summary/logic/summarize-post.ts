@@ -1,10 +1,11 @@
 /**
  * Post Summarization Logic
  *
- * Uses Gemini AI to summarize individual post content.
+ * Uses AI (Gemini or Groq) to summarize individual post content.
  */
 
 import { getAIService } from '@/services/ai/gemini-service'
+import { parseAIJsonResponse } from '@/services/ai/shared'
 import { logger } from '@/lib/logger'
 
 // Minimum characters for a post to be "long enough" to summarize
@@ -99,15 +100,14 @@ REGLAS:
 - NO uses markdown para el JSON.
 - NO uses BBCode.
 - Mantén el idioma Español.
+- Tu respuesta debe empezar con { y terminar con }. Sin texto antes ni despues.
 
 POST A RESUMIR:
 "${text}"`
 
 	try {
 		const rawResponse = await aiService.generate(prompt)
-		// Clean potential markdown blocks
-		const cleanJson = rawResponse.replace(/```json\n?|\n?```/g, '').trim()
-		const result = JSON.parse(cleanJson)
+		const result = parseAIJsonResponse<{ summary?: string; tone?: string }>(rawResponse)
 
 		return {
 			summary: result.summary || 'No se pudo generar el resumen.',
@@ -115,7 +115,6 @@ POST A RESUMIR:
 		}
 	} catch (e) {
 		logger.error('Error parsing summary JSON:', e)
-		// Fallback if JSON fails
 		return {
 			summary: 'Error al procesar la respuesta de la IA.',
 			tone: 'Error',

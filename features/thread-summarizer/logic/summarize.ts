@@ -1,4 +1,5 @@
 import { getAIService } from '@/services/ai/gemini-service'
+import { parseAIJsonResponse } from '@/services/ai/shared'
 import { logger } from '@/lib/logger'
 import {
 	extractAllPagePosts,
@@ -18,6 +19,8 @@ export interface ThreadSummary {
 	postsAnalyzed: number
 	uniqueAuthors: number
 	pageNumber: number
+	generationMs?: number
+	modelUsed?: string
 	error?: string
 }
 
@@ -47,7 +50,8 @@ REGLAS ESTRICTAS:
 - El JSON debe ser valido.
 - Resume SOLO los posts que te paso.
 - Ignora posts sin contenido ("pole", "+1").
-- Responde en espanol.`
+- Responde en espanol.
+- IMPORTANTE: Tu respuesta debe empezar con { y terminar con }. Sin texto antes ni despues.`
 
 // =============================================================================
 // MAIN FUNCTION
@@ -97,9 +101,9 @@ POSTS DE ESTA PAGINA (${allPagePosts.length} posts):
 ${formattedPosts}`
 
 		const rawResponse = await aiService.generate(finalPrompt)
-		
+
 		// Parse JSON response safely
-		const parsedData = parseJSONResponse(rawResponse)
+		const parsedData = parseAIJsonResponse<Omit<ThreadSummary, 'title' | 'postsAnalyzed' | 'uniqueAuthors' | 'pageNumber' | 'error'>>(rawResponse)
 
 		// Hydrate participants with avatars using robust matching
 		const participantsWithAvatars = parsedData.participants.map(p => {
@@ -140,7 +144,7 @@ ${formattedPosts}`
 		logger.error('ThreadSummarizer error:', error)
 
 		const errorMessage = error instanceof Error ? error.message : String(error)
-		const errorMsg = errorMessage.includes('429')
+		const errorMsg = (errorMessage.includes('429') || errorMessage.includes('Límite de velocidad') || errorMessage.includes('modelos agotados'))
 			? 'Limite de consultas IA excedido. Espera un momento.'
 			: errorMessage.includes('400')
 			? 'Contenido demasiado largo para procesar.'
@@ -153,23 +157,6 @@ ${formattedPosts}`
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-function parseJSONResponse(text: string): Omit<ThreadSummary, 'title' | 'postsAnalyzed' | 'uniqueAuthors' | 'pageNumber' | 'error'> {
-	try {
-        // Clean markdown code blocks if present
-		const cleanText = text.replace(/```json\n?|\n?```/g, '').trim()
-		return JSON.parse(cleanText)
-	} catch (e) {
-        logger.error('Failed to parse summary JSON:', text)
-		// Fallback for parsing failure
-		return {
-			topic: 'Error al procesar el formato de la respuesta.',
-			keyPoints: ['No se pudo generar un resumen estructurado.'],
-			participants: [],
-			status: 'Error de formato',
-		}
-	}
-}
 
 function createErrorSummary(title: string, pageNumber: number, error: string, posts = 0, authors = 0): ThreadSummary {
 	return {
@@ -184,4 +171,3 @@ function createErrorSummary(title: string, pageNumber: number, error: string, po
 		error,
 	}
 }
-

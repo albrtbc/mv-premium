@@ -22,16 +22,26 @@ import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right'
 import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw'
 import History from 'lucide-react/dist/esm/icons/history'
 import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
+import Clock3 from 'lucide-react/dist/esm/icons/clock-3'
 import { ShadowWrapper } from '@/components/shadow-wrapper'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { sendMessage } from '@/lib/messaging'
 import { summarizeMultiplePages, type MultiPageSummary } from '../logic/summarize-multi-page'
-import { MAX_MULTI_PAGES, getTotalPages, getCurrentPage, type MultiPageProgress } from '../logic/fetch-pages'
+import {
+	MAX_MULTI_PAGES_GEMINI,
+	MAX_MULTI_PAGES_GROQ,
+	getProviderMultiPageLimit,
+	getTotalPages,
+	getCurrentPage,
+	type MultiPageProgress,
+} from '../logic/fetch-pages'
 import { getCachedMultiSummary, setCachedMultiSummary, getCachedMultiAge, formatCacheAge } from '../logic/summary-cache'
-import { useSettingsStore } from '@/store/settings-store'
-import { getAvailableModels, getLastModelUsed } from '@/services/ai/gemini-service'
+import { getLastModelUsed } from '@/services/ai/gemini-service'
+import { useAIModelLabel } from '@/hooks/use-ai-model-label'
 import { renderInlineMarkdown, markdownToBBCode } from '../logic/render-inline-markdown'
+import { useSettingsStore } from '@/store/settings-store'
+import { toast } from '@/lib/lazy-toast'
 
 // =============================================================================
 // TYPES
@@ -44,6 +54,14 @@ interface MultiPageSummaryModalProps {
 	onClose: () => void
 }
 
+function formatDuration(ms: number): string {
+	const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+	const minutes = Math.floor(totalSeconds / 60)
+	const seconds = totalSeconds % 60
+	if (minutes > 0) return `${minutes}m ${seconds}s`
+	return `${seconds}s`
+}
+
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -54,10 +72,13 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 	const [progress, setProgress] = useState<MultiPageProgress | null>(null)
 	const [copied, setCopied] = useState(false)
 	const [actualModel, setActualModel] = useState<string | null>(null)
-	const { aiModel } = useSettingsStore()
-	const models = getAvailableModels()
-	const displayModel = actualModel || aiModel
-	const modelLabel = models.find(m => m.value === displayModel)?.label || displayModel
+	const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
+	const [elapsedSeconds, setElapsedSeconds] = useState(0)
+	const { modelLabel, isModelFallback, configuredModel, isProviderFallback, providerFallbackMessage } =
+		useAIModelLabel(actualModel)
+	const aiProvider = useSettingsStore(s => s.aiProvider)
+	const hasAnyAIKey = useSettingsStore(s => s.geminiApiKey.trim().length > 0 || s.groqApiKey.trim().length > 0)
+	const providerMaxPages = getProviderMultiPageLimit(aiProvider)
 
 	// Page range state
 	const totalPages = getTotalPages()
@@ -72,37 +93,74 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 			setSummary(null)
 			setProgress(null)
 			setCopied(false)
+			setActualModel(null)
+			setStartedAtMs(null)
+			setElapsedSeconds(0)
 			setFromPage(1)
 			setToPage(Math.min(totalPages, 5))
 		}
-	}, [isOpen, totalPages])
+	}, [isOpen, totalPages, providerMaxPages])
 
 	const pageCount = Math.max(1, toPage - fromPage + 1)
-	const isValidRange = fromPage >= 1 && toPage >= fromPage && toPage <= totalPages && pageCount <= MAX_MULTI_PAGES
+	const isValidRange = fromPage >= 1 && toPage >= fromPage && toPage <= totalPages && pageCount <= providerMaxPages
 
 	const handleStartSummary = useCallback(async () => {
+		if (!isValidRange || pageCount < 2) return
+
+		const startedAt = Date.now()
 		setStep('loading')
 		setProgress(null)
 		setActualModel(null)
+		setStartedAtMs(startedAt)
+		setElapsedSeconds(0)
 
 		const result = await summarizeMultiplePages(fromPage, toPage, p => setProgress(p))
-
-		if (!result.error) {
-			setCachedMultiSummary(fromPage, toPage, result)
+		const usedModel = getLastModelUsed()
+		const timedResult: MultiPageSummary = {
+			...result,
+			generationMs: Date.now() - startedAt,
+			modelUsed: usedModel || undefined,
 		}
 
-		setActualModel(getLastModelUsed())
-		setSummary(result)
+		if (!timedResult.error) {
+			setCachedMultiSummary(fromPage, toPage, timedResult)
+		}
+
+		setActualModel(usedModel)
+		setSummary(timedResult)
 		setStep('result')
-	}, [fromPage, toPage])
+		setStartedAtMs(null)
+	}, [fromPage, toPage, isValidRange, pageCount])
 
 	const handleLoadCached = useCallback(() => {
 		const cached = getCachedMultiSummary(fromPage, toPage)
 		if (cached) {
+			setActualModel(cached.modelUsed || null)
 			setSummary(cached)
 			setStep('result')
+			setStartedAtMs(null)
+			setElapsedSeconds(0)
 		}
 	}, [fromPage, toPage])
+
+	useEffect(() => {
+		if (step !== 'loading' || startedAtMs === null) return
+
+		setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
+		const intervalId = window.setInterval(() => {
+			setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
+		}, 1000)
+
+		return () => window.clearInterval(intervalId)
+	}, [step, startedAtMs])
+
+	// If API keys are removed while modal is open, auto-close to avoid stale UI.
+	useEffect(() => {
+		if (isOpen && !hasAnyAIKey) {
+			toast.error('No hay API Keys de IA configuradas. Cerrando resumen multi-página.')
+			onClose()
+		}
+	}, [isOpen, hasAnyAIKey, onClose])
 
 	const handleCopy = () => {
 		if (!summary) return
@@ -147,6 +205,11 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 	}
 
 	const isAINotConfigured = summary?.error?.includes('IA no configurada')
+	const badgeTitle = providerFallbackMessage
+		? providerFallbackMessage
+		: isModelFallback
+			? `Modelo configurado: ${configuredModel}`
+			: undefined
 
 	if (!isOpen) return null
 
@@ -165,11 +228,11 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 							<span
 								className={cn(
 									'text-[10px] px-1.5 py-0.5 rounded font-medium',
-									actualModel && actualModel !== aiModel
+									isProviderFallback || isModelFallback
 										? 'text-amber-600 bg-amber-500/10'
 										: 'text-muted-foreground bg-muted'
 								)}
-								title={actualModel && actualModel !== aiModel ? `Modelo configurado: ${aiModel}` : undefined}
+								title={badgeTitle}
 							>
 								{modelLabel}
 							</span>
@@ -186,6 +249,12 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 
 					{/* Content */}
 					<div className="flex-1 overflow-y-auto p-4">
+						{providerFallbackMessage && (
+							<div className="mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md p-2.5">
+								<AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+								<p className="text-xs text-amber-700 dark:text-amber-400">{providerFallbackMessage}</p>
+							</div>
+						)}
 						{step === 'config' && (
 							<ConfigStep
 								fromPage={fromPage}
@@ -194,6 +263,8 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 								currentPage={currentPage}
 								pageCount={pageCount}
 								isValidRange={isValidRange}
+								aiProvider={aiProvider}
+								providerMaxPages={providerMaxPages}
 								onFromPageChange={setFromPage}
 								onToPageChange={setToPage}
 								onStart={handleStartSummary}
@@ -202,7 +273,7 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 							/>
 						)}
 
-						{step === 'loading' && <LoadingStep progress={progress} pageCount={pageCount} />}
+						{step === 'loading' && <LoadingStep progress={progress} pageCount={pageCount} elapsedSeconds={elapsedSeconds} />}
 
 						{step === 'result' && summary?.error && (
 							<ErrorStep
@@ -274,6 +345,8 @@ function ConfigStep({
 	currentPage,
 	pageCount,
 	isValidRange,
+	aiProvider,
+	providerMaxPages,
 	onFromPageChange,
 	onToPageChange,
 	onStart,
@@ -286,25 +359,39 @@ function ConfigStep({
 	currentPage: number
 	pageCount: number
 	isValidRange: boolean
+	aiProvider: 'gemini' | 'groq'
+	providerMaxPages: number
 	onFromPageChange: (v: number) => void
 	onToPageChange: (v: number) => void
 	onStart: () => void
 	onLoadCached: () => void
 	cachedAge: number | null
 }) {
+	const isGroq = aiProvider === 'groq'
+
 	// Quick range presets
 	const presets = [
-		{ label: 'Todo el hilo', from: 1, to: totalPages, show: totalPages <= MAX_MULTI_PAGES },
+		{ label: 'Todo el hilo', from: 1, to: totalPages, show: totalPages <= providerMaxPages },
 		{ label: 'Primeras 5', from: 1, to: Math.min(5, totalPages), show: totalPages >= 3 },
-		{ label: 'Primeras 10', from: 1, to: Math.min(10, totalPages), show: totalPages >= 6 },
-		{ label: 'Primeras 20', from: 1, to: Math.min(20, totalPages), show: totalPages >= 15 },
+		{ label: 'Primeras 10', from: 1, to: Math.min(10, totalPages), show: totalPages >= 6 && providerMaxPages >= 10 },
+		{ label: 'Primeras 20', from: 1, to: Math.min(20, totalPages), show: totalPages >= 15 && providerMaxPages >= 20 },
 		{ label: 'Últimas 5', from: Math.max(1, totalPages - 4), to: totalPages, show: totalPages >= 3 },
-		{ label: 'Últimas 10', from: Math.max(1, totalPages - 9), to: totalPages, show: totalPages >= 6 },
-		{ label: 'Últimas 20', from: Math.max(1, totalPages - 19), to: totalPages, show: totalPages >= 15 },
+		{
+			label: 'Últimas 10',
+			from: Math.max(1, totalPages - 9),
+			to: totalPages,
+			show: totalPages >= 6 && providerMaxPages >= 10,
+		},
+		{
+			label: 'Últimas 20',
+			from: Math.max(1, totalPages - 19),
+			to: totalPages,
+			show: totalPages >= 15 && providerMaxPages >= 20,
+		},
 		{
 			label: `Desde actual (${currentPage})`,
 			from: currentPage,
-			to: Math.min(currentPage + 9, totalPages),
+			to: Math.min(currentPage + providerMaxPages - 1, totalPages),
 			show: currentPage > 1 && currentPage < totalPages,
 		},
 	].filter(p => p.show)
@@ -320,9 +407,36 @@ function ConfigStep({
 						<p className="text-xs text-muted-foreground mt-1">
 							Selecciona el rango de páginas a resumir. El hilo tiene <strong>{totalPages}</strong>{' '}
 							{totalPages === 1 ? 'página' : 'páginas'}.
-							{totalPages > MAX_MULTI_PAGES && (
-								<span className="text-amber-500"> (máximo {MAX_MULTI_PAGES} páginas por resumen)</span>
+							{totalPages > providerMaxPages && (
+								<span className="text-amber-500"> (máximo {providerMaxPages} páginas con el proveedor actual)</span>
 							)}
+						</p>
+					</div>
+				</div>
+			</div>
+
+			{/* Provider limits */}
+			<div
+				className={cn(
+					'rounded-lg p-3 border',
+					isGroq ? 'bg-amber-500/10 border-amber-500/30' : 'bg-blue-500/10 border-blue-500/30'
+				)}
+			>
+				<div className="flex items-start gap-2">
+					<AlertTriangle className={cn('w-4 h-4 mt-0.5 flex-shrink-0', isGroq ? 'text-amber-500' : 'text-blue-500')} />
+					<div className="space-y-1">
+						<p className="text-sm font-medium text-foreground">
+							Límites por proveedor (actual: {isGroq ? 'Groq / Kimi' : 'Gemini'})
+						</p>
+						<p className="text-xs text-muted-foreground">
+							Groq / Kimi: <strong>2-{MAX_MULTI_PAGES_GROQ}</strong> páginas por límites de tokens por minuto
+							(TPM) y rate limit.
+						</p>
+						<p className="text-xs text-muted-foreground">
+							Gemini: <strong>2-{MAX_MULTI_PAGES_GEMINI}</strong> páginas por resumen, mejor tolerancia en hilos largos.
+						</p>
+						<p className="text-xs text-muted-foreground">
+							Si necesitas más rango, cambia el proveedor desde Ajustes de IA.
 						</p>
 					</div>
 				</div>
@@ -391,7 +505,7 @@ function ConfigStep({
 			</div>
 
 			{/* Warnings */}
-			{pageCount > 10 && (
+			{isValidRange && pageCount > 10 && (
 				<div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md p-2.5">
 					<AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
 					<p className="text-xs text-amber-600 dark:text-amber-400">
@@ -415,7 +529,7 @@ function ConfigStep({
 					<AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
 					<p className="text-xs text-destructive">
 						Rango no válido. Asegúrate de que las páginas están entre 1 y {totalPages}
-						{pageCount > MAX_MULTI_PAGES ? ` y no superas ${MAX_MULTI_PAGES} páginas.` : '.'}
+						{pageCount > providerMaxPages ? ` y no superas ${providerMaxPages} páginas con ${isGroq ? 'Groq / Kimi' : 'Gemini'}.` : '.'}
 					</p>
 				</div>
 			)}
@@ -448,7 +562,15 @@ function ConfigStep({
 	)
 }
 
-function LoadingStep({ progress, pageCount }: { progress: MultiPageProgress | null; pageCount: number }) {
+function LoadingStep({
+	progress,
+	pageCount,
+	elapsedSeconds,
+}: {
+	progress: MultiPageProgress | null
+	pageCount: number
+	elapsedSeconds: number
+}) {
 	const getProgressText = () => {
 		if (!progress) return 'Preparando...'
 
@@ -499,6 +621,7 @@ function LoadingStep({ progress, pageCount }: { progress: MultiPageProgress | nu
 			<div className="text-center space-y-2">
 				<p className="text-sm font-medium text-foreground">{getProgressText()}</p>
 				<p className="text-xs text-muted-foreground">Resumiendo {pageCount} páginas · Esto puede tardar</p>
+				<p className="text-xs text-muted-foreground/80">Tiempo transcurrido: {elapsedSeconds}s</p>
 			</div>
 
 			{/* Progress bar */}
@@ -541,10 +664,10 @@ function ErrorStep({
 			</div>
 			<div className="text-center space-y-2">
 				<p className={cn('text-sm font-medium', isAINotConfigured ? 'text-foreground' : 'text-destructive')}>
-					{isAINotConfigured ? 'API de Gemini no configurada' : 'Error'}
+					{isAINotConfigured ? 'IA no configurada' : 'Error'}
 				</p>
 				<p className="text-xs text-muted-foreground">
-					{isAINotConfigured ? 'Necesitas una API Key de Google Gemini para usar esta funcion.' : summary.error}
+					{isAINotConfigured ? 'Necesitas una API Key de Gemini o Groq para usar esta función.' : summary.error}
 				</p>
 				{isAINotConfigured ? (
 					<Button size="sm" onClick={onOpenSettings} className="mt-3 gap-2">
@@ -654,18 +777,41 @@ function ResultStep({ summary }: { summary: MultiPageSummary }) {
 					<Users className="w-3.5 h-3.5" />
 					<span>{summary.totalUniqueAuthors} autores</span>
 				</div>
+				{summary.modelUsed && (
+					<div className="flex items-center gap-1.5">
+						<Bot className="w-3.5 h-3.5" />
+						<span>{summary.modelUsed}</span>
+					</div>
+				)}
+				{typeof summary.generationMs === 'number' && (
+					<div className="flex items-center gap-1.5">
+						<Clock3 className="w-3.5 h-3.5" />
+						<span>{formatDuration(summary.generationMs)}</span>
+					</div>
+				)}
 				</div>
 
-			{/* AI Studio link */}
-			<a
-				href="https://aistudio.google.com/"
-				target="_blank"
-				rel="noopener noreferrer"
-				className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors pt-1"
-			>
-				<ExternalLink className="w-3 h-3" />
-				Consulta tu uso en AI Studio &gt; Dashboard &gt; Uso y facturación &gt; Límite de frecuencia
-			</a>
+			{/* API console links */}
+			<div className="flex flex-col gap-1 pt-1">
+				<a
+					href="https://aistudio.google.com/"
+					target="_blank"
+					rel="noopener noreferrer"
+					className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+				>
+					<ExternalLink className="w-3 h-3" />
+					Gemini: Consulta tu uso en AI Studio
+				</a>
+				<a
+					href="https://console.groq.com/"
+					target="_blank"
+					rel="noopener noreferrer"
+					className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+				>
+					<ExternalLink className="w-3 h-3" />
+					Groq: Consulta tu uso en Groq Console
+				</a>
+			</div>
 		</div>
 	)
 }

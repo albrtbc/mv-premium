@@ -10,8 +10,9 @@
  */
 
 import { getAIService } from '@/services/ai/gemini-service'
+import { parseAIJsonResponse } from '@/services/ai/shared'
 import { logger } from '@/lib/logger'
-import { fetchMultiplePages, type MultiPageProgress, type PageData } from './fetch-pages'
+import { fetchMultiplePages, getProviderMultiPageLimit, type MultiPageProgress, type PageData } from './fetch-pages'
 import { formatPostsForPrompt } from './extract-posts'
 
 // =============================================================================
@@ -30,6 +31,8 @@ export interface MultiPageSummary {
 	pagesAnalyzed: number
 	pageRange: string
 	fetchErrors: number[]
+	generationMs?: number
+	modelUsed?: string
 	error?: string
 }
 
@@ -37,11 +40,44 @@ export interface MultiPageSummary {
 // CONSTANTS
 // =============================================================================
 
-/** Max pages to put in a single AI prompt (increased from 5 — Gemini Flash handles large context well) */
-const PAGES_PER_BATCH = 8
+// GEMINI LIMITS (Original, High Performance)
+const GEMINI_PAGES_PER_BATCH = 8
+const GEMINI_MAX_CHARS_PER_BATCH = 40000
 
-/** Max total chars per batch prompt */
-const MAX_CHARS_PER_BATCH = 40000
+// GROQ LIMITS (Safer for Free Tier TPM)
+const GROQ_PAGES_PER_BATCH = 4
+const GROQ_MAX_CHARS_PER_BATCH = 16000
+
+// GROQ THROTTLING (helps avoid 429 on long ranges like 30 pages)
+const GROQ_LARGE_RANGE_THRESHOLD = 20
+const GROQ_PAGES_PER_BATCH_LARGE_RANGE = 3
+const GROQ_MAX_CHARS_PER_BATCH_LARGE_RANGE = 12000
+const GROQ_DELAY_BETWEEN_CALLS_MS = 0
+const GROQ_DELAY_BETWEEN_CALLS_MS_LARGE_RANGE = 0
+
+function sleep(ms: number): Promise<void> {
+	return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function getGroqLimits(totalRequestedPages: number): {
+	pagesPerBatch: number
+	maxCharsPerBatch: number
+	delayBetweenCallsMs: number
+} {
+	if (totalRequestedPages >= GROQ_LARGE_RANGE_THRESHOLD) {
+		return {
+			pagesPerBatch: GROQ_PAGES_PER_BATCH_LARGE_RANGE,
+			maxCharsPerBatch: GROQ_MAX_CHARS_PER_BATCH_LARGE_RANGE,
+			delayBetweenCallsMs: GROQ_DELAY_BETWEEN_CALLS_MS_LARGE_RANGE,
+		}
+	}
+
+	return {
+		pagesPerBatch: GROQ_PAGES_PER_BATCH,
+		maxCharsPerBatch: GROQ_MAX_CHARS_PER_BATCH,
+		delayBetweenCallsMs: GROQ_DELAY_BETWEEN_CALLS_MS,
+	}
+}
 
 // =============================================================================
 // DYNAMIC LIMITS
@@ -99,10 +135,10 @@ function buildStatsBlock(pages: PageData[]): string {
 }
 
 // =============================================================================
-// PROMPTS
+// PROMPTS - GEMINI (Standard JSON)
 // =============================================================================
 
-function buildSingleBatchPrompt(pageCount: number): string {
+function buildSingleBatchPromptGemini(pageCount: number): string {
 	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
 
 	return `Eres un analista de foros. Tu trabajo es resumir MULTIPLES PAGINAS de un hilo de Mediavida y devolver un objeto JSON valido.
@@ -133,10 +169,11 @@ REGLAS ESTRICTAS:
 - Los posts marcados con [👍N] tienen N votos de la comunidad. Los posts muy votados suelen contener opiniones o informacion especialmente relevante. Tenlos en cuenta para los puntos clave y participantes.
 - Usa las ESTADISTICAS DEL HILO como referencia objetiva para seleccionar participantes destacados, pero no te limites solo a los que mas postean: alguien con pocos posts pero muy votados puede ser mas relevante.
 - Incluye hasta ${maxKeyPoints} puntos clave.
-- Responde en espanol.`
+- Responde en espanol.
+- IMPORTANTE: El bloque JSON final debe ser válido y contener toda la información solicitada.`
 }
 
-function buildMetaSummaryPrompt(pageCount: number): string {
+function buildMetaSummaryPromptGemini(pageCount: number): string {
 	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
 
 	return `Eres un analista de foros. Te voy a dar RESUMENES PARCIALES de diferentes secciones de un hilo largo de Mediavida. Tu trabajo es crear UN UNICO RESUMEN GLOBAL coherente combinando todos los parciales.
@@ -166,7 +203,85 @@ REGLAS ESTRICTAS:
 - Si un tema evoluciona entre secciones, describe la evolucion.
 - Los participantes deben ser los MAS destacados en todo el hilo (hasta ${maxParticipants}).
 - Usa las ESTADISTICAS DEL HILO como referencia objetiva. Alguien con pocos posts pero muy votados puede ser mas relevante que alguien que postea mucho sin impacto.
-- Responde en espanol.`
+- Responde en espanol.
+- IMPORTANTE: El bloque JSON final debe ser válido.`
+}
+
+// =============================================================================
+// PROMPTS - GROQ (JSON only)
+// =============================================================================
+
+function buildSingleBatchPromptGroq(pageCount: number): string {
+	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
+
+	return `Eres un analista de foros experto. Tu trabajo es resumir MULTIPLES PAGINAS de un hilo de Mediavida y devolver un objeto JSON valido.
+
+FORMATO DE SALIDA (JSON estrictamente valido):
+{
+  "topic": "Una frase concisa y DETALLADA explicando el tema principal específico.",
+  "keyPoints": [
+    "Punto clave 1 (con nombres propios y argumentos concretos)",
+    "Punto clave 2",
+    "... (hasta ${maxKeyPoints} puntos clave)"
+  ],
+  "participants": [
+    { "name": "Usuario1", "contribution": "Resumen de su postura. Si tiene votos, indícalo como '(N votos)' al final." },
+    { "name": "Usuario2", "contribution": "Resumen de su postura." },
+    "... (hasta ${maxParticipants} participantes destacados)"
+  ],
+  "status": "Una frase sobre el estado actual del debate."
+}
+
+REGLAS ESTRICTAS:
+- Devuelve SOLO el JSON. No incluyas bloques de codigo markdown.
+- El JSON debe ser valido.
+- Resume TODOS los posts que te paso, dando una vision global.
+- EVITA FRASES GENÉRICAS como "Se discute sobre X". Di QUÉ se dice sobre X.
+- Ignora posts sin contenido ("pole", "+1").
+- Identifica los temas principales y como evolucionan entre paginas.
+- Incluye hasta ${maxParticipants} participantes, priorizando los mas activos y relevantes.
+- Los posts marcados con [👍N] tienen N votos de la comunidad. Son MUY importantes.
+  - Al citar participantes con muchos votos, menciona los votos explícitamente en español: "(15 votos)", NO uses inglés como "15-vote post".
+- Usa las ESTADISTICAS DEL HILO como referencia objetiva.
+- Incluye hasta ${maxKeyPoints} puntos clave.
+- RESPUESTA 100% EN ESPAÑOL. No uses términos en inglés.
+- IMPORTANTE: Tu respuesta debe empezar con { y terminar con }. Sin texto antes ni después.`
+}
+
+function buildMetaSummaryPromptGroq(pageCount: number): string {
+	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
+
+	return `Eres un analista de foros experto. Te voy a dar RESUMENES PARCIALES de diferentes secciones de un hilo largo de Mediavida. Tu trabajo es crear UN UNICO RESUMEN GLOBAL coherente combinando todos los parciales.
+
+FORMATO DE SALIDA (JSON estrictamente valido):
+{
+  "topic": "El tema principal del hilo completo, detallado y específico.",
+  "keyPoints": [
+    "Punto clave 1 (los mas importantes de todo el hilo, con detalles concretos)",
+    "Punto clave 2",
+    "... (hasta ${maxKeyPoints} puntos clave)"
+  ],
+  "participants": [
+    { "name": "Usuario1", "contribution": "Su aportacion general al hilo. Si es muy votado, indícalo como '(N votos)'." },
+    { "name": "Usuario2", "contribution": "Su aportacion general al hilo" },
+    "... (hasta ${maxParticipants} participantes destacados)"
+  ],
+  "status": "Estado final del debate considerando toda la evolucion del hilo."
+}
+
+REGLAS ESTRICTAS:
+- Devuelve SOLO el JSON. No incluyas bloques de codigo markdown.
+- El JSON debe ser valido.
+- Combina los resumenes parciales en UN UNICO resumen coherente.
+- No repitas informacion redundante entre secciones.
+- EVITA GENERALIDADES. No digas "hubo debate", di "X argumentó Y contra Z".
+- Prioriza los puntos mas relevantes e impactantes.
+- Si un tema evoluciona entre secciones, describe la evolucion.
+- Los participantes deben ser los MAS destacados en todo el hilo (hasta ${maxParticipants}).
+- Si mencionas votos, hazlo EN ESPAÑOL: "(15 votos)", NO en inglés ("15-vote post").
+- Usa las ESTADISTICAS DEL HILO como referencia objetiva.
+- RESPUESTA 100% EN ESPAÑOL.
+- IMPORTANTE: Tu respuesta debe empezar con { y terminar con }. Sin texto antes ni después.`
 }
 
 // =============================================================================
@@ -190,6 +305,46 @@ export async function summarizeMultiplePages(
 	if (!aiService) {
 		return createErrorSummary('', fromPage, toPage, 'IA no configurada. Ve a Ajustes > Inteligencia Artificial.')
 	}
+
+	// Detect provider (gemini vs groq)
+	// If getProvider is not available (legacy), assume gemini
+	const provider = 'getProvider' in aiService ? aiService.getProvider() : 'gemini'
+	const totalRequestedPages = Math.max(1, toPage - fromPage + 1)
+	const providerMaxPages = getProviderMultiPageLimit(provider)
+
+	// Multi-page mode is intentionally 2+ pages.
+	if (totalRequestedPages < 2) {
+		return createErrorSummary(
+			'',
+			fromPage,
+			toPage,
+			'Para resumir una sola página, usa el botón "Resumir" del hilo.'
+		)
+	}
+
+	if (totalRequestedPages > providerMaxPages) {
+		if (provider === 'groq') {
+			return createErrorSummary(
+				'',
+				fromPage,
+				toPage,
+				`Con Groq (Kimi) el máximo es ${providerMaxPages} páginas por resumen debido a límites de tokens por minuto (TPM). Usa un rango más corto o cambia a Gemini para hasta 30 páginas.`
+			)
+		}
+
+		return createErrorSummary(
+			'',
+			fromPage,
+			toPage,
+			`El máximo para este proveedor es ${providerMaxPages} páginas por resumen.`
+		)
+	}
+
+	// SELECT LIMITS BASED ON PROVIDER
+	const groqLimits = getGroqLimits(totalRequestedPages)
+	const pagesPerBatch = provider === 'groq' ? groqLimits.pagesPerBatch : GEMINI_PAGES_PER_BATCH
+	const maxCharsPerBatch = provider === 'groq' ? groqLimits.maxCharsPerBatch : GEMINI_MAX_CHARS_PER_BATCH
+	const delayBetweenCallsMs = provider === 'groq' ? groqLimits.delayBetweenCallsMs : 0
 
 	// 1. Fetch all pages
 	const fetchResult = await fetchMultiplePages(fromPage, toPage, onProgress)
@@ -219,7 +374,7 @@ export async function summarizeMultiplePages(
 		const totalPages = fetchResult.pages.length
 		const statsBlock = buildStatsBlock(fetchResult.pages)
 
-		if (totalPages <= PAGES_PER_BATCH) {
+		if (totalPages <= pagesPerBatch) {
 			// Direct single-batch summarization
 			onProgress?.({ phase: 'summarizing', current: 1, total: 2 })
 			rawSummary = await summarizeBatch(
@@ -227,16 +382,22 @@ export async function summarizeMultiplePages(
 				fetchResult.threadTitle,
 				fetchResult.pages,
 				totalPages,
-				statsBlock
+				statsBlock,
+				provider,
+				maxCharsPerBatch
 			)
 			onProgress?.({ phase: 'summarizing', current: 2, total: 2 })
 		} else {
 			// Map-reduce: split into batches
-			const batches = splitIntoBatches(fetchResult.pages, PAGES_PER_BATCH)
+			const batches = splitIntoBatches(fetchResult.pages, pagesPerBatch)
 			const partialSummaries: string[] = []
 			const batchPageRanges: string[] = []
 
 			for (let i = 0; i < batches.length; i++) {
+				if (provider === 'groq' && i > 0) {
+					await sleep(delayBetweenCallsMs)
+				}
+
 				onProgress?.({
 					phase: 'summarizing',
 					current: i + 1,
@@ -254,13 +415,19 @@ export async function summarizeMultiplePages(
 					aiService,
 					fetchResult.threadTitle,
 					batch,
-					totalPages,
-					statsBlock
+					batch.length,
+					statsBlock,
+					provider,
+					maxCharsPerBatch
 				)
 				partialSummaries.push(partial)
 			}
 
 			// Meta-summary from partials
+			if (provider === 'groq') {
+				await sleep(delayBetweenCallsMs)
+			}
+
 			onProgress?.({
 				phase: 'summarizing',
 				current: batches.length + 1,
@@ -277,11 +444,13 @@ export async function summarizeMultiplePages(
 				fromPage,
 				toPage,
 				totalPages,
-				statsBlock
+				statsBlock,
+				provider
 			)
 		}
 
-		const parsed = parseJSONResponse(rawSummary)
+		type ParsedSummary = Omit<MultiPageSummary, 'title' | 'totalPostsAnalyzed' | 'totalUniqueAuthors' | 'pagesAnalyzed' | 'pageRange' | 'fetchErrors' | 'error'>
+		const parsed = parseAIJsonResponse<ParsedSummary>(rawSummary)
 
 		// Hydrate participants with avatars
 		const participantsWithAvatars = parsed.participants.map(p => {
@@ -317,13 +486,18 @@ export async function summarizeMultiplePages(
 		logger.error('MultiPageSummarizer error:', error)
 
 		const errorMessage = error instanceof Error ? error.message : String(error)
-		const errorMsg = errorMessage.includes('429')
-			? 'Limite de consultas IA excedido. Espera un momento e intentalo de nuevo.'
-			: errorMessage.includes('400')
-			? 'Contenido demasiado largo para procesar. Prueba con menos paginas.'
-			: 'Error al generar el resumen multi-pagina.'
+		
+		let userFriendlyError = 'Error al generar el resumen multi-pagina.'
+		
+		if (errorMessage.includes('429') || errorMessage.includes('TPM') || errorMessage.includes('Rate limit') || errorMessage.includes('Límite de velocidad') || errorMessage.includes('modelos agotados')) {
+			userFriendlyError = 'Límite de velocidad excedido. El plan gratuito es limitado para resúmenes largos. Espera un momento o reduce el rango de páginas.'
+		} else if (errorMessage.includes('400') || errorMessage.includes('too large') || errorMessage.includes('context length')) {
+			userFriendlyError = 'Contenido demasiado largo para procesar. Intenta reducir el número de páginas.'
+		} else if (errorMessage.includes('500') || errorMessage.includes('503')) {
+			userFriendlyError = 'Error temporal del servidor. Inténtalo de nuevo.'
+		}
 
-		return createErrorSummary(fetchResult.threadTitle, fromPage, toPage, errorMsg)
+		return createErrorSummary(fetchResult.threadTitle, fromPage, toPage, userFriendlyError)
 	}
 }
 
@@ -339,7 +513,9 @@ async function summarizeBatch(
 	threadTitle: string,
 	pages: PageData[],
 	totalPageCount: number,
-	statsBlock?: string
+	statsBlock?: string,
+	provider: 'gemini' | 'groq' = 'gemini',
+	maxChars: number = GEMINI_MAX_CHARS_PER_BATCH
 ): Promise<string> {
 	const pageRangeLabel =
 		pages.length === 1
@@ -353,13 +529,14 @@ async function summarizeBatch(
 	}
 
 	// Truncate if total content is too large
-	if (formattedContent.length > MAX_CHARS_PER_BATCH) {
-		formattedContent = formattedContent.substring(0, MAX_CHARS_PER_BATCH) + '\n[...contenido truncado]'
+	if (formattedContent.length > maxChars) {
+		formattedContent = formattedContent.substring(0, maxChars) + '\n[...contenido truncado]'
 	}
 
 	const statsSection = statsBlock ? `\n${statsBlock}\n` : ''
 
-	const prompt = `${buildSingleBatchPrompt(totalPageCount)}
+	const promptBuilder = provider === 'groq' ? buildSingleBatchPromptGroq : buildSingleBatchPromptGemini
+	const prompt = `${promptBuilder(totalPageCount)}
 
 ---
 TITULO DEL HILO: ${threadTitle} (${pageRangeLabel})
@@ -382,7 +559,8 @@ async function createMetaSummary(
 	fromPage: number,
 	toPage: number,
 	totalPageCount: number,
-	statsBlock: string
+	statsBlock: string,
+	provider: 'gemini' | 'groq' = 'gemini'
 ): Promise<string> {
 	const formattedPartials = partialSummaries
 		.map((summary, i) => {
@@ -391,7 +569,8 @@ async function createMetaSummary(
 		})
 		.join('\n\n')
 
-	const prompt = `${buildMetaSummaryPrompt(totalPageCount)}
+	const promptBuilder = provider === 'groq' ? buildMetaSummaryPromptGroq : buildMetaSummaryPromptGemini
+	const prompt = `${promptBuilder(totalPageCount)}
 
 ---
 TITULO DEL HILO: ${threadTitle}
@@ -419,26 +598,6 @@ function splitIntoBatches(pages: PageData[], batchSize: number): PageData[][] {
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-function parseJSONResponse(
-	text: string
-): Omit<
-	MultiPageSummary,
-	'title' | 'totalPostsAnalyzed' | 'totalUniqueAuthors' | 'pagesAnalyzed' | 'pageRange' | 'fetchErrors' | 'error'
-> {
-	try {
-		const cleanText = text.replace(/```json\n?|\n?```/g, '').trim()
-		return JSON.parse(cleanText)
-	} catch {
-		logger.error('Failed to parse multi-page summary JSON:', text)
-		return {
-			topic: 'Error al procesar el formato de la respuesta.',
-			keyPoints: ['No se pudo generar un resumen estructurado.'],
-			participants: [],
-			status: 'Error de formato',
-		}
-	}
-}
 
 function createErrorSummary(title: string, fromPage: number, toPage: number, error: string): MultiPageSummary {
 	return {

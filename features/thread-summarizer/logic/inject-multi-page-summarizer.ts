@@ -84,7 +84,7 @@ export function injectMultiPageSummarizerButton(): void {
 
 	buttonResult = createThreadActionButton({
 		id: BUTTON_ID,
-		icon: 'fa-files-o',
+		icon: 'fa-book',
 		text: 'Resumen+',
 		tooltip: 'Resumir múltiples páginas con IA',
 		ariaLabel: 'Resumir múltiples páginas del hilo con inteligencia artificial',
