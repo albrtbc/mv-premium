@@ -8,6 +8,7 @@
 
 import { MV_SELECTORS } from '@/constants'
 import { logger } from '@/lib/logger'
+import { cleanPostContent } from './clean-post-content'
 
 // =============================================================================
 // CONSTANTS
@@ -77,8 +78,8 @@ function extractSinglePost(postEl: HTMLElement): ExtractedPost | null {
 	const number = parseInt(numAttr || '0', 10)
 
 	// 2. Author (from post header, not from quotes)
-	const authorEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_AUTHOR_ALL)
-	const author = authorEl?.textContent?.trim() || 'Anónimo'
+	const author = extractAuthorName(postEl)
+	if (!author) return null
 
 	// 3. Avatar
 	const avatarEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_AVATAR_IMG)
@@ -95,10 +96,13 @@ function extractSinglePost(postEl: HTMLElement): ExtractedPost | null {
 	}
 
 	// 4. Content (cleaned)
-	const contentEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_BODY_ALL)
+	const contentEl =
+		postEl.querySelector(MV_SELECTORS.THREAD.POST_CONTENTS) ||
+		postEl.querySelector(MV_SELECTORS.THREAD.POST_BODY_ALL)
 	if (!contentEl) return null
 
-	const content = cleanPostContent(contentEl)
+	// Keep spoiler content for thread summaries; remove only spoiler trigger links.
+	const content = cleanPostContent(contentEl, { keepSpoilers: true })
 	if (!content) return null
 
 	// 5. Timestamp
@@ -120,38 +124,25 @@ function extractSinglePost(postEl: HTMLElement): ExtractedPost | null {
 	}
 }
 
-/**
- * Sanitizes post content by removing quotes, spoilers, media embeds, and technical artifacts.
- * Normalizes white space for better AI processing.
- */
-function cleanPostContent(contentEl: Element): string {
-	const clone = contentEl.cloneNode(true) as HTMLElement
+function extractAuthorName(postEl: HTMLElement): string {
+	const dataAuthor = postEl.getAttribute('data-autor')?.replace(/\s+/g, ' ').trim()
+	if (dataAuthor) return dataAuthor
 
-	// Remove nested quotes and other noise
-	const selectorsToRemove = [
-		'blockquote',
-		'.cita',
-		'.ref', // Quotes
-		'.spoiler',
-		'.sp', // Spoilers
-		'.edit',
-		'.edited', // "Edited by..."
-		'script',
-		'style', // Technical junk
-		'[data-s9e-mediaembed]', // Media embeds
-		'.media-container',
-		'.iframe-container',
-		'.video-container',
-		'img', // Images (avoid alt text)
-		'.post-signature',
-		'.signature', // Signatures
-	]
+	// Prefer direct author link text to avoid picking aliases/titles near the nick.
+	const authorLink =
+		postEl.querySelector<HTMLAnchorElement>(MV_SELECTORS.THREAD.POST_AUTHOR_LINK) ||
+		postEl.querySelector<HTMLAnchorElement>('.post-header .autor a, .post-meta .autor a')
 
-	clone.querySelectorAll(selectorsToRemove.join(', ')).forEach(el => el.remove())
+	if (authorLink?.textContent) {
+		const text = authorLink.textContent.replace(/\s+/g, ' ').trim()
+		if (text) return text
+	}
 
-	// Normalize whitespace
-	return (clone.textContent || '').replace(/\s+/g, ' ').trim()
+	const authorEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_AUTHOR_ALL)
+	const fallback = authorEl?.textContent?.replace(/\s+/g, ' ').trim()
+	return fallback || ''
 }
+
 
 // =============================================================================
 // SMART TRUNCATION

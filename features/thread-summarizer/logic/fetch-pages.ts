@@ -8,6 +8,7 @@
 import { MV_SELECTORS } from '@/constants'
 import { logger } from '@/lib/logger'
 import type { ExtractedPost } from './extract-posts'
+import { cleanPostContent } from './clean-post-content'
 
 // =============================================================================
 // CONSTANTS
@@ -195,8 +196,8 @@ function extractSinglePostFromElement(postEl: HTMLElement): ExtractedPost | null
 	const numAttr = postEl.getAttribute('data-num') || postEl.id?.replace('post-', '')
 	const number = parseInt(numAttr || '0', 10)
 
-	const authorEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_AUTHOR_ALL)
-	const author = authorEl?.textContent?.trim() || 'Anónimo'
+	const author = extractAuthorName(postEl)
+	if (!author) return null
 
 	// Avatar
 	const avatarEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_AVATAR_IMG)
@@ -210,10 +211,13 @@ function extractSinglePostFromElement(postEl: HTMLElement): ExtractedPost | null
 		avatarUrl = rawAvatar
 	}
 
-	const contentEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_BODY_ALL)
+	const contentEl =
+		postEl.querySelector(MV_SELECTORS.THREAD.POST_CONTENTS) ||
+		postEl.querySelector(MV_SELECTORS.THREAD.POST_BODY_ALL)
 	if (!contentEl) return null
 
-	const content = cleanPostContent(contentEl)
+	// Keep spoiler content for thread summaries; remove only spoiler trigger links.
+	const content = cleanPostContent(contentEl, { keepSpoilers: true })
 	if (!content) return null
 
 	const timeEl = postEl.querySelector(`${MV_SELECTORS.THREAD.POST_TIME}, ${MV_SELECTORS.THREAD.POST_TIME_ALT}`)
@@ -226,34 +230,25 @@ function extractSinglePostFromElement(postEl: HTMLElement): ExtractedPost | null
 	return { number, author, content, timestamp, charCount: content.length, avatarUrl, votes: votes || undefined }
 }
 
-/**
- * Cleans post content by removing quotes, spoilers, media, etc.
- */
-function cleanPostContent(contentEl: Element): string {
-	const clone = contentEl.cloneNode(true) as HTMLElement
+function extractAuthorName(postEl: HTMLElement): string {
+	const dataAuthor = postEl.getAttribute('data-autor')?.replace(/\s+/g, ' ').trim()
+	if (dataAuthor) return dataAuthor
 
-	const selectorsToRemove = [
-		'blockquote',
-		'.cita',
-		'.ref',
-		'.spoiler',
-		'.sp',
-		'.edit',
-		'.edited',
-		'script',
-		'style',
-		'[data-s9e-mediaembed]',
-		'.media-container',
-		'.iframe-container',
-		'.video-container',
-		'img',
-		'.post-signature',
-		'.signature',
-	]
+	// Prefer direct author link text to avoid picking aliases/titles near the nick.
+	const authorLink =
+		postEl.querySelector<HTMLAnchorElement>(MV_SELECTORS.THREAD.POST_AUTHOR_LINK) ||
+		postEl.querySelector<HTMLAnchorElement>('.post-header .autor a, .post-meta .autor a')
 
-	clone.querySelectorAll(selectorsToRemove.join(', ')).forEach(el => el.remove())
-	return (clone.textContent || '').replace(/\s+/g, ' ').trim()
+	if (authorLink?.textContent) {
+		const text = authorLink.textContent.replace(/\s+/g, ' ').trim()
+		if (text) return text
+	}
+
+	const authorEl = postEl.querySelector(MV_SELECTORS.THREAD.POST_AUTHOR_ALL)
+	const fallback = authorEl?.textContent?.replace(/\s+/g, ' ').trim()
+	return fallback || ''
 }
+
 
 /**
  * Truncates posts to fit within token limits for multi-page processing.

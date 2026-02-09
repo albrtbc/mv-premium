@@ -7,6 +7,7 @@
 import { getAIService } from '@/services/ai/gemini-service'
 import { parseAIJsonResponse } from '@/services/ai/shared'
 import { logger } from '@/lib/logger'
+import { cleanPostContent } from '@/features/thread-summarizer/logic/clean-post-content'
 
 // Minimum characters for a post to be "long enough" to summarize
 const MIN_POST_LENGTH = 150
@@ -44,29 +45,11 @@ export function getShortPostMessage(): string {
 
 /**
  * Extracts and cleans text from a post element, removing quotes, spoilers, and code blocks.
+ * Keeps spoiler content visible (removes only trigger links).
  * @param postBody - The post body DOM element
  */
 export function extractPostText(postBody: Element): string {
-	// Clone to avoid modifying the original
-	const clone = postBody.cloneNode(true) as Element
-
-	// Remove blockquotes (cited text) - Keep this to avoid summarizing what others said
-	clone.querySelectorAll('blockquote, .quote').forEach(el => el.remove())
-
-	// CLEANUP: Remove "Click para desplegar" or spoiler triggers if they exist as separate text nodes
-	// but KEEP the spoiler content.
-	// In MV, the structure is usually: .spoiler-wrap > a.spoiler (trigger) + div.spoiler (content)
-	// We want to remove the trigger 'a.spoiler' but keep 'div.spoiler'
-	clone.querySelectorAll('.spoiler-wrap > a.spoiler').forEach(el => el.remove())
-
-	// Remove code blocks (usually not useful for summary)
-	clone.querySelectorAll('pre, code').forEach(el => el.remove())
-
-	// Get text content
-	const text = clone.textContent || ''
-
-	// Clean up whitespace
-	return text.trim().replace(/\s+/g, ' ')
+	return cleanPostContent(postBody, { keepSpoilers: true, removeCodeBlocks: true })
 }
 
 interface PostSummaryResult {

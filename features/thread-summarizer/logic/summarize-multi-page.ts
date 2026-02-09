@@ -2,18 +2,35 @@
  * Multi-Page Thread Summarizer
  *
  * Summarizes multiple pages of a thread using a map-reduce approach:
- * - Pages ≤ 8: Single prompt with all posts combined
- * - Pages > 8: Summarize each group of ~8 pages → meta-summary from partial summaries
+ * - Pages ≤ batch limit: Single prompt with all posts combined
+ * - Pages > batch limit: Summarize each group → meta-summary from partial summaries
  *
- * Injects community stats (top posters, most-voted posts) into prompts
- * to improve participant selection and key point identification.
+ * Provider-aware execution:
+ * - Gemini: Parallel batch processing (up to 3 concurrent) for speed
+ * - Groq: Sequential processing with delays to respect TPM limits
+ *
+ * Includes exponential-backoff retry on 429 (Rate Limit) errors,
+ * and community stats injection (top posters, most-voted posts).
  */
 
 import { getAIService } from '@/services/ai/gemini-service'
-import { parseAIJsonResponse } from '@/services/ai/shared'
 import { logger } from '@/lib/logger'
 import { fetchMultiplePages, getProviderMultiPageLimit, type MultiPageProgress, type PageData } from './fetch-pages'
 import { formatPostsForPrompt } from './extract-posts'
+import {
+	sleep,
+	generateWithRetry,
+	hydrateParticipantAvatars,
+	parseJsonWithAIFallback,
+	SUMMARY_JSON_STRUCTURE,
+} from './summarizer-helpers'
+import {
+	getScaledLimits,
+	buildSingleBatchPromptGemini,
+	buildMetaSummaryPromptGemini,
+	buildSingleBatchPromptGroq,
+	buildMetaSummaryPromptGroq,
+} from './prompt-builder'
 
 // =============================================================================
 // TYPES
@@ -36,6 +53,18 @@ export interface MultiPageSummary {
 	error?: string
 }
 
+type SummaryPayload = {
+	topic: string
+	keyPoints: string[]
+	participants: { name: string; contribution: string }[]
+	status: string
+}
+
+interface BatchResult {
+	summary: string
+	pageRange: string
+}
+
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -44,9 +73,9 @@ export interface MultiPageSummary {
 const GEMINI_PAGES_PER_BATCH = 8
 const GEMINI_MAX_CHARS_PER_BATCH = 40000
 
-// GROQ LIMITS (Safer for Free Tier TPM)
-const GROQ_PAGES_PER_BATCH = 4
-const GROQ_MAX_CHARS_PER_BATCH = 16000
+// GROQ LIMITS (single-call strategy for 2-10 pages)
+const GROQ_PAGES_PER_BATCH = 10
+const GROQ_MAX_CHARS_PER_BATCH = 28000
 
 // GROQ THROTTLING (helps avoid 429 on long ranges like 30 pages)
 const GROQ_LARGE_RANGE_THRESHOLD = 20
@@ -55,9 +84,53 @@ const GROQ_MAX_CHARS_PER_BATCH_LARGE_RANGE = 12000
 const GROQ_DELAY_BETWEEN_CALLS_MS = 0
 const GROQ_DELAY_BETWEEN_CALLS_MS_LARGE_RANGE = 0
 
-function sleep(ms: number): Promise<void> {
-	return new Promise(resolve => setTimeout(resolve, ms))
+// GROQ TOKEN BUDGET GUARDS (on_demand TPM is strict: 10k/request window)
+const GROQ_TPM_LIMIT = 10000
+const GROQ_CHARS_PER_TOKEN_ESTIMATE = 2.5
+const GROQ_SAFETY_MARGIN_TOKENS = 1200
+const GROQ_BATCH_RESERVED_RESPONSE_TOKENS = 1024
+const GROQ_META_RESERVED_RESPONSE_TOKENS = 1100
+const GROQ_MIN_DYNAMIC_CONTENT_CHARS = 1200
+const GROQ_MAX_STATS_CHARS = 900
+const GROQ_MAX_TOTAL_PROMPT_CHARS = 19000
+const GROQ_PRIORITY_MIN_VOTES = 8
+const GROQ_PRIORITY_MAX_ITEMS = 8
+const GROQ_PRIORITY_SNIPPET_MAX_CHARS = 240
+const GROQ_PRIORITY_BLOCK_MAX_CHARS = 1800
+const GROQ_TRIM_HEAD_RATIO = 0.62
+
+// CONCURRENCY (Gemini parallel batch processing)
+const GEMINI_MAX_CONCURRENT_BATCHES = 3
+
+/**
+ * Worker-pool concurrency limiter.
+ * Runs async tasks in parallel with at most `maxConcurrency` active at a time.
+ * Results are returned in the original order.
+ */
+async function runConcurrent<T, R>(
+	items: T[],
+	maxConcurrency: number,
+	fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+	const results: R[] = new Array(items.length)
+	let nextIndex = 0
+
+	async function worker(): Promise<void> {
+		while (nextIndex < items.length) {
+			const idx = nextIndex++
+			results[idx] = await fn(items[idx], idx)
+		}
+	}
+
+	const workerCount = Math.min(maxConcurrency, items.length)
+	await Promise.all(Array.from({ length: workerCount }, () => worker()))
+
+	return results
 }
+
+// =============================================================================
+// PROVIDER LIMITS
+// =============================================================================
 
 function getGroqLimits(totalRequestedPages: number): {
 	pagesPerBatch: number
@@ -77,21 +150,6 @@ function getGroqLimits(totalRequestedPages: number): {
 		maxCharsPerBatch: GROQ_MAX_CHARS_PER_BATCH,
 		delayBetweenCallsMs: GROQ_DELAY_BETWEEN_CALLS_MS,
 	}
-}
-
-// =============================================================================
-// DYNAMIC LIMITS
-// =============================================================================
-
-/**
- * Returns scaled limits for key points and participants based on page count.
- */
-function getScaledLimits(pageCount: number): { maxKeyPoints: number; maxParticipants: number } {
-	if (pageCount <= 3) return { maxKeyPoints: 5, maxParticipants: 5 }
-	if (pageCount <= 7) return { maxKeyPoints: 7, maxParticipants: 8 }
-	if (pageCount <= 15) return { maxKeyPoints: 9, maxParticipants: 10 }
-	if (pageCount <= 25) return { maxKeyPoints: 12, maxParticipants: 14 }
-	return { maxKeyPoints: 15, maxParticipants: 16 }
 }
 
 // =============================================================================
@@ -134,154 +192,80 @@ function buildStatsBlock(pages: PageData[]): string {
 	return block
 }
 
-// =============================================================================
-// PROMPTS - GEMINI (Standard JSON)
-// =============================================================================
-
-function buildSingleBatchPromptGemini(pageCount: number): string {
-	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
-
-	return `Eres un analista de foros. Tu trabajo es resumir MULTIPLES PAGINAS de un hilo de Mediavida y devolver un objeto JSON valido.
-
-FORMATO DE SALIDA (JSON estrictamente valido):
-{
-  "topic": "Una frase concisa explicando el tema principal del hilo en estas paginas.",
-  "keyPoints": [
-    "Punto clave 1",
-    "Punto clave 2",
-    "... (hasta ${maxKeyPoints} puntos clave)"
-  ],
-  "participants": [
-    { "name": "Usuario1", "contribution": "Resumen breve de su postura o aporte principal" },
-    { "name": "Usuario2", "contribution": "Resumen breve de su postura o aporte principal" },
-    "... (hasta ${maxParticipants} participantes destacados)"
-  ],
-  "status": "Una frase sobre el estado general del debate en estas paginas."
+function trimStatsForProvider(statsBlock: string, provider: 'gemini' | 'groq'): string {
+	if (provider !== 'groq') return statsBlock
+	if (statsBlock.length <= GROQ_MAX_STATS_CHARS) return statsBlock
+	return statsBlock.slice(0, GROQ_MAX_STATS_CHARS) + '\n[...estadisticas truncadas]'
 }
 
-REGLAS ESTRICTAS:
-- Devuelve SOLO el JSON. No incluyas bloques de codigo markdown.
-- El JSON debe ser valido.
-- Resume TODOS los posts que te paso, dando una vision global.
-- Ignora posts sin contenido ("pole", "+1").
-- Identifica los temas principales y como evolucionan entre paginas.
-- Incluye hasta ${maxParticipants} participantes, priorizando los mas activos y relevantes.
-- Los posts marcados con [👍N] tienen N votos de la comunidad. Los posts muy votados suelen contener opiniones o informacion especialmente relevante. Tenlos en cuenta para los puntos clave y participantes.
-- Usa las ESTADISTICAS DEL HILO como referencia objetiva para seleccionar participantes destacados, pero no te limites solo a los que mas postean: alguien con pocos posts pero muy votados puede ser mas relevante.
-- Incluye hasta ${maxKeyPoints} puntos clave.
-- Responde en espanol.
-- IMPORTANTE: El bloque JSON final debe ser válido y contener toda la información solicitada.`
+function clipChars(text: string, maxChars: number): string {
+	if (text.length <= maxChars) return text
+	if (maxChars <= 3) return text.slice(0, maxChars)
+	return text.slice(0, maxChars - 3) + '...'
 }
 
-function buildMetaSummaryPromptGemini(pageCount: number): string {
-	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
+function buildHighImpactPostsBlock(pages: PageData[]): string {
+	const highlights = pages
+		.flatMap(page =>
+			page.posts.map(post => ({
+				pageNumber: page.pageNumber,
+				number: post.number,
+				author: post.author,
+				votes: post.votes ?? 0,
+				content: normalizeWhitespace(post.content),
+			}))
+		)
+		.filter(post => post.votes >= GROQ_PRIORITY_MIN_VOTES && post.content.length > 24)
+		.sort((a, b) => {
+			if (b.votes !== a.votes) return b.votes - a.votes
+			return a.number - b.number
+		})
+		.slice(0, GROQ_PRIORITY_MAX_ITEMS)
 
-	return `Eres un analista de foros. Te voy a dar RESUMENES PARCIALES de diferentes secciones de un hilo largo de Mediavida. Tu trabajo es crear UN UNICO RESUMEN GLOBAL coherente combinando todos los parciales.
+	if (highlights.length === 0) return ''
 
-FORMATO DE SALIDA (JSON estrictamente valido):
-{
-  "topic": "El tema principal del hilo completo.",
-  "keyPoints": [
-    "Punto clave 1 (los mas importantes de todo el hilo)",
-    "Punto clave 2",
-    "... (hasta ${maxKeyPoints} puntos clave)"
-  ],
-  "participants": [
-    { "name": "Usuario1", "contribution": "Su aportacion general al hilo" },
-    { "name": "Usuario2", "contribution": "Su aportacion general al hilo" },
-    "... (hasta ${maxParticipants} participantes destacados)"
-  ],
-  "status": "Estado final del debate considerando toda la evolucion del hilo."
+	let block = 'POSTS PRIORITARIOS (MUY VOTADOS):\n'
+	for (const post of highlights) {
+		const snippet = clipChars(post.content, GROQ_PRIORITY_SNIPPET_MAX_CHARS)
+		const line = `- #${post.number} p.${post.pageNumber} ${post.author} [👍${post.votes}]: ${snippet}\n`
+		if ((block + line).length > GROQ_PRIORITY_BLOCK_MAX_CHARS) break
+		block += line
+	}
+
+	return block.trimEnd()
 }
 
-REGLAS ESTRICTAS:
-- Devuelve SOLO el JSON. No incluyas bloques de codigo markdown.
-- El JSON debe ser valido.
-- Combina los resumenes parciales en UN UNICO resumen coherente.
-- No repitas informacion redundante entre secciones.
-- Prioriza los puntos mas relevantes e impactantes.
-- Si un tema evoluciona entre secciones, describe la evolucion.
-- Los participantes deben ser los MAS destacados en todo el hilo (hasta ${maxParticipants}).
-- Usa las ESTADISTICAS DEL HILO como referencia objetiva. Alguien con pocos posts pero muy votados puede ser mas relevante que alguien que postea mucho sin impacto.
-- Responde en espanol.
-- IMPORTANTE: El bloque JSON final debe ser válido.`
+function trimContentKeepingHeadAndTail(text: string, maxChars: number): string {
+	const marker = '\n[...contenido truncado por límite TPM de Groq]\n'
+
+	if (text.length <= maxChars) return text
+	if (maxChars <= marker.length + 40) return text.slice(0, maxChars)
+
+	const budget = maxChars - marker.length
+	const headChars = Math.floor(budget * GROQ_TRIM_HEAD_RATIO)
+	const tailChars = Math.max(0, budget - headChars)
+	const tailStart = Math.max(0, text.length - tailChars)
+
+	return `${text.slice(0, headChars)}${marker}${text.slice(tailStart)}`
 }
 
-// =============================================================================
-// PROMPTS - GROQ (JSON only)
-// =============================================================================
+function fitDynamicContentToGroqBudget(
+	promptPrefix: string,
+	dynamicContent: string,
+	reservedResponseTokens: number
+): string {
+	const maxPromptTokens = GROQ_TPM_LIMIT - reservedResponseTokens - GROQ_SAFETY_MARGIN_TOKENS
+	const maxPromptCharsByTokens = Math.floor(maxPromptTokens * GROQ_CHARS_PER_TOKEN_ESTIMATE)
+	const maxPromptChars = Math.min(maxPromptCharsByTokens, GROQ_MAX_TOTAL_PROMPT_CHARS)
+	const availableChars = maxPromptChars - promptPrefix.length
 
-function buildSingleBatchPromptGroq(pageCount: number): string {
-	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
+	if (availableChars <= GROQ_MIN_DYNAMIC_CONTENT_CHARS) {
+		return trimContentKeepingHeadAndTail(dynamicContent, GROQ_MIN_DYNAMIC_CONTENT_CHARS)
+	}
 
-	return `Eres un analista de foros experto. Tu trabajo es resumir MULTIPLES PAGINAS de un hilo de Mediavida y devolver un objeto JSON valido.
+	if (dynamicContent.length <= availableChars) return dynamicContent
 
-FORMATO DE SALIDA (JSON estrictamente valido):
-{
-  "topic": "Una frase concisa y DETALLADA explicando el tema principal específico.",
-  "keyPoints": [
-    "Punto clave 1 (con nombres propios y argumentos concretos)",
-    "Punto clave 2",
-    "... (hasta ${maxKeyPoints} puntos clave)"
-  ],
-  "participants": [
-    { "name": "Usuario1", "contribution": "Resumen de su postura. Si tiene votos, indícalo como '(N votos)' al final." },
-    { "name": "Usuario2", "contribution": "Resumen de su postura." },
-    "... (hasta ${maxParticipants} participantes destacados)"
-  ],
-  "status": "Una frase sobre el estado actual del debate."
-}
-
-REGLAS ESTRICTAS:
-- Devuelve SOLO el JSON. No incluyas bloques de codigo markdown.
-- El JSON debe ser valido.
-- Resume TODOS los posts que te paso, dando una vision global.
-- EVITA FRASES GENÉRICAS como "Se discute sobre X". Di QUÉ se dice sobre X.
-- Ignora posts sin contenido ("pole", "+1").
-- Identifica los temas principales y como evolucionan entre paginas.
-- Incluye hasta ${maxParticipants} participantes, priorizando los mas activos y relevantes.
-- Los posts marcados con [👍N] tienen N votos de la comunidad. Son MUY importantes.
-  - Al citar participantes con muchos votos, menciona los votos explícitamente en español: "(15 votos)", NO uses inglés como "15-vote post".
-- Usa las ESTADISTICAS DEL HILO como referencia objetiva.
-- Incluye hasta ${maxKeyPoints} puntos clave.
-- RESPUESTA 100% EN ESPAÑOL. No uses términos en inglés.
-- IMPORTANTE: Tu respuesta debe empezar con { y terminar con }. Sin texto antes ni después.`
-}
-
-function buildMetaSummaryPromptGroq(pageCount: number): string {
-	const { maxKeyPoints, maxParticipants } = getScaledLimits(pageCount)
-
-	return `Eres un analista de foros experto. Te voy a dar RESUMENES PARCIALES de diferentes secciones de un hilo largo de Mediavida. Tu trabajo es crear UN UNICO RESUMEN GLOBAL coherente combinando todos los parciales.
-
-FORMATO DE SALIDA (JSON estrictamente valido):
-{
-  "topic": "El tema principal del hilo completo, detallado y específico.",
-  "keyPoints": [
-    "Punto clave 1 (los mas importantes de todo el hilo, con detalles concretos)",
-    "Punto clave 2",
-    "... (hasta ${maxKeyPoints} puntos clave)"
-  ],
-  "participants": [
-    { "name": "Usuario1", "contribution": "Su aportacion general al hilo. Si es muy votado, indícalo como '(N votos)'." },
-    { "name": "Usuario2", "contribution": "Su aportacion general al hilo" },
-    "... (hasta ${maxParticipants} participantes destacados)"
-  ],
-  "status": "Estado final del debate considerando toda la evolucion del hilo."
-}
-
-REGLAS ESTRICTAS:
-- Devuelve SOLO el JSON. No incluyas bloques de codigo markdown.
-- El JSON debe ser valido.
-- Combina los resumenes parciales en UN UNICO resumen coherente.
-- No repitas informacion redundante entre secciones.
-- EVITA GENERALIDADES. No digas "hubo debate", di "X argumentó Y contra Z".
-- Prioriza los puntos mas relevantes e impactantes.
-- Si un tema evoluciona entre secciones, describe la evolucion.
-- Los participantes deben ser los MAS destacados en todo el hilo (hasta ${maxParticipants}).
-- Si mencionas votos, hazlo EN ESPAÑOL: "(15 votos)", NO en inglés ("15-vote post").
-- Usa las ESTADISTICAS DEL HILO como referencia objetiva.
-- RESPUESTA 100% EN ESPAÑOL.
-- IMPORTANTE: Tu respuesta debe empezar con { y terminar con }. Sin texto antes ni después.`
+	return trimContentKeepingHeadAndTail(dynamicContent, availableChars)
 }
 
 // =============================================================================
@@ -303,7 +287,7 @@ export async function summarizeMultiplePages(
 	const aiService = await getAIService()
 
 	if (!aiService) {
-		return createErrorSummary('', fromPage, toPage, 'IA no configurada. Ve a Ajustes > Inteligencia Artificial.')
+		return createErrorSummary('', fromPage, toPage, 'IA no configurada. Ve a Ajustes > Integraciones.')
 	}
 
 	// Detect provider (gemini vs groq)
@@ -314,12 +298,7 @@ export async function summarizeMultiplePages(
 
 	// Multi-page mode is intentionally 2+ pages.
 	if (totalRequestedPages < 2) {
-		return createErrorSummary(
-			'',
-			fromPage,
-			toPage,
-			'Para resumir una sola página, usa el botón "Resumir" del hilo.'
-		)
+		return createErrorSummary('', fromPage, toPage, 'Para resumir una sola página, usa el botón "Resumir" del hilo.')
 	}
 
 	if (totalRequestedPages > providerMaxPages) {
@@ -367,17 +346,20 @@ export async function summarizeMultiplePages(
 			}
 		})
 	})
+	const authorStats = buildAuthorStats(fetchResult.pages)
+	const { maxParticipants, maxKeyPoints } = getScaledLimits(fetchResult.pages.length)
+	const targetParticipants = Math.min(maxParticipants, fetchResult.totalUniqueAuthors)
 
 	try {
-		let rawSummary: string
+		let parsed: SummaryPayload
 
 		const totalPages = fetchResult.pages.length
-		const statsBlock = buildStatsBlock(fetchResult.pages)
+		const statsBlock = trimStatsForProvider(buildStatsBlock(fetchResult.pages), provider)
 
 		if (totalPages <= pagesPerBatch) {
 			// Direct single-batch summarization
 			onProgress?.({ phase: 'summarizing', current: 1, total: 2 })
-			rawSummary = await summarizeBatch(
+			const rawSummary = await summarizeBatch(
 				aiService,
 				fetchResult.threadTitle,
 				fetchResult.pages,
@@ -387,44 +369,66 @@ export async function summarizeMultiplePages(
 				maxCharsPerBatch
 			)
 			onProgress?.({ phase: 'summarizing', current: 2, total: 2 })
+			parsed = await parseSummaryPayloadWithFallback(rawSummary, aiService, 'resumen final')
 		} else {
-			// Map-reduce: split into batches
+			// Map-reduce: split into batches, process per-provider strategy
 			const batches = splitIntoBatches(fetchResult.pages, pagesPerBatch)
-			const partialSummaries: string[] = []
-			const batchPageRanges: string[] = []
+			let batchResults: BatchResult[]
 
-			for (let i = 0; i < batches.length; i++) {
-				if (provider === 'groq' && i > 0) {
-					await sleep(delayBetweenCallsMs)
-				}
-
-				onProgress?.({
-					phase: 'summarizing',
-					current: i + 1,
-					total: batches.length + 1, // +1 for meta-summary
-					batch: i + 1,
-					totalBatches: batches.length,
+			if (provider === 'gemini') {
+				// GEMINI: Parallel batch processing with concurrency limit
+				let completedBatches = 0
+				batchResults = await runConcurrent(batches, GEMINI_MAX_CONCURRENT_BATCHES, async batch => {
+					const result = await processBatch(
+						aiService,
+						fetchResult.threadTitle,
+						batch,
+						totalPages,
+						statsBlock,
+						provider,
+						maxCharsPerBatch
+					)
+					completedBatches++
+					onProgress?.({
+						phase: 'summarizing',
+						current: completedBatches,
+						total: batches.length + 1,
+						batch: completedBatches,
+						totalBatches: batches.length,
+					})
+					return result
 				})
+			} else {
+				// GROQ: Sequential processing with delay between calls
+				batchResults = []
+				for (let i = 0; i < batches.length; i++) {
+					if (i > 0 && delayBetweenCallsMs > 0) {
+						await sleep(delayBetweenCallsMs)
+					}
 
-				const batch = batches[i]
-				const rangeStart = batch[0].pageNumber
-				const rangeEnd = batch[batch.length - 1].pageNumber
-				batchPageRanges.push(`Paginas ${rangeStart}-${rangeEnd}`)
+					onProgress?.({
+						phase: 'summarizing',
+						current: i + 1,
+						total: batches.length + 1,
+						batch: i + 1,
+						totalBatches: batches.length,
+					})
 
-				const partial = await summarizeBatch(
-					aiService,
-					fetchResult.threadTitle,
-					batch,
-					batch.length,
-					statsBlock,
-					provider,
-					maxCharsPerBatch
-				)
-				partialSummaries.push(partial)
+					const result = await processBatch(
+						aiService,
+						fetchResult.threadTitle,
+						batches[i],
+						totalPages,
+						statsBlock,
+						provider,
+						maxCharsPerBatch
+					)
+					batchResults.push(result)
+				}
 			}
 
 			// Meta-summary from partials
-			if (provider === 'groq') {
+			if (provider === 'groq' && delayBetweenCallsMs > 0) {
 				await sleep(delayBetweenCallsMs)
 			}
 
@@ -436,7 +440,10 @@ export async function summarizeMultiplePages(
 				totalBatches: batches.length + 1,
 			})
 
-			rawSummary = await createMetaSummary(
+			const partialSummaries = batchResults.map(r => r.summary)
+			const batchPageRanges = batchResults.map(r => r.pageRange)
+
+			const rawSummary = await createMetaSummary(
 				aiService,
 				fetchResult.threadTitle,
 				partialSummaries,
@@ -447,30 +454,24 @@ export async function summarizeMultiplePages(
 				statsBlock,
 				provider
 			)
+			parsed = await parseSummaryPayloadWithFallback(rawSummary, aiService, 'meta-resumen final')
 		}
-
-		type ParsedSummary = Omit<MultiPageSummary, 'title' | 'totalPostsAnalyzed' | 'totalUniqueAuthors' | 'pagesAnalyzed' | 'pageRange' | 'fetchErrors' | 'error'>
-		const parsed = parseAIJsonResponse<ParsedSummary>(rawSummary)
+		parsed = await improveSummaryQualityIfNeeded(parsed, {
+			aiService,
+			provider,
+			targetParticipants,
+			targetKeyPoints: maxKeyPoints,
+			authorStats,
+			label: 'resumen multi-página',
+		})
+		parsed = normalizeSummaryPayload(parsed, {
+			targetParticipants,
+			targetKeyPoints: maxKeyPoints,
+			authorStats,
+		})
 
 		// Hydrate participants with avatars
-		const participantsWithAvatars = parsed.participants.map(p => {
-			const cleanName = p.name.toLowerCase().trim()
-			let avatarUrl = avatarMap.get(p.name) || avatarMap.get(cleanName)
-
-			if (!avatarUrl) {
-				const matchedKey = Array.from(avatarMap.keys()).find(k => {
-					const kLower = k.toLowerCase()
-					return kLower.includes(cleanName) || cleanName.includes(kLower)
-				})
-				if (matchedKey) avatarUrl = avatarMap.get(matchedKey)
-			}
-
-			if (avatarUrl?.startsWith('//')) {
-				avatarUrl = 'https:' + avatarUrl
-			}
-
-			return { ...p, avatarUrl }
-		})
+		const participantsWithAvatars = hydrateParticipantAvatars(parsed.participants, avatarMap)
 
 		return {
 			...parsed,
@@ -486,12 +487,23 @@ export async function summarizeMultiplePages(
 		logger.error('MultiPageSummarizer error:', error)
 
 		const errorMessage = error instanceof Error ? error.message : String(error)
-		
+
 		let userFriendlyError = 'Error al generar el resumen multi-pagina.'
-		
-		if (errorMessage.includes('429') || errorMessage.includes('TPM') || errorMessage.includes('Rate limit') || errorMessage.includes('Límite de velocidad') || errorMessage.includes('modelos agotados')) {
-			userFriendlyError = 'Límite de velocidad excedido. El plan gratuito es limitado para resúmenes largos. Espera un momento o reduce el rango de páginas.'
-		} else if (errorMessage.includes('400') || errorMessage.includes('too large') || errorMessage.includes('context length')) {
+
+		if (
+			errorMessage.includes('429') ||
+			errorMessage.includes('TPM') ||
+			errorMessage.includes('Rate limit') ||
+			errorMessage.includes('Límite de velocidad') ||
+			errorMessage.includes('modelos agotados')
+		) {
+			userFriendlyError =
+				'Límite de velocidad excedido. El plan gratuito es limitado para resúmenes largos. Espera un momento o reduce el rango de páginas.'
+		} else if (
+			errorMessage.includes('400') ||
+			errorMessage.includes('too large') ||
+			errorMessage.includes('context length')
+		) {
 			userFriendlyError = 'Contenido demasiado largo para procesar. Intenta reducir el número de páginas.'
 		} else if (errorMessage.includes('500') || errorMessage.includes('503')) {
 			userFriendlyError = 'Error temporal del servidor. Inténtalo de nuevo.'
@@ -506,7 +518,37 @@ export async function summarizeMultiplePages(
 // =============================================================================
 
 /**
- * Summarizes a single batch of pages in one AI call.
+ * Processes a single batch: computes page range label and calls summarizeBatch.
+ * Used by both parallel (Gemini) and sequential (Groq) orchestrators.
+ */
+async function processBatch(
+	aiService: { generate: (prompt: string) => Promise<string> },
+	threadTitle: string,
+	batch: PageData[],
+	totalPageCount: number,
+	statsBlock: string,
+	provider: 'gemini' | 'groq',
+	maxCharsPerBatch: number
+): Promise<BatchResult> {
+	const rangeStart = batch[0].pageNumber
+	const rangeEnd = batch[batch.length - 1].pageNumber
+	const pageRange = `Paginas ${rangeStart}-${rangeEnd}`
+
+	const summary = await summarizeBatch(
+		aiService,
+		threadTitle,
+		batch,
+		totalPageCount,
+		statsBlock,
+		provider,
+		maxCharsPerBatch
+	)
+
+	return { summary, pageRange }
+}
+
+/**
+ * Summarizes a single batch of pages in one AI call (with retry on 429).
  */
 async function summarizeBatch(
 	aiService: { generate: (prompt: string) => Promise<string> },
@@ -534,21 +576,29 @@ async function summarizeBatch(
 	}
 
 	const statsSection = statsBlock ? `\n${statsBlock}\n` : ''
+	const highImpactBlock = provider === 'groq' ? buildHighImpactPostsBlock(pages) : ''
+	const highImpactSection = highImpactBlock ? `\n${highImpactBlock}\n` : ''
 
 	const promptBuilder = provider === 'groq' ? buildSingleBatchPromptGroq : buildSingleBatchPromptGemini
-	const prompt = `${promptBuilder(totalPageCount)}
+	const promptPrefix = `${promptBuilder(totalPageCount)}
 
 ---
 TITULO DEL HILO: ${threadTitle} (${pageRangeLabel})
 ${statsSection}
+${highImpactSection}
 POSTS:
-${formattedContent}`
+`
+	const safeContent =
+		provider === 'groq'
+			? fitDynamicContentToGroqBudget(promptPrefix, formattedContent, GROQ_BATCH_RESERVED_RESPONSE_TOKENS)
+			: formattedContent
+	const prompt = `${promptPrefix}${safeContent}`
 
-	return aiService.generate(prompt)
+	return generateWithRetry(aiService, prompt)
 }
 
 /**
- * Creates a meta-summary from partial summaries using map-reduce.
+ * Creates a meta-summary from partial summaries using map-reduce (with retry on 429).
  * Includes page range labels for each partial and global stats.
  */
 async function createMetaSummary(
@@ -570,7 +620,7 @@ async function createMetaSummary(
 		.join('\n\n')
 
 	const promptBuilder = provider === 'groq' ? buildMetaSummaryPromptGroq : buildMetaSummaryPromptGemini
-	const prompt = `${promptBuilder(totalPageCount)}
+	const promptPrefix = `${promptBuilder(totalPageCount)}
 
 ---
 TITULO DEL HILO: ${threadTitle}
@@ -579,9 +629,14 @@ RANGO DE PAGINAS: ${fromPage} a ${toPage}
 ${statsBlock}
 
 RESUMENES PARCIALES:
-${formattedPartials}`
+`
+	const safePartials =
+		provider === 'groq'
+			? fitDynamicContentToGroqBudget(promptPrefix, formattedPartials, GROQ_META_RESERVED_RESPONSE_TOKENS)
+			: formattedPartials
+	const prompt = `${promptPrefix}${safePartials}`
 
-	return aiService.generate(prompt)
+	return generateWithRetry(aiService, prompt)
 }
 
 /**
@@ -613,4 +668,396 @@ function createErrorSummary(title: string, fromPage: number, toPage: number, err
 		fetchErrors: [],
 		error,
 	}
+}
+
+type AuthorAggregate = {
+	posts: number
+	votes: number
+	topSnippet?: string
+	topPostNumber?: number
+	topPostVotes?: number
+}
+
+interface NormalizeSummaryOptions {
+	targetParticipants: number
+	targetKeyPoints: number
+	authorStats: Map<string, AuthorAggregate>
+}
+
+interface QualityRefinementOptions extends NormalizeSummaryOptions {
+	aiService: { generate: (prompt: string) => Promise<string> }
+	provider: 'gemini' | 'groq'
+	label: string
+}
+
+interface QualityAssessment {
+	ok: boolean
+	score: number
+	issues: string[]
+}
+
+const MAX_STATUS_CHARS = 400
+const MIN_STATUS_WORDS = 12
+const MAX_STATUS_WORDS = 40
+const MIN_CONTRIBUTION_WORDS = 8
+const MIN_KEYPOINT_WORDS = 6
+const MAX_TOP_SNIPPET_CHARS = 160
+
+const COMPARISON_STOPWORDS = new Set([
+	'el',
+	'la',
+	'los',
+	'las',
+	'un',
+	'una',
+	'unos',
+	'unas',
+	'de',
+	'del',
+	'en',
+	'con',
+	'por',
+	'para',
+	'sobre',
+	'que',
+	'se',
+	'no',
+	'ya',
+	'al',
+	'lo',
+	'su',
+	'sus',
+	'es',
+])
+
+function buildAuthorStats(pages: PageData[]): Map<string, AuthorAggregate> {
+	const stats = new Map<string, AuthorAggregate>()
+
+	for (const page of pages) {
+		for (const post of page.posts) {
+			const current = stats.get(post.author) ?? { posts: 0, votes: 0, topPostVotes: 0 }
+			current.posts += 1
+			const postVotes = post.votes && post.votes > 0 ? post.votes : 0
+			current.votes += postVotes
+
+			const cleanContent = normalizeWhitespace(post.content)
+			if (cleanContent.length > 24) {
+				if (!current.topSnippet) {
+					current.topSnippet = clipChars(cleanContent, MAX_TOP_SNIPPET_CHARS)
+					current.topPostNumber = post.number
+					current.topPostVotes = postVotes
+				} else if (postVotes >= (current.topPostVotes ?? 0)) {
+					current.topSnippet = clipChars(cleanContent, MAX_TOP_SNIPPET_CHARS)
+					current.topPostNumber = post.number
+					current.topPostVotes = postVotes
+				}
+			}
+
+			stats.set(post.author, current)
+		}
+	}
+
+	return stats
+}
+
+function normalizeSummaryPayload(
+	parsed: SummaryPayload,
+	options: NormalizeSummaryOptions
+): SummaryPayload {
+	const { targetParticipants, targetKeyPoints } = options
+	const topic = normalizeWhitespace(typeof parsed.topic === 'string' ? parsed.topic : '')
+	const keyPoints = normalizeKeyPoints(Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [], targetKeyPoints)
+	const participants = normalizeParticipants(Array.isArray(parsed.participants) ? parsed.participants : [], targetParticipants)
+	const status = normalizeStatus(typeof parsed.status === 'string' ? parsed.status : '')
+
+	return {
+		topic,
+		keyPoints,
+		participants,
+		status,
+	}
+}
+
+function normalizeKeyPoints(rawKeyPoints: string[], targetKeyPoints: number): string[] {
+	if (targetKeyPoints <= 0) return []
+
+	const seen = new Set<string>()
+	const normalized: string[] = []
+
+	for (const point of rawKeyPoints) {
+		const clean = normalizeWhitespace(typeof point === 'string' ? point : '')
+		if (!clean) continue
+
+		const signature = getComparisonSignature(clean)
+		if (seen.has(signature)) continue
+		if (normalized.some(existing => areLikelyDuplicatePoints(existing, clean))) continue
+
+		seen.add(signature)
+		normalized.push(clean)
+		if (normalized.length >= targetKeyPoints) break
+	}
+
+	return normalized
+}
+
+function normalizeParticipants(
+	rawParticipants: { name: string; contribution: string }[],
+	targetParticipants: number
+): { name: string; contribution: string }[] {
+	if (targetParticipants <= 0) return []
+
+	const seenNames = new Set<string>()
+	const normalized: { name: string; contribution: string }[] = []
+
+	for (const participant of rawParticipants) {
+		const name = normalizeWhitespace(typeof participant?.name === 'string' ? participant.name : '')
+		if (!name) continue
+
+		const signature = name.toLowerCase()
+		if (seenNames.has(signature)) continue
+		seenNames.add(signature)
+
+		const contribution = normalizeWhitespace(
+			typeof participant?.contribution === 'string' ? participant.contribution : ''
+		)
+		if (!contribution) continue
+
+		normalized.push({
+			name,
+			contribution,
+		})
+
+		if (normalized.length >= targetParticipants) return normalized
+	}
+
+	return normalized
+}
+
+function isWeakContribution(text: string): boolean {
+	const clean = normalizeWhitespace(text)
+	if (!clean) return true
+	if (countWords(clean) < MIN_CONTRIBUTION_WORDS) return true
+	if (/[#]\d+\s+\d+h/i.test(clean)) return true
+	if (clean.endsWith('...')) return true
+	if (/(?:\bcon la|\bde la|\by|\bque|\ben|\ba|\bpor)$/i.test(clean)) return true
+	return false
+}
+
+function normalizeStatus(rawStatus: string): string {
+	const clean = collapseDuplicateSentences(normalizeWhitespace(rawStatus))
+	if (!clean) return ''
+	if (clean.length > MAX_STATUS_CHARS) return clean.slice(0, MAX_STATUS_CHARS).trim()
+	return clean
+}
+
+function normalizeWhitespace(text: string): string {
+	return text.replace(/\s+/g, ' ').trim()
+}
+
+function countWords(text: string): number {
+	const clean = normalizeWhitespace(text)
+	if (!clean) return 0
+	return clean.split(' ').filter(Boolean).length
+}
+
+function isWeakStatus(text: string): boolean {
+	return countWords(text) < MIN_STATUS_WORDS
+}
+
+function isWeakKeyPoint(text: string): boolean {
+	return countWords(text) < MIN_KEYPOINT_WORDS
+}
+
+function sanitizeSnippet(snippet: string): string {
+	return normalizeWhitespace(snippet.replace(/["“”]/g, "'"))
+}
+
+function getComparisonSignature(text: string): string {
+	return normalizeWhitespace(
+		text
+			.toLowerCase()
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.replace(/[^a-z0-9\s]/g, ' ')
+			.replace(/\s+/g, ' ')
+	)
+}
+
+function getComparisonTokens(text: string): Set<string> {
+	const signature = getComparisonSignature(text)
+	if (!signature) return new Set<string>()
+	return new Set(
+		signature
+			.split(' ')
+			.filter(token => token.length >= 3)
+			.filter(token => !COMPARISON_STOPWORDS.has(token))
+	)
+}
+
+function tokenJaccardSimilarity(left: Set<string>, right: Set<string>): number {
+	if (left.size === 0 || right.size === 0) return 0
+	let intersection = 0
+	for (const token of left) {
+		if (right.has(token)) intersection++
+	}
+	const union = left.size + right.size - intersection
+	return union > 0 ? intersection / union : 0
+}
+
+function areLikelyDuplicatePoints(a: string, b: string): boolean {
+	const leftSignature = getComparisonSignature(a)
+	const rightSignature = getComparisonSignature(b)
+
+	if (!leftSignature || !rightSignature) return false
+	if (leftSignature === rightSignature) return true
+	if (leftSignature.length >= 42 && rightSignature.length >= 42) {
+		if (leftSignature.includes(rightSignature) || rightSignature.includes(leftSignature)) return true
+	}
+
+	const similarity = tokenJaccardSimilarity(getComparisonTokens(leftSignature), getComparisonTokens(rightSignature))
+	return similarity >= 0.78
+}
+
+function collapseDuplicateSentences(text: string): string {
+	const sentences = text.split(/(?<=[.!?])\s+/)
+	const seen = new Set<string>()
+	const unique: string[] = []
+
+	for (const sentence of sentences) {
+		const clean = sentence.trim()
+		if (!clean) continue
+		const signature = clean.toLowerCase()
+		if (seen.has(signature)) continue
+		seen.add(signature)
+		unique.push(clean)
+	}
+
+	return unique.join(' ')
+}
+
+function assessSummaryQuality(
+	parsed: SummaryPayload,
+	options: Pick<NormalizeSummaryOptions, 'targetParticipants' | 'targetKeyPoints'>
+): QualityAssessment {
+	const topic = normalizeWhitespace(typeof parsed.topic === 'string' ? parsed.topic : '')
+	const keyPoints = Array.isArray(parsed.keyPoints) ? parsed.keyPoints.map(point => normalizeWhitespace(point)) : []
+	const participants = Array.isArray(parsed.participants)
+		? parsed.participants.map(participant => ({
+				name: normalizeWhitespace(participant?.name || ''),
+				contribution: normalizeWhitespace(participant?.contribution || ''),
+			}))
+		: []
+	const status = normalizeWhitespace(typeof parsed.status === 'string' ? parsed.status : '')
+
+	const weakContributionCount = participants.filter(
+		participant => !participant.name || isWeakContribution(participant.contribution)
+	).length
+	const weakKeyPointCount = keyPoints.filter(point => !point || isWeakKeyPoint(point)).length
+	const weakStatus = !status || isWeakStatus(status)
+
+	const issues: string[] = []
+	if (!topic || countWords(topic) < 4) issues.push('topic demasiado escueto')
+	if (weakKeyPointCount > 0) issues.push(`${weakKeyPointCount} keyPoints flojos o genéricos`)
+	if (weakContributionCount > 0) issues.push(`${weakContributionCount} participants con contribution floja`)
+	if (weakStatus) issues.push('status demasiado genérico o corto')
+
+	let score = 0
+	score += Math.min(participants.length, options.targetParticipants)
+	score += Math.min(keyPoints.length, options.targetKeyPoints)
+	score += (participants.length - weakContributionCount) * 3
+	score += (keyPoints.length - weakKeyPointCount) * 2
+	if (!weakStatus) score += 3
+	score -= weakContributionCount * 3
+	score -= weakKeyPointCount * 2
+
+	return {
+		ok: issues.length === 0,
+		score,
+		issues,
+	}
+}
+
+function buildAuthorQualityHints(authorStats: Map<string, AuthorAggregate>, maxItems = 10): string {
+	const rows = Array.from(authorStats.entries())
+		.sort((a, b) => {
+			if (b[1].votes !== a[1].votes) return b[1].votes - a[1].votes
+			return b[1].posts - a[1].posts
+		})
+		.slice(0, maxItems)
+		.map(([author, stats]) => {
+			const snippet = stats.topSnippet ? ` | cita: "${sanitizeSnippet(stats.topSnippet)}"` : ''
+			return `- ${author}: ${stats.posts} posts, ${stats.votes} votos${snippet}`
+		})
+
+	return rows.join('\n')
+}
+
+function buildQualityRepairPrompt(
+	parsed: SummaryPayload,
+	options: Pick<QualityRefinementOptions, 'targetParticipants' | 'targetKeyPoints' | 'authorStats'>,
+	issues: string[]
+): string {
+	const issueSummary = issues.join('; ')
+	const authorHints = buildAuthorQualityHints(options.authorStats)
+	const payload = JSON.stringify(parsed)
+
+	return `Eres un editor de calidad para resúmenes de foros. Debes REESCRIBIR el siguiente JSON para hacerlo más útil, sin inventar hechos.
+
+FORMATO ESTRICTO:
+${SUMMARY_JSON_STRUCTURE}
+
+OBJETIVO:
+- Corregir estos problemas detectados: ${issueSummary}.
+- Mantener el mismo tema y sentido general.
+- keyPoints: hasta ${options.targetKeyPoints} puntos, concretos y no genéricos.
+- participants: hasta ${options.targetParticipants} usuarios con contribution concreta.
+- Cada contribution: mínimo ${MIN_CONTRIBUTION_WORDS} palabras, con postura y contexto.
+- status: frase original de ${MIN_STATUS_WORDS}-${MAX_STATUS_WORDS} palabras.
+- PROHIBIDO usar plantillas genéricas como "participó activamente", "presencia constante" o similares.
+- No inventes nombres, cifras ni hechos.
+- Devuelve SOLO JSON válido, sin markdown ni texto extra.
+
+PISTAS DE AUTORES (solo referencia, no inventar):
+${authorHints || '- sin pistas adicionales'}
+
+JSON A REESCRIBIR:
+${payload}`
+}
+
+async function improveSummaryQualityIfNeeded(
+	parsed: SummaryPayload,
+	options: QualityRefinementOptions
+): Promise<SummaryPayload> {
+	// The extra quality pass is mainly needed for Groq/Kimi responses.
+	if (options.provider !== 'groq') return parsed
+
+	const initialQuality = assessSummaryQuality(parsed, options)
+	if (initialQuality.ok) return parsed
+
+	try {
+		const repairPrompt = buildQualityRepairPrompt(parsed, options, initialQuality.issues)
+		const repairedRaw = await generateWithRetry(options.aiService, repairPrompt)
+		const repairedParsed = await parseSummaryPayloadWithFallback(
+			repairedRaw,
+			options.aiService,
+			`${options.label} (revisión de calidad)`
+		)
+		const repairedQuality = assessSummaryQuality(repairedParsed, options)
+
+		if (repairedQuality.score > initialQuality.score) {
+			return repairedParsed
+		}
+	} catch (error) {
+		logger.warn('Quality refinement pass failed. Keeping initial parsed summary.', error)
+	}
+
+	return parsed
+}
+
+async function parseSummaryPayloadWithFallback(
+	rawSummary: string,
+	aiService: { generate: (prompt: string) => Promise<string> },
+	label: string
+): Promise<SummaryPayload> {
+	return parseJsonWithAIFallback<SummaryPayload>(rawSummary, aiService, label, SUMMARY_JSON_STRUCTURE)
 }
