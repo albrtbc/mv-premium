@@ -37,8 +37,8 @@ export function PostSummaryDialog({ postElement, onClose }: PostSummaryDialogPro
 		document.body.style.overflow = 'hidden'
 		setActualModel(null)
         
-        // Extract post content
-		const postBody = postElement.querySelector('.post-contents .body, .post-body, .cuerpo')
+		// Extract post content
+		const postBody = postElement.querySelector('.post-contents, .post-contents .body, .post-body, .cuerpo')
 		if (!postBody) {
 			setState('error')
 			setContent({ summary: 'No se pudo encontrar el contenido del post.', tone: 'Error' })

@@ -6,23 +6,13 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import X from 'lucide-react/dist/esm/icons/x'
-import Copy from 'lucide-react/dist/esm/icons/copy'
 import Loader2 from 'lucide-react/dist/esm/icons/loader-2'
-import AlertCircle from 'lucide-react/dist/esm/icons/alert-circle'
-import Bot from 'lucide-react/dist/esm/icons/bot'
-import Users from 'lucide-react/dist/esm/icons/users'
-import MessageSquare from 'lucide-react/dist/esm/icons/message-square'
-import Check from 'lucide-react/dist/esm/icons/check'
-import FileText from 'lucide-react/dist/esm/icons/file-text'
-import Settings from 'lucide-react/dist/esm/icons/settings'
-import Layers from 'lucide-react/dist/esm/icons/layers'
 import AlertTriangle from 'lucide-react/dist/esm/icons/alert-triangle'
+import Bot from 'lucide-react/dist/esm/icons/bot'
+import AlertCircle from 'lucide-react/dist/esm/icons/alert-circle'
+import Layers from 'lucide-react/dist/esm/icons/layers'
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right'
-import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw'
 import History from 'lucide-react/dist/esm/icons/history'
-import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
-import Clock3 from 'lucide-react/dist/esm/icons/clock-3'
 import { ShadowWrapper } from '@/components/shadow-wrapper'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -39,9 +29,21 @@ import {
 import { getCachedMultiSummary, setCachedMultiSummary, getCachedMultiAge, formatCacheAge } from '../logic/summary-cache'
 import { getLastModelUsed } from '@/services/ai/gemini-service'
 import { useAIModelLabel } from '@/hooks/use-ai-model-label'
-import { renderInlineMarkdown, markdownToBBCode } from '../logic/render-inline-markdown'
+import { markdownToBBCode } from '../logic/render-inline-markdown'
 import { useSettingsStore } from '@/store/settings-store'
 import { toast } from '@/lib/lazy-toast'
+import {
+	formatDuration,
+	useSummaryTimer,
+	useSummaryClipboard,
+	SummaryModalHeader,
+	SummaryErrorState,
+	SummaryResultSection,
+	SummaryMetadata,
+	SummaryModalFooter,
+	APIConsoleLinks,
+	MetadataIcons,
+} from './shared/summary-modal-shared'
 
 // =============================================================================
 // TYPES
@@ -54,14 +56,6 @@ interface MultiPageSummaryModalProps {
 	onClose: () => void
 }
 
-function formatDuration(ms: number): string {
-	const totalSeconds = Math.max(0, Math.floor(ms / 1000))
-	const minutes = Math.floor(totalSeconds / 60)
-	const seconds = totalSeconds % 60
-	if (minutes > 0) return `${minutes}m ${seconds}s`
-	return `${seconds}s`
-}
-
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -70,15 +64,17 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 	const [step, setStep] = useState<ModalStep>('config')
 	const [summary, setSummary] = useState<MultiPageSummary | null>(null)
 	const [progress, setProgress] = useState<MultiPageProgress | null>(null)
-	const [copied, setCopied] = useState(false)
 	const [actualModel, setActualModel] = useState<string | null>(null)
 	const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
-	const [elapsedSeconds, setElapsedSeconds] = useState(0)
 	const { modelLabel, isModelFallback, configuredModel, isProviderFallback, providerFallbackMessage } =
 		useAIModelLabel(actualModel)
 	const aiProvider = useSettingsStore(s => s.aiProvider)
-	const hasAnyAIKey = useSettingsStore(s => s.geminiApiKey.trim().length > 0 || s.groqApiKey.trim().length > 0)
+	const hasProviderKey = useSettingsStore(s =>
+		s.aiProvider === 'gemini' ? s.geminiApiKey.trim().length > 0 : s.groqApiKey.trim().length > 0
+	)
 	const providerMaxPages = getProviderMultiPageLimit(aiProvider)
+
+	const { elapsedSeconds, setElapsedSeconds } = useSummaryTimer(step === 'loading', startedAtMs)
 
 	// Page range state
 	const totalPages = getTotalPages()
@@ -92,17 +88,43 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 			setStep('config')
 			setSummary(null)
 			setProgress(null)
-			setCopied(false)
 			setActualModel(null)
 			setStartedAtMs(null)
 			setElapsedSeconds(0)
 			setFromPage(1)
 			setToPage(Math.min(totalPages, 5))
 		}
-	}, [isOpen, totalPages, providerMaxPages])
+	}, [isOpen, totalPages, providerMaxPages, setElapsedSeconds])
 
 	const pageCount = Math.max(1, toPage - fromPage + 1)
 	const isValidRange = fromPage >= 1 && toPage >= fromPage && toPage <= totalPages && pageCount <= providerMaxPages
+
+	const buildCopyText = useCallback(() => {
+		if (!summary) return null
+		return [
+			`[center][b]✨ Resumen del Hilo (Págs. ${summary.pageRange})[/b][/center]`,
+			'',
+			`[b]🤖 TEMA:[/b] ${markdownToBBCode(summary.topic)}`,
+			'',
+			'[bar]PUNTOS CLAVE[/bar]',
+			'[list]',
+			...summary.keyPoints.map(p => `[*] ${markdownToBBCode(p)}`),
+			'[/list]',
+			'',
+			'[bar]PARTICIPANTES DESTACADOS[/bar]',
+			'[list]',
+			...summary.participants.map(p => `[*] [b]${p.name}[/b]: ${markdownToBBCode(p.contribution)}`),
+			'[/list]',
+			'',
+			`[quote][b]📝 ESTADO DEL DEBATE:[/b] [i]"${markdownToBBCode(summary.status)}"[/i][/quote]`,
+			'',
+			`📊 [b]${summary.totalPostsAnalyzed}[/b] posts · [b]${summary.pagesAnalyzed}[/b] páginas · [b]${summary.totalUniqueAuthors}[/b] autores`,
+			'',
+			'[i]Generado con Resumidor IA de Mediavida Premium[/i]',
+		].join('\n')
+	}, [summary])
+
+	const { copied, handleCopy } = useSummaryClipboard(buildCopyText)
 
 	const handleStartSummary = useCallback(async () => {
 		if (!isValidRange || pageCount < 2) return
@@ -130,7 +152,7 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 		setSummary(timedResult)
 		setStep('result')
 		setStartedAtMs(null)
-	}, [fromPage, toPage, isValidRange, pageCount])
+	}, [fromPage, toPage, isValidRange, pageCount, setElapsedSeconds])
 
 	const handleLoadCached = useCallback(() => {
 		const cached = getCachedMultiSummary(fromPage, toPage)
@@ -141,67 +163,26 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 			setStartedAtMs(null)
 			setElapsedSeconds(0)
 		}
-	}, [fromPage, toPage])
+	}, [fromPage, toPage, setElapsedSeconds])
 
 	useEffect(() => {
-		if (step !== 'loading' || startedAtMs === null) return
-
-		setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
-		const intervalId = window.setInterval(() => {
-			setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
-		}, 1000)
-
-		return () => window.clearInterval(intervalId)
-	}, [step, startedAtMs])
-
-	// If API keys are removed while modal is open, auto-close to avoid stale UI.
-	useEffect(() => {
-		if (isOpen && !hasAnyAIKey) {
-			toast.error('No hay API Keys de IA configuradas. Cerrando resumen multi-página.')
+		if (isOpen && !hasProviderKey) {
+			toast.error(
+				`No hay API Key configurada para ${aiProvider === 'gemini' ? 'Gemini' : 'Groq'}. Cerrando resumen multi-página.`
+			)
 			onClose()
 		}
-	}, [isOpen, hasAnyAIKey, onClose])
-
-	const handleCopy = () => {
-		if (!summary) return
-
-		const text = [
-			`[center][b]✨ Resumen del Hilo (Págs. ${summary.pageRange})[/b][/center]`,
-			'',
-			`[b]🤖 TEMA:[/b] ${markdownToBBCode(summary.topic)}`,
-			'',
-			'[bar]PUNTOS CLAVE[/bar]',
-			'[list]',
-			...summary.keyPoints.map(p => `[*] ${markdownToBBCode(p)}`),
-			'[/list]',
-			'',
-			'[bar]PARTICIPANTES DESTACADOS[/bar]',
-			'[list]',
-			...summary.participants.map(p => `[*] [b]${p.name}[/b]: ${markdownToBBCode(p.contribution)}`),
-			'[/list]',
-			'',
-			`[quote][b]📝 ESTADO DEL DEBATE:[/b] [i]"${markdownToBBCode(summary.status)}"[/i][/quote]`,
-			'',
-			`📊 [b]${summary.totalPostsAnalyzed}[/b] posts · [b]${summary.pagesAnalyzed}[/b] páginas · [b]${summary.totalUniqueAuthors}[/b] autores`,
-			'',
-			'[i]Generado con Resumidor IA de Mediavida Premium[/i]',
-		].join('\n')
-
-		navigator.clipboard.writeText(text)
-		setCopied(true)
-		setTimeout(() => setCopied(false), 2000)
-	}
-
-	const handleBackdropClick = (e: React.MouseEvent) => {
-		if (e.target === e.currentTarget) {
-			// Don't allow closing during loading
-			if (step !== 'loading') onClose()
-		}
-	}
+	}, [isOpen, hasProviderKey, aiProvider, onClose])
 
 	const openAISettings = () => {
 		sendMessage('openOptionsPage', 'settings?tab=ai')
 		onClose()
+	}
+
+	const handleBackdropClick = (e: React.MouseEvent) => {
+		if (e.target === e.currentTarget) {
+			if (step !== 'loading') onClose()
+		}
 	}
 
 	const isAINotConfigured = summary?.error?.includes('IA no configurada')
@@ -220,34 +201,16 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 				onClick={handleBackdropClick}
 			>
 				<div className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
-					{/* Header */}
-					<div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
-						<div className="flex items-center gap-2">
-							<Layers className="w-5 h-5 text-primary" />
-							<h2 className="text-lg font-semibold text-foreground">Resumen Multi-Página</h2>
-							<span
-								className={cn(
-									'text-[10px] px-1.5 py-0.5 rounded font-medium',
-									isProviderFallback || isModelFallback
-										? 'text-amber-600 bg-amber-500/10'
-										: 'text-muted-foreground bg-muted'
-								)}
-								title={badgeTitle}
-							>
-								{modelLabel}
-							</span>
-						</div>
-						{step !== 'loading' && (
-							<button
-								onClick={onClose}
-								className="p-1 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-							>
-								<X className="w-5 h-5" />
-							</button>
-						)}
-					</div>
+					<SummaryModalHeader
+						icon={<Layers className="w-5 h-5 text-primary" />}
+						title="Resumen Multi-Página"
+						modelLabel={modelLabel}
+						isModelFallback={isModelFallback}
+						isProviderFallback={isProviderFallback}
+						badgeTitle={badgeTitle}
+						onClose={step !== 'loading' ? onClose : undefined}
+					/>
 
-					{/* Content */}
 					<div className="flex-1 overflow-y-auto p-4">
 						{providerFallbackMessage && (
 							<div className="mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md p-2.5">
@@ -276,21 +239,63 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 						{step === 'loading' && <LoadingStep progress={progress} pageCount={pageCount} elapsedSeconds={elapsedSeconds} />}
 
 						{step === 'result' && summary?.error && (
-							<ErrorStep
-								summary={summary}
+							<SummaryErrorState
+								error={summary.error}
 								isAINotConfigured={!!isAINotConfigured}
 								onOpenSettings={openAISettings}
-								onRetry={() => setStep('config')}
+								extraAction={
+									<Button size="sm" variant="outline" onClick={() => setStep('config')} className="mt-3 gap-2">
+										<ChevronRight className="w-4 h-4 rotate-180" />
+										Volver a intentar
+									</Button>
+								}
 							/>
 						)}
 
-						{step === 'result' && summary && !summary.error && <ResultStep summary={summary} />}
+						{step === 'result' && summary && !summary.error && (
+							<>
+								<SummaryResultSection
+									topic={summary.topic}
+									keyPoints={summary.keyPoints}
+									participants={summary.participants}
+									status={summary.status}
+									beforeContent={
+										summary.fetchErrors.length > 0 ? (
+											<div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md p-2.5">
+												<AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+												<p className="text-xs text-amber-600 dark:text-amber-400">
+													No se pudieron descargar las páginas: {summary.fetchErrors.join(', ')}
+												</p>
+											</div>
+										) : undefined
+									}
+								/>
+								<SummaryMetadata
+									items={[
+										{ icon: <Layers className="w-3.5 h-3.5" />, label: `Págs. ${summary.pageRange}` },
+										{ icon: MetadataIcons.page, label: `${summary.pagesAnalyzed} páginas` },
+										{ icon: MetadataIcons.posts, label: `${summary.totalPostsAnalyzed} posts` },
+										{ icon: MetadataIcons.authors, label: `${summary.totalUniqueAuthors} autores` },
+										...(summary.modelUsed
+											? [{ icon: MetadataIcons.model, label: summary.modelUsed }]
+											: []),
+										...(typeof summary.generationMs === 'number'
+											? [{ icon: MetadataIcons.time, label: formatDuration(summary.generationMs) }]
+											: []),
+									]}
+								/>
+								<APIConsoleLinks />
+							</>
+						)}
 					</div>
 
-					{/* Footer */}
 					{step === 'result' && summary && !summary.error && (
-						<div className="flex items-center justify-between gap-2 p-4 border-t border-border bg-muted/10">
-							<div className="flex items-center gap-1">
+						<SummaryModalFooter
+							onRegenerate={handleStartSummary}
+							onCopy={handleCopy}
+							onClose={onClose}
+							copied={copied}
+							extraButtons={
 								<Button
 									variant="ghost"
 									size="sm"
@@ -300,33 +305,8 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 									<ChevronRight className="w-3.5 h-3.5 rotate-180" />
 									Otro rango
 								</Button>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={handleStartSummary}
-									className="gap-1.5 text-muted-foreground"
-								>
-									<RefreshCw className="w-3.5 h-3.5" />
-									Regenerar
-								</Button>
-							</div>
-							<div className="flex items-center gap-2">
-								<Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
-									{copied ? (
-										<>
-											<Check className="w-4 h-4" /> Copiado
-										</>
-									) : (
-										<>
-											<Copy className="w-4 h-4" /> Copiar
-										</>
-									)}
-								</Button>
-								<Button size="sm" onClick={onClose}>
-									Cerrar
-								</Button>
-							</div>
-						</div>
+							}
+						/>
 					)}
 				</div>
 			</div>
@@ -335,7 +315,7 @@ export function MultiPageSummaryModal({ isOpen, onClose }: MultiPageSummaryModal
 }
 
 // =============================================================================
-// SUB-COMPONENTS
+// SUB-COMPONENTS (unique to multi-page)
 // =============================================================================
 
 function ConfigStep({
@@ -369,7 +349,6 @@ function ConfigStep({
 }) {
 	const isGroq = aiProvider === 'groq'
 
-	// Quick range presets
 	const presets = [
 		{ label: 'Todo el hilo', from: 1, to: totalPages, show: totalPages <= providerMaxPages },
 		{ label: 'Primeras 5', from: 1, to: Math.min(5, totalPages), show: totalPages >= 3 },
@@ -595,12 +574,10 @@ function LoadingStep({
 		if (!progress) return 0
 
 		if (progress.phase === 'fetching') {
-			// Fetch is 40% of total progress
 			return Math.round((progress.current / progress.total) * 40)
 		}
 
 		if (progress.phase === 'summarizing') {
-			// Summarize is 60% (40-100)
 			return 40 + Math.round((progress.current / progress.total) * 60)
 		}
 
@@ -632,185 +609,6 @@ function LoadingStep({
 						style={{ width: `${percentage}%` }}
 					/>
 				</div>
-			</div>
-		</div>
-	)
-}
-
-function ErrorStep({
-	summary,
-	isAINotConfigured,
-	onOpenSettings,
-	onRetry,
-}: {
-	summary: MultiPageSummary
-	isAINotConfigured: boolean
-	onOpenSettings: () => void
-	onRetry: () => void
-}) {
-	return (
-		<div className="flex flex-col items-center justify-center py-12 gap-4">
-			<div
-				className={cn(
-					'w-12 h-12 rounded-full flex items-center justify-center',
-					isAINotConfigured ? 'bg-primary/10' : 'bg-destructive/10'
-				)}
-			>
-				{isAINotConfigured ? (
-					<Settings className="w-6 h-6 text-primary" />
-				) : (
-					<AlertCircle className="w-6 h-6 text-destructive" />
-				)}
-			</div>
-			<div className="text-center space-y-2">
-				<p className={cn('text-sm font-medium', isAINotConfigured ? 'text-foreground' : 'text-destructive')}>
-					{isAINotConfigured ? 'IA no configurada' : 'Error'}
-				</p>
-				<p className="text-xs text-muted-foreground">
-					{isAINotConfigured ? 'Necesitas una API Key de Gemini o Groq para usar esta función.' : summary.error}
-				</p>
-				{isAINotConfigured ? (
-					<Button size="sm" onClick={onOpenSettings} className="mt-3 gap-2">
-						<Settings className="w-4 h-4" />
-						Configurar API
-					</Button>
-				) : (
-					<Button size="sm" variant="outline" onClick={onRetry} className="mt-3 gap-2">
-						<ChevronRight className="w-4 h-4 rotate-180" />
-						Volver a intentar
-					</Button>
-				)}
-			</div>
-		</div>
-	)
-}
-
-function ResultStep({ summary }: { summary: MultiPageSummary }) {
-	return (
-		<div className="space-y-6">
-			{/* Fetch errors warning */}
-			{summary.fetchErrors.length > 0 && (
-				<div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md p-2.5">
-					<AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-					<p className="text-xs text-amber-600 dark:text-amber-400">
-						No se pudieron descargar las páginas: {summary.fetchErrors.join(', ')}
-					</p>
-				</div>
-			)}
-
-			{/* Topic */}
-			<div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-				<h3 className="text-xs font-bold text-primary mb-1 uppercase tracking-wider flex items-center gap-1.5">
-					<Bot className="w-3.5 h-3.5" /> Tema Principal
-				</h3>
-				<p className="text-sm font-medium text-foreground leading-relaxed">{renderInlineMarkdown(summary.topic)}</p>
-			</div>
-
-			{/* Key Points */}
-			<div className="space-y-3">
-				<h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-					<Check className="w-3.5 h-3.5" /> Puntos Clave
-				</h3>
-				<ul className="grid gap-2">
-					{summary.keyPoints?.map((point, i) => (
-						<li
-							key={i}
-							className="text-sm text-foreground/90 bg-muted/30 rounded-md p-2.5 flex gap-3 items-start border border-border/50"
-						>
-							<span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-							<span className="leading-relaxed">{renderInlineMarkdown(point)}</span>
-						</li>
-					))}
-				</ul>
-			</div>
-
-			{/* Participants */}
-			<div className="space-y-3">
-				<h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-					<Users className="w-3.5 h-3.5" /> Participantes Destacados
-				</h3>
-				<div className="grid gap-2">
-					{summary.participants?.map((p, i) => (
-						<div
-							key={i}
-							className="flex gap-3 text-sm border border-border/40 rounded-md p-2 hover:bg-muted/20 transition-colors"
-						>
-							<div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary flex items-center justify-center font-bold text-xs text-secondary-foreground uppercase overflow-hidden">
-								{p.avatarUrl ? (
-									<img src={p.avatarUrl} alt={p.name} className="w-full h-full object-cover" />
-								) : (
-									p.name.substring(0, 2)
-								)}
-							</div>
-							<div className="space-y-0.5">
-								<div className="font-semibold text-foreground">{p.name}</div>
-								<div className="text-muted-foreground text-xs leading-relaxed">
-									{renderInlineMarkdown(p.contribution)}
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
-
-			{/* Status */}
-			<div className="bg-muted/50 rounded-lg p-3 border-l-2 border-primary">
-				<h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Estado del Debate</h3>
-				<p className="text-sm text-foreground/80 italic">{renderInlineMarkdown(summary.status)}</p>
-			</div>
-
-			{/* Metadata */}
-			<div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground/70 pt-2">
-				<div className="flex items-center gap-1.5">
-					<Layers className="w-3.5 h-3.5" />
-					<span>Págs. {summary.pageRange}</span>
-				</div>
-				<div className="flex items-center gap-1.5">
-					<FileText className="w-3.5 h-3.5" />
-					<span>{summary.pagesAnalyzed} páginas</span>
-				</div>
-				<div className="flex items-center gap-1.5">
-					<MessageSquare className="w-3.5 h-3.5" />
-					<span>{summary.totalPostsAnalyzed} posts</span>
-				</div>
-				<div className="flex items-center gap-1.5">
-					<Users className="w-3.5 h-3.5" />
-					<span>{summary.totalUniqueAuthors} autores</span>
-				</div>
-				{summary.modelUsed && (
-					<div className="flex items-center gap-1.5">
-						<Bot className="w-3.5 h-3.5" />
-						<span>{summary.modelUsed}</span>
-					</div>
-				)}
-				{typeof summary.generationMs === 'number' && (
-					<div className="flex items-center gap-1.5">
-						<Clock3 className="w-3.5 h-3.5" />
-						<span>{formatDuration(summary.generationMs)}</span>
-					</div>
-				)}
-				</div>
-
-			{/* API console links */}
-			<div className="flex flex-col gap-1 pt-1">
-				<a
-					href="https://aistudio.google.com/"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-				>
-					<ExternalLink className="w-3 h-3" />
-					Gemini: Consulta tu uso en AI Studio
-				</a>
-				<a
-					href="https://console.groq.com/"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-				>
-					<ExternalLink className="w-3 h-3" />
-					Groq: Consulta tu uso en Groq Console
-				</a>
 			</div>
 		</div>
 	)
