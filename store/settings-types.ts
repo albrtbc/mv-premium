@@ -17,7 +17,7 @@ import type { UserTemplates } from '@/types/templates'
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 /** AI Model options - Gemini */
-export type GeminiModel = 'gemini-2.5-flash' | 'gemini-2.5-flash-lite' | 'gemini-3-flash-preview'
+export type GeminiModel = 'gemini-3-flash-preview' | 'gemini-2.5-flash' | 'gemini-2.5-flash-lite'
 
 /** AI Model options - Groq */
 export type GroqModel = 'llama-3.3-70b-versatile' | 'moonshotai/kimi-k2-instruct'

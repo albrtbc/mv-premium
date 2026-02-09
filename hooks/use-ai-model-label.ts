@@ -20,11 +20,11 @@ interface AIModelLabelResult {
 	configuredModel: string
 	/** Provider selected in settings */
 	configuredProvider: 'gemini' | 'groq'
-	/** Provider that will actually be used based on available API keys */
+	/** Provider that will be used (no cross-provider fallback) */
 	effectiveProvider: 'gemini' | 'groq'
-	/** True when configured provider has no key and we auto-switch provider */
+	/** Kept for UI compatibility; always false because provider auto-switch is disabled */
 	isProviderFallback: boolean
-	/** Human-readable provider fallback message */
+	/** Kept for UI compatibility; always null */
 	providerFallbackMessage: string | null
 }
 
@@ -38,25 +38,7 @@ export function useAIModelLabel(actualModel: string | null): AIModelLabelResult 
 	const aiProvider = useSettingsStore(s => s.aiProvider)
 	const aiModel = useSettingsStore(s => s.aiModel)
 	const groqModel = useSettingsStore(s => s.groqModel)
-	const geminiApiKey = useSettingsStore(s => s.geminiApiKey)
-	const groqApiKey = useSettingsStore(s => s.groqApiKey)
-
-	const hasGeminiKey = geminiApiKey.trim().length > 0
-	const hasGroqKey = groqApiKey.trim().length > 0
-
-	// Mirrors getAIService() provider fallback behavior to avoid misleading labels in UI.
-	const effectiveProvider =
-		aiProvider === 'gemini'
-			? hasGeminiKey
-				? 'gemini'
-				: hasGroqKey
-					? 'groq'
-					: 'gemini'
-			: hasGroqKey
-				? 'groq'
-				: hasGeminiKey
-					? 'gemini'
-					: 'groq'
+	const effectiveProvider = aiProvider
 
 	const configuredModel = effectiveProvider === 'groq' ? groqModel : aiModel
 	const displayModel = actualModel || configuredModel
@@ -71,12 +53,8 @@ export function useAIModelLabel(actualModel: string | null): AIModelLabelResult 
 	})()
 
 	const isModelFallback = !!actualModel && actualModel !== configuredModel
-	const isProviderFallback = aiProvider !== effectiveProvider
-	const providerFallbackMessage = isProviderFallback
-		? aiProvider === 'gemini'
-			? 'Gemini no tiene API Key configurada. Se está usando Groq automáticamente.'
-			: 'Groq no tiene API Key configurada. Se está usando Gemini automáticamente.'
-		: null
+	const isProviderFallback = false
+	const providerFallbackMessage = null
 
 	return {
 		displayModel,

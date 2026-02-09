@@ -29,9 +29,9 @@ const positiveIntSchema = z.number().int().min(0)
 // =============================================================================
 
 export const aiModelSchema = z.enum([
+	'gemini-3-flash-preview',
 	'gemini-2.5-flash',
 	'gemini-2.5-flash-lite',
-	'gemini-3-flash-preview',
 ])
 
 export const groqModelSchema = z.enum([
@@ -68,7 +68,7 @@ export const settingsSchema = z.object({
 	// AI Settings
 	geminiApiKey: apiKeySchema.default(''),
 	groqApiKey: apiKeySchema.default(''),
-	aiModel: aiModelSchema.default('gemini-2.5-flash'),
+	aiModel: aiModelSchema.default('gemini-3-flash-preview'),
 	groqModel: groqModelSchema.default('moonshotai/kimi-k2-instruct'),
 	aiProvider: aiProviderSchema.default('gemini'),
 

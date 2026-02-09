@@ -33,9 +33,9 @@ export interface AIService {
  * Available Gemini models (free tier)
  */
 export type GeminiModel =
-	| 'gemini-2.5-flash' // Recommended
+	| 'gemini-3-flash-preview' // Recommended
+	| 'gemini-2.5-flash' // Stable option
 	| 'gemini-2.5-flash-lite' // Lite version
-	| 'gemini-3-flash-preview' // Next gen preview
 
 /**
  * Available Groq models (free tier)

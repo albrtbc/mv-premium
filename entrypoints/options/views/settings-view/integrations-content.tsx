@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingsSection } from '../../components/settings/settings-section'
 import { SettingRow, ApiKeyInput } from '../../components/settings'
+import { ProviderStatusBadge } from '../../components/settings/provider-status-badge'
 import { useSettingsStore } from '@/store/settings-store'
 import { getAvailableModels, testGeminiConnection } from '@/services/ai/gemini-service'
 import { getAvailableGroqModels, testGroqConnection } from '@/services/ai/groq-service'
@@ -113,8 +114,9 @@ export function IntegrationsContent() {
 					<div className="flex gap-3">
 						<Image className="h-5 w-5 mt-0.5" />
 						<div>
-							<h4 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+							<h4 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2">
 								Alojamiento de Imágenes (Base: freeimage.host)
+								<ProviderStatusBadge isConfigured={!!imgbbApiKey} />
 							</h4>
 							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
 								{imgbbApiKey ? (
@@ -211,7 +213,10 @@ export function IntegrationsContent() {
 					<div className="flex gap-3">
 						<Sparkles className="h-5 w-5 mt-0.5 text-purple-500" />
 						<div>
-							<h4 className="text-sm font-medium leading-none">Google Gemini API</h4>
+							<h4 className="text-sm font-medium leading-none flex items-center gap-2">
+								Google Gemini API
+								<ProviderStatusBadge isConfigured={!!geminiApiKey} />
+							</h4>
 							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
 								IA en la nube con modelos potentes (gratis con límites)
 							</p>
@@ -281,7 +286,10 @@ export function IntegrationsContent() {
 					<div className="flex gap-3">
 						<Zap className="h-5 w-5 mt-0.5 text-orange-500" />
 						<div>
-							<h4 className="text-sm font-medium leading-none">Groq API</h4>
+							<h4 className="text-sm font-medium leading-none flex items-center gap-2">
+								Groq API
+								<ProviderStatusBadge isConfigured={!!groqApiKey} />
+							</h4>
 							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
 								IA ultra-rápida con Kimi K2 (gratis con límites)
 							</p>

@@ -31,10 +31,36 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
 
 let groqNextAllowedAt = 0
 
-const GROQ_TARGET_TPM = 14000
+const GROQ_TARGET_TPM = 9000
 const GROQ_MIN_GAP_MS = 2000
 const GROQ_MAX_GAP_MS = 30000
 const GROQ_MAX_TOTAL_RETRY_WINDOW_MS = 90000
+const GROQ_THREAD_PROMPT_MAX_CHARS = 19000
+
+function trimThreadPromptForGroq(content: string): string {
+	if (content.length <= GROQ_THREAD_PROMPT_MAX_CHARS) return content
+
+	const suffix = '\n[...contenido truncado por límite TPM de Groq]'
+	const markers = ['RESUMENES PARCIALES:', 'POSTS:']
+
+	for (const marker of markers) {
+		const markerIndex = content.indexOf(marker)
+		if (markerIndex < 0) continue
+
+		const splitIndex = markerIndex + marker.length + 1
+		const head = content.slice(0, splitIndex)
+		const budgetForTail = GROQ_THREAD_PROMPT_MAX_CHARS - head.length - suffix.length
+
+		if (budgetForTail <= 0) {
+			return content.slice(0, GROQ_THREAD_PROMPT_MAX_CHARS - suffix.length) + suffix
+		}
+
+		const tail = content.slice(splitIndex, splitIndex + budgetForTail)
+		return `${head}${tail}${suffix}`
+	}
+
+	return content.slice(0, GROQ_THREAD_PROMPT_MAX_CHARS - suffix.length) + suffix
+}
 
 async function waitForGroqSlot(): Promise<void> {
 	const now = Date.now()
@@ -145,13 +171,12 @@ function parseGroqRetryDelayMs(response: Response, errorData: unknown, attempt: 
 
 /**
  * Fallback models in order of preference.
- * The 3 free-tier models come first; older models serve as silent last-resort.
+ * Keep this chain strictly within Gemini models.
  */
 const GEMINI_FALLBACK_MODELS = [
+	'gemini-3-flash-preview',
 	'gemini-2.5-flash',
 	'gemini-2.5-flash-lite',
-	'gemini-3-flash-preview',
-	'gemini-2.0-flash', // Silent fallback (deprecated 31/03/2026)
 ] as const
 
 // =============================================================================
@@ -278,8 +303,8 @@ export function setupGroqHandler(): void {
 
 		const currentModel = model || 'moonshotai/kimi-k2-instruct'
 
-		// Convert history to OpenAI format (no system prompt - features provide their own)
-		const messages: { role: 'user' | 'assistant'; content: string }[] = []
+		// Convert history to OpenAI format
+		const messages: { role: 'user' | 'assistant' | 'system'; content: string }[] = []
 
 		if (history) {
 			for (const msg of history) {
@@ -295,12 +320,46 @@ export function setupGroqHandler(): void {
 			messages.push({ role: 'user', content: prompt })
 		}
 
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i]
+			if (
+				msg.role === 'user' &&
+				(msg.content.includes('TITULO DEL HILO') ||
+					msg.content.includes('POSTS:') ||
+					msg.content.includes('RESUMENES PARCIALES:'))
+			) {
+				messages[i] = {
+					...msg,
+					content: trimThreadPromptForGroq(msg.content),
+				}
+			}
+		}
+
 		// Retry with adaptive wait on 429 rate limits.
 		const maxAttempts = 3
 		const inputChars = messages.reduce((acc, msg) => acc + msg.content.length, 0)
 		const isMetaSummary = messages.some(msg => msg.role === 'user' && msg.content.includes('RESUMENES PARCIALES'))
 		const isThreadSummary = messages.some(msg => msg.role === 'user' && msg.content.includes('TITULO DEL HILO'))
-		const maxTokens = isThreadSummary ? (isMetaSummary ? 1200 : inputChars > 18000 ? 900 : 700) : 1800
+		let maxTokens = isThreadSummary ? (isMetaSummary ? 1100 : 1024) : 1800
+		const temperature = isThreadSummary ? 0.65 : 0.6
+
+		// Inject system message for thread summaries to reinforce critical instructions
+		if (isThreadSummary) {
+			messages.unshift({
+				role: 'system',
+					content: [
+						'Eres un analista de foros experto. Devuelves SOLO JSON válido sin markdown.',
+						'REGLAS CRITICAS:',
+						'- NIVEL DE DETALLE: cada "contribution" debe tener 2-3 frases breves y cada punto clave 1-3 frases breves, sin párrafos largos.',
+						'- Si el prompt pide un máximo de puntos clave o participantes, intenta completar ese máximo cuando haya material suficiente.',
+						'- Cada "contribution" termina con punto (.). PROHIBIDO frases genéricas como "participó activamente".',
+						'- No confundas apodos/rangos/títulos junto al nick con el nombre del usuario: usa solo el nick real.',
+						'- Si un post solo tiene media/embed/enlace sin comentario propio, no lo uses para atribuir postura personal.',
+						'- "status" DEBE ser una frase ORIGINAL de 18-40 palabras sobre el clima del debate. NUNCA una sola palabra.',
+						'- Identifica correctamente QUIÉN critica a QUIÉN.',
+					].join('\n'),
+			})
+		}
 		const startedAt = Date.now()
 
 		for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -326,7 +385,7 @@ export function setupGroqHandler(): void {
 						body: JSON.stringify({
 							model: currentModel,
 							messages,
-							temperature: 0.6,
+							temperature,
 							top_p: 0.9,
 							// Keep responses compact to reduce TPM pressure in long summarization flows.
 							max_tokens: maxTokens,
@@ -353,6 +412,29 @@ export function setupGroqHandler(): void {
 				}
 
 				const errorData = await response.json()
+				const errorMessage = errorData?.error?.message || ''
+
+				// Handle payload too large for current TPM window.
+				// Retry by shrinking output budget first; this often salvages borderline requests.
+				if (
+					response.status === 400 &&
+					typeof errorMessage === 'string' &&
+					(errorMessage.includes('Request too large') || errorMessage.includes('tokens per minute (TPM)'))
+				) {
+					if (attempt < maxAttempts - 1 && maxTokens > 240) {
+						maxTokens = Math.max(240, Math.floor(maxTokens * 0.65))
+						logger.warn(
+							`Groq request too large on ${currentModel} (attempt ${attempt + 1}/${maxAttempts}). Retrying with max_tokens=${maxTokens}.`
+						)
+						continue
+					}
+
+					return {
+						success: false,
+						error:
+							'La petición a Groq es demasiado grande para el límite TPM actual. Reduce el rango de páginas o usa Gemini.',
+					}
+				}
 
 				// Handle 429 - Rate limit exceeded
 				if (response.status === 429) {

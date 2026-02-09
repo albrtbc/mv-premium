@@ -69,29 +69,23 @@ class GeminiService implements AIService {
 
 /**
  * Factory function to get the configured AI service instance.
- * Uses the aiProvider setting to determine which service to return.
- * Falls back to the other provider if the preferred one isn't configured.
+ * Uses the aiProvider setting and only returns that provider.
+ * No cross-provider fallback is performed.
  */
 export async function getAIService(): Promise<AIService | null> {
 	const settings = await getSettings()
-	const { geminiApiKey, groqApiKey, aiModel = 'gemini-2.5-flash', aiProvider = 'gemini' } = settings
+	const { geminiApiKey, groqApiKey, aiModel = 'gemini-3-flash-preview', aiProvider = 'gemini' } = settings
 
 	if (aiProvider === 'groq') {
 		if (groqApiKey) {
 			const { getGroqService } = await import('./groq-service')
 			return getGroqService()
 		}
-		if (geminiApiKey) {
-			return new GeminiService(geminiApiKey, aiModel)
-		}
-	} else {
-		if (geminiApiKey) {
-			return new GeminiService(geminiApiKey, aiModel)
-		}
-		if (groqApiKey) {
-			const { getGroqService } = await import('./groq-service')
-			return getGroqService()
-		}
+		return null
+	}
+
+	if (geminiApiKey) {
+		return new GeminiService(geminiApiKey, aiModel)
 	}
 
 	return null
@@ -133,8 +127,8 @@ export async function testGeminiConnection(
  */
 export function getAvailableModels() {
 	return [
-		{ value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Recomendado (Default)' },
+		{ value: 'gemini-3-flash-preview', label: 'Gemini 3.0 Flash Preview', description: 'Recomendado (Default)' },
+		{ value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Estable y equilibrado' },
 		{ value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', description: 'Versión ligera' },
-		{ value: 'gemini-3-flash-preview', label: 'Gemini 3.0 Flash', description: 'Preview Última Generación' },
 	]
 }

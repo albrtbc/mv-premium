@@ -26,7 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	// AI Settings
 	geminiApiKey: '',
 	groqApiKey: '',
-	aiModel: 'gemini-2.5-flash',
+	aiModel: 'gemini-3-flash-preview',
 	groqModel: 'moonshotai/kimi-k2-instruct',
 	aiProvider: 'gemini',
 
