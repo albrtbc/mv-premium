@@ -317,6 +317,25 @@ export async function getSyncStorageInfo(): Promise<{ bytesUsed: number; bytesQu
 	}
 }
 
+function isPrimitiveValue(value: unknown): boolean {
+	return value === null || (typeof value !== 'object' && typeof value !== 'function')
+}
+
+function hasMeaningfulChange(currentValue: unknown, nextValue: unknown): boolean {
+	// Fast path for identical values (handles primitives and object references).
+	if (Object.is(currentValue, nextValue)) {
+		return false
+	}
+
+	// If either side is primitive, a non-identical value means a real change.
+	if (isPrimitiveValue(currentValue) || isPrimitiveValue(nextValue)) {
+		return true
+	}
+
+	// Fallback for arrays/objects where reference can differ between contexts.
+	return JSON.stringify(currentValue) !== JSON.stringify(nextValue)
+}
+
 // =============================================================================
 // CROSS-TAB SYNCHRONIZATION
 // =============================================================================
@@ -343,7 +362,7 @@ export function initCrossTabSync(): () => void {
 			for (const key of validKeys) {
 				if (key in newState) {
 					const currentValue = currentState[key]
-					if (JSON.stringify(currentValue) !== JSON.stringify(newState[key])) {
+					if (hasMeaningfulChange(currentValue, newState[key])) {
 						updates[key] = newState[key] as never
 					}
 				}
