@@ -13,10 +13,11 @@ import Gift from 'lucide-react/dist/esm/icons/gift'
 import Trophy from 'lucide-react/dist/esm/icons/trophy'
 import Users from 'lucide-react/dist/esm/icons/users'
 import VolumeX from 'lucide-react/dist/esm/icons/volume-x'
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
 import StickyNote from 'lucide-react/dist/esm/icons/sticky-note'
 import Layout from 'lucide-react/dist/esm/icons/layout'
-import Brush from 'lucide-react/dist/esm/icons/brush'
 import { getDrafts, draftsStorage } from '@/features/drafts/storage'
+import { getHiddenThreads, watchHiddenThreads } from '@/features/hidden-threads/logic/storage'
 import { useSettingsStore } from '@/store/settings-store'
 import { CommandMenu } from '@/features/command-menu/components/command-menu'
 import { CommandMenuTrigger } from '@/features/command-menu/components/command-menu-trigger'
@@ -49,6 +50,7 @@ interface SidebarCounts {
 	drafts: number
 	templates: number
 	muted: number
+	hidden: number
 }
 
 const platformItems: NavItem[] = [
@@ -82,6 +84,12 @@ const platformItems: NavItem[] = [
 		badgeKey: 'muted',
 	},
 	{
+		title: 'Hilos Ocultos',
+		path: '/hidden-threads',
+		icon: EyeOff,
+		badgeKey: 'hidden',
+	},
+	{
 		title: 'Usuarios',
 		path: '/users',
 		icon: Users,
@@ -112,6 +120,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 		drafts: 0,
 		templates: 0,
 		muted: 0,
+		hidden: 0,
 	})
 
 	// Keyboard shortcut for command menu (Ctrl+K / Cmd+K)
@@ -141,19 +150,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 			setCounts(prev => ({ ...prev, muted: m }))
 		}
 
+		const loadHidden = async () => {
+			const hiddenThreads = await getHiddenThreads()
+			setCounts(prev => ({ ...prev, hidden: hiddenThreads.length }))
+		}
+
 		// Initial load
 		loadDrafts()
 		loadMuted()
+		void loadHidden()
 
 		// Listeners
 		const unwatchDrafts = draftsStorage.watch(() => loadDrafts())
 		const unwatchSettings = useSettingsStore.subscribe(state => {
 			setCounts(prev => ({ ...prev, muted: state.mutedWords.length }))
 		})
+		const unwatchHidden = watchHiddenThreads(hiddenThreads => {
+			setCounts(prev => ({ ...prev, hidden: hiddenThreads.length }))
+		})
 
 		return () => {
 			unwatchDrafts()
 			unwatchSettings()
+			unwatchHidden()
 		}
 	}, [])
 

@@ -216,6 +216,22 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 	// =========================================================================
 	// FORUM LIST / SUBFORUM PAGES
 	// =========================================================================
+	// Hidden threads first to minimize visible time before canonical filter is applied.
+	// Includes profile pages where "Últimos posts" or similar thread lists may appear.
+	const isPaginatedSubforum = /^\/foro\/[^/]+\/p\d+\/?$/.test(window.location.pathname)
+	const isUserProfilePage = /^\/id\/[^/]+(?:\/.*)?$/.test(window.location.pathname)
+	if (
+		pageContext?.isForumList ||
+		pageContext?.isSubforum ||
+		isPaginatedSubforum ||
+		pageContext?.isForumGlobalView ||
+		pageContext?.isFavorites ||
+		isUserProfilePage
+	) {
+		const { initHiddenThreadsFiltering } = await import('@/features/hidden-threads')
+		void initHiddenThreadsFiltering()
+	}
+
 	if (pageContext?.isForumList || pageContext?.isSubforum) {
 		const { injectFavoriteSubforumButtons } = await import(
 			'@/features/favorite-subforums/logic/favorite-subforum-inject'

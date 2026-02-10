@@ -34,6 +34,7 @@ import { DraftEditorView } from './views/draft-editor-view'
 import { UsersView } from './views/users-view'
 import { SettingsView } from './views/settings-view'
 import MutedPostsView from './views/muted-posts-view'
+import { HiddenThreadsView } from './views/hidden-threads-view'
 import { WhatsNewView } from './views/whats-new-view'
 
 import React from 'react'
@@ -48,6 +49,7 @@ const routeLabels: Record<string, string> = {
 	templates: 'Plantillas',
 	'template-editor': 'Plantillas de Fichas',
 	'muted-posts': 'Palabras Silenciadas',
+	'hidden-threads': 'Hilos Ocultos',
 	favorites: 'Subforos Favoritos',
 	subforums: 'Subforos',
 	users: 'Usuarios',
@@ -241,6 +243,7 @@ export default function OptionsApp() {
 
 							{/* Others */}
 							<Route path="/muted-posts" element={<MutedPostsView />} />
+							<Route path="/hidden-threads" element={<HiddenThreadsView />} />
 							<Route path="/users" element={<UsersView />} />
 							<Route path="/settings" element={<SettingsView />} />
 

@@ -67,7 +67,7 @@ export default defineBackground(() => {
 	// Setup All Handlers
 	// ==========================================================================
 
-	// Context menus (save thread, ignore user, mute word)
+	// Context menus (save thread, hide thread, mute word)
 	setupContextMenuListener()
 	initContextMenuWatcher()
 

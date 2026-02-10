@@ -45,6 +45,7 @@ export const DOM_MARKERS = {
 		// User Customizations
 		IGNORED_USER: 'mvp-ignored-user',
 		IGNORED_MESSAGE: 'mvp-ignored-message',
+		HIDDEN_THREAD: 'mvp-hidden-thread',
 		MUTED_USER: 'mvp-muted-user',
 		MUTE_PLACEHOLDER: 'mvp-mute-placeholder',
 		REVEAL_BTN: 'mvp-reveal-btn',
@@ -131,6 +132,7 @@ export const DOM_MARKERS = {
 		NEW_THREAD_BUTTON: 'mvp-new-thread-button',
 		NEW_THREAD_DROPDOWN: 'mvp-new-thread-dropdown',
 		WHATS_NEW_BADGE: 'mvp-whats-new-badge',
+		HIDDEN_THREADS_STYLES: 'mvp-hidden-threads-styles',
 		// Gallery
 		GALLERY_BTN: 'mvp-gallery-btn',
 		GALLERY_TRIGGER: 'mvp-gallery-trigger',

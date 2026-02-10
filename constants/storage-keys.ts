@@ -26,6 +26,7 @@ export const STORAGE_KEYS = {
 
 	// Features
 	MUTED_WORDS: 'mvp-muted-words',
+	HIDDEN_THREADS: 'mvp-hidden-threads',
 	SAVED_THREADS: 'mvp-saved-threads',
 	USER_CUSTOMIZATIONS: 'mvp-user-customizations',
 	FAVORITE_SUBFORUMS: 'mvp-favorite-subforums',

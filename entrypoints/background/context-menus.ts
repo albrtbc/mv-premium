@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger'
 import { storage } from '#imports'
 import { STORAGE_KEYS } from '@/constants'
 import { saveThread, type SavedThread } from '@/features/saved-threads/logic/storage'
+import { hideThreadFromUrl, isThreadHidden } from '@/features/hidden-threads/logic/storage'
 import { sendMessage } from '@/lib/messaging'
 
 // =============================================================================
@@ -46,6 +47,14 @@ export async function createContextMenus(): Promise<void> {
 			targetUrlPatterns: ['*://www.mediavida.com/foro/*/*'],
 		})
 	}
+
+	// "Ocultar hilo" - Available on any Mediavida thread link
+	browser.contextMenus.create({
+		id: 'mvp-hide-thread',
+		title: '🙈  Ocultar hilo',
+		contexts: ['link'],
+		targetUrlPatterns: ['*://www.mediavida.com/foro/*/*'],
+	})
 
 	// "Silenciar palabra" - appears when text is selected on Mediavida
 	// This is core functionality (muted words) but could be toggled too if requested.
@@ -94,6 +103,9 @@ export function setupContextMenuListener(): void {
 			case 'mvp-save-thread':
 				if (linkUrl) await handleSaveThread(linkUrl, tab?.id)
 				break
+			case 'mvp-hide-thread':
+				if (linkUrl) await handleHideThread(linkUrl, tab?.id)
+				break
 			case 'mvp-mute-word':
 				if (selectionText) await handleMuteWord(selectionText, tab?.id)
 				break
@@ -141,6 +153,30 @@ async function handleSaveThread(url: string, tabId?: number): Promise<void> {
 	} catch (error) {
 		logger.error('Error saving thread:', error)
 		notifyTab(tabId, '❌ Error al guardar')
+	}
+}
+
+/**
+ * Hide a thread from context menu
+ */
+async function handleHideThread(url: string, tabId?: number): Promise<void> {
+	try {
+		const alreadyHidden = await isThreadHidden(url)
+		if (alreadyHidden) {
+			notifyTab(tabId, 'ℹ️ El hilo ya estaba oculto')
+			return
+		}
+
+		const hiddenThread = await hideThreadFromUrl(url)
+		if (!hiddenThread) {
+			notifyTab(tabId, '❌ URL de hilo no válida')
+			return
+		}
+
+		notifyTab(tabId, '🙈 Hilo ocultado')
+	} catch (error) {
+		logger.error('Error hiding thread:', error)
+		notifyTab(tabId, '❌ Error al ocultar hilo')
 	}
 }
 
