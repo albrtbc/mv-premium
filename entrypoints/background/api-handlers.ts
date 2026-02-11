@@ -5,7 +5,7 @@
 
 import { browser } from 'wxt/browser'
 import { logger } from '@/lib/logger'
-import { fetchSteamGameDetails } from '@/services/api/steam'
+import { fetchSteamBundleDetails, fetchSteamGameDetails } from '@/services/api/steam'
 import { onMessage } from '@/lib/messaging'
 import { API_URLS } from '@/constants'
 import type { GiphyPaginatedResponse } from '@/services/api/giphy'
@@ -120,6 +120,15 @@ export function setupSteamHandler(): void {
 			return await fetchSteamGameDetails(appId)
 		} catch (error) {
 			logger.error('Steam fetch error:', error)
+			return null
+		}
+	})
+
+	onMessage('fetchSteamBundle', async ({ data: bundleId }) => {
+		try {
+			return await fetchSteamBundleDetails(bundleId)
+		} catch (error) {
+			logger.error('Steam bundle fetch error:', error)
 			return null
 		}
 	})

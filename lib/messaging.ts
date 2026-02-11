@@ -12,7 +12,7 @@
  * - Frontend: Import `sendMessage` to call background functions
  */
 import { defineExtensionMessaging } from '@webext-core/messaging'
-import type { SteamGameDetails } from '@/services/api/steam'
+import type { SteamGameDetails, SteamBundleDetails } from '@/services/api/steam'
 import type { GiphyPaginatedResponse } from '@/services/api/giphy'
 import type { ChatMessage } from '@/types/ai'
 
@@ -81,6 +81,13 @@ interface ProtocolMap {
 	 * @returns Game details or null if not found
 	 */
 	fetchSteamGame: (appId: number) => SteamGameDetails | null
+
+	/**
+	 * Fetch Steam bundle details (CORS proxy)
+	 * @param bundleId - Steam Bundle ID
+	 * @returns Bundle details or null if not found
+	 */
+	fetchSteamBundle: (bundleId: number) => SteamBundleDetails | null
 
 	/**
 	 * Upload image to ImgBB via background script
