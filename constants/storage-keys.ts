@@ -40,6 +40,8 @@ export const STORAGE_KEYS = {
 	EDITOR_PRESERVE: 'mvp-editor-preserve',
 	BOOKMARKS_VIEW_MODE: 'mvp-bookmarks-view-mode',
 	NATIVE_LIVE_DELAY: 'mvp-native-live-delay',
+	LIVE_THREAD_DELAY: 'mvp-live-thread-delay',
+	HOMEPAGE_RECENT_FORUMS: 'mvp-homepage-recent-forums',
 
 	// UI State
 	LIVE_PREVIEW_ENABLED: 'mvp-live-preview-enabled',

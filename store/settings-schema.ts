@@ -78,7 +78,9 @@ export const settingsSchema = z.object({
 	// Feature Toggles - Navigation
 	infiniteScrollEnabled: z.boolean().default(false),
 	liveThreadEnabled: z.boolean().default(false),
+	newHomepageEnabled: z.boolean().default(false),
 	nativeLiveDelayEnabled: z.boolean().default(true),
+	liveThreadDelayEnabled: z.boolean().default(true),
 
 	// Feature Toggles - Content
 	mediaHoverCardsEnabled: z.boolean().default(true),

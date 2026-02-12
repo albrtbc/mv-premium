@@ -39,6 +39,19 @@ import { toast } from '@/lib/lazy-toast'
 import { logger } from '@/lib/logger'
 
 export async function runContentMain(ctx: unknown): Promise<void> {
+	const pathname = window.location.pathname
+	const isHomepage = pathname === '/' || pathname === '' || /^\/p\d+$/.test(pathname)
+	const earlyHomepageModulePromise = (() => {
+		if (!isHomepage) return null
+
+		try {
+			const cachedEnabled = localStorage.getItem('mvp-new-homepage-enabled-cache') === 'true'
+			return cachedEnabled ? import('@/features/new-homepage') : null
+		} catch {
+			return null
+		}
+	})()
+
 	const showToastFromMessage = (text: string) => {
 		// Determine toast type from emoji prefix
 		if (text.startsWith('✅') || text.startsWith('🔇') || text.startsWith('📌')) {
@@ -108,6 +121,22 @@ export async function runContentMain(ctx: unknown): Promise<void> {
 	await waitForHydration()
 	initCrossTabSync()
 
+	const newHomepageEnabled = useSettingsStore.getState().newHomepageEnabled
+
+	// Keep cache in sync for the early homepage script
+	try {
+		localStorage.setItem('mvp-new-homepage-enabled-cache', String(newHomepageEnabled))
+	} catch {
+		// localStorage may be unavailable
+	}
+
+	// Fast path: inject homepage as early as possible (before other async init)
+	if (isHomepage && newHomepageEnabled) {
+		;(earlyHomepageModulePromise ?? import('@/features/new-homepage')).then(({ injectHomepage }) => {
+			injectHomepage()
+		})
+	}
+
 	// =====================================================================
 	// 2. DETECT AND SAVE CURRENT USER
 	// =====================================================================
@@ -133,8 +162,6 @@ export async function runContentMain(ctx: unknown): Promise<void> {
 	// 4. CALCULATE PAGE CONTEXT (once)
 	// Note: Mediavida is MPA, URL won't change without reload
 	// =====================================================================
-	const pathname = window.location.pathname
-	const isHomepage = pathname === '/' || pathname === ''
 	const isThread = isThreadPage()
 	const isCine = isCineForum()
 	const isFavorites = isFavoritesPage()
@@ -159,6 +186,17 @@ export async function runContentMain(ctx: unknown): Promise<void> {
 		isHomepage,
 		isForumRelated,
 		isMediaForum: isMediaForum(),
+	}
+
+	// Track forum visits for the custom homepage quick-access shortcuts
+	if (pathname.startsWith('/foro/')) {
+		const forumSlug = pathname.split('/')[2]
+		const excludedSlugs = new Set(['spy', 'top', 'unread', 'featured', 'new', 'favoritos', 'marcadores'])
+		if (forumSlug && !excludedSlugs.has(forumSlug)) {
+			import('@/features/new-homepage/lib/visited-forums').then(({ setLatestVisitedForum }) => {
+				void setLatestVisitedForum(forumSlug)
+			})
+		}
 	}
 
 	let isInjectionRunInFlight = false

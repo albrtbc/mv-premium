@@ -683,7 +683,7 @@ function queueBundleTask<T>(task: () => Promise<T>): Promise<T> {
 	})
 }
 
-function hasEnoughAjaxBundleData(details: SteamBundleDetails | null): boolean {
+function hasEnoughAjaxBundleData(details: SteamBundleDetails | null): details is SteamBundleDetails {
 	if (!details) return false
 
 	// If ajax already has pricing/discount data, the inline card can be rendered

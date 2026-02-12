@@ -34,6 +34,7 @@ export const FeatureFlag = {
 	// User-controlled Features (via settings)
 	InfiniteScroll: 'infinite-scroll',
 	LiveThread: 'live-thread',
+	NewHomepage: 'new-homepage',
 	MutedWords: 'muted-words',
 	NativeLiveDelay: 'native-live-delay',
 
@@ -80,6 +81,7 @@ const FEATURE_CONFIG: Record<FeatureFlagKey, FeatureConfig> = {
 	// User-controlled Features
 	[FeatureFlag.InfiniteScroll]: { settingsKey: 'infiniteScrollEnabled' },
 	[FeatureFlag.LiveThread]: { settingsKey: 'liveThreadEnabled' },
+	[FeatureFlag.NewHomepage]: { settingsKey: 'newHomepageEnabled' },
 	[FeatureFlag.MutedWords]: { settingsKey: 'mutedWordsEnabled' },
 	[FeatureFlag.NativeLiveDelay]: { settingsKey: 'nativeLiveDelayEnabled' },
 

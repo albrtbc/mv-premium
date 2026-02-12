@@ -27,6 +27,7 @@ export function SettingsNavigation() {
 		setLiveThreadEnabled,
 		galleryButtonEnabled,
 		nativeLiveDelayEnabled,
+		liveThreadDelayEnabled,
 		centeredPostsEnabled,
 		centeredControlsSticky,
 		setSetting,
@@ -151,8 +152,27 @@ export function SettingsNavigation() {
 
 			<SettingRow
 				icon={<Clock className="h-4 w-4" />}
-				label="Delay en LIVE nativos"
-				description="Añade un control de delay en los hilos LIVE nativos de Mediavida para evitar spoilers."
+				label="Delay en Live de MV Premium"
+				description="Añade un control de delay en el live propio de MV Premium para evitar spoilers."
+			>
+				<Switch
+					checked={liveThreadDelayEnabled}
+					onCheckedChange={(checked) => {
+						setSetting('liveThreadDelayEnabled', checked)
+						reloadMediavidaTabs()
+						toast.success(
+							checked ? 'Delay en Modo Live activado' : 'Configuración guardada'
+						)
+					}}
+				/>
+			</SettingRow>
+
+			<Separator />
+
+			<SettingRow
+				icon={<Clock className="h-4 w-4" />}
+				label="Delay en Live nativo de Mediavida"
+				description="Añade un control de delay en los hilos live nativos de Mediavida para evitar spoilers."
 			>
 				<Switch
 					checked={nativeLiveDelayEnabled}

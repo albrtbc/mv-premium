@@ -2,6 +2,7 @@
  * Features Content - Feature toggles
  */
 import Film from 'lucide-react/dist/esm/icons/film'
+import HomeIcon from 'lucide-react/dist/esm/icons/home'
 import { logger } from '@/lib/logger'
 import ImageIcon from 'lucide-react/dist/esm/icons/image-play'
 import Pin from 'lucide-react/dist/esm/icons/pin'
@@ -25,6 +26,7 @@ import { useSettingsStore } from '@/store/settings-store'
 export function FeaturesContent() {
 	const {
 		setSetting,
+		newHomepageEnabled,
 		navbarSearchEnabled,
 		cinemaButtonEnabled,
 		gameButtonEnabled,
@@ -56,6 +58,7 @@ export function FeaturesContent() {
 	const withToastAndReload =
 		(
 			key:
+				| 'newHomepageEnabled'
 				| 'navbarSearchEnabled'
 				| 'cinemaButtonEnabled'
 				| 'gameButtonEnabled'
@@ -92,6 +95,14 @@ export function FeaturesContent() {
 				<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Navegación</h3>
 				<p className="text-xs text-muted-foreground">Estos cambios requieren recargar las pestañas de Mediavida.</p>
 			</div>
+
+			<SettingRow
+				icon={<HomeIcon className="h-4 w-4" />}
+				label="Homepage de MV Premium"
+				description="Reemplaza la portada nativa por una homepage personalizada de MV Premium con noticias y actividad del foro."
+			>
+				<Switch checked={newHomepageEnabled} onCheckedChange={withToastAndReload('newHomepageEnabled', true)} />
+			</SettingRow>
 
 			<SettingRow
 				icon={<Search className="h-4 w-4" />}

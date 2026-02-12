@@ -62,8 +62,10 @@ export interface Settings {
 	infiniteScrollEnabled: boolean
 	autoInfiniteScrollEnabled: boolean
 	liveThreadEnabled: boolean
+	newHomepageEnabled: boolean
 	galleryButtonEnabled: boolean
 	nativeLiveDelayEnabled: boolean
+	liveThreadDelayEnabled: boolean
 	navbarSearchEnabled: boolean
 
 	// Feature Toggles - Editor

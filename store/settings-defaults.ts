@@ -37,7 +37,9 @@ export const DEFAULT_SETTINGS: Settings = {
 	infiniteScrollEnabled: false,
 	autoInfiniteScrollEnabled: false,
 	liveThreadEnabled: false,
+	newHomepageEnabled: false,
 	nativeLiveDelayEnabled: true,
+	liveThreadDelayEnabled: true,
 	galleryButtonEnabled: true,
 	navbarSearchEnabled: true,
 

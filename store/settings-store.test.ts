@@ -68,6 +68,10 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().liveThreadEnabled).toBe(false)
 		})
 
+		it('has live thread delay enabled by default', () => {
+			expect(useSettingsStore.getState().liveThreadDelayEnabled).toBe(true)
+		})
+
 		it('has empty API keys by default', () => {
 			const state = useSettingsStore.getState()
 			expect(state.imgbbApiKey).toBe('')
