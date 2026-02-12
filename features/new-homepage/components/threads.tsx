@@ -35,7 +35,6 @@ function ThreadItem(props: HomepageThread) {
 				<a
 					href={`/foro/${forumSlug}`}
 					title={`Ir a ${forumSlug}`}
-					className="hover:scale-125 transition duration-150"
 				>
 					<i className={clsx('fid', getIconClassBySlug(forumSlug))} />
 				</a>

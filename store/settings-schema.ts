@@ -72,7 +72,6 @@ export const settingsSchema = z.object({
 	nativeLiveDelayEnabled: z.boolean().default(true),
 
 	// Feature Toggles - Appearance
-	monospaceEnabled: z.boolean().default(false),
 	newHomepageEnabled: z.boolean().default(false),
 
 	// Feature Toggles - Users

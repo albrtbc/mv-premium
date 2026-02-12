@@ -48,10 +48,7 @@ export function Home({ onLoad }: { onLoad: () => void }) {
 
 	return (
 		<div className="pb-4">
-			<div className="flex items-end justify-between">
-				<h1>Noticias</h1>
-				<a href="/p2">Siguientes</a>
-			</div>
+			<h1>Noticias</h1>
 			<News.Root className="mt-3">
 				<News.NewsItemList threads={lastNews} loading={lastNewsPending} maxThreads={MAX_NEWS} />
 			</News.Root>
@@ -63,7 +60,6 @@ export function Home({ onLoad }: { onLoad: () => void }) {
 							{lastVisitedForums.slice(0, 8).map(forumSlug => (
 								<a
 									key={forumSlug}
-									className="hover:scale-125 duration-200 transition"
 									href={`/foro/${forumSlug}`}
 									title={forumSlug}
 								>

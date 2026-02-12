@@ -22,14 +22,14 @@ function NewsItem({ url, forumSlug, title, thumbnail, createdAt }: HomepageThrea
 		>
 			<div className="bg-mv-surface w-full p-2" style={{ minHeight: '48px' }}>
 				<div className="flex items-start gap-2">
-					<a className="hover:scale-125 duration-200 transition" href={`/foro/${forumSlug}`}>
+					<a href={`/foro/${forumSlug}`}>
 						<i className={clsx('fid', getIconClassBySlug(forumSlug))} />
 					</a>
 					<a href={url} title={title} className="text-sm font-medium line-clamp-2 hover:underline" style={{ minHeight: '40px' }}>
 						{title}
 					</a>
 				</div>
-				<div className="text-gray-400 dark:text-gray-600 text-right mt-2">{createdAt}</div>
+				<div className="text-right mt-2" style={{ color: 'var(--mvp-text-muted)' }}>{createdAt}</div>
 			</div>
 		</div>
 	)

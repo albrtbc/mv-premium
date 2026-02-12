@@ -50,7 +50,6 @@ export const DEFAULT_SETTINGS: Settings = {
 	postSummaryEnabled: true,
 	saveThreadEnabled: true,
 	// Feature Toggles - Appearance
-	monospaceEnabled: false,
 	newHomepageEnabled: false,
 
 	// Feature Toggles - Users

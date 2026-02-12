@@ -66,7 +66,6 @@ export interface Settings {
 	saveThreadEnabled: boolean
 
 	// Feature Toggles - Appearance
-	monospaceEnabled: boolean
 	newHomepageEnabled: boolean
 
 	// Feature Toggles - Users

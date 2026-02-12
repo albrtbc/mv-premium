@@ -22,8 +22,10 @@ const BADGE_ID = DOM_MARKERS.IDS.WHATS_NEW_BADGE
  * @returns HTML string for the icon
  */
 function getDashboardIconHTML(iconType: DashboardIcon): string {
-	const iconStyles = 'font-size: 18px; vertical-align: middle; transition: all 0.2s ease-in-out;'
-	
+	// Inline font-family ensures the icon is never overridden by the global custom font
+	// Use single quotes for font names to avoid breaking the HTML style="" attribute
+	const iconStyles = "font-family: 'FontAwesome', 'Font Awesome 6 Free', 'Font Awesome 5 Free' !important; font-size: 18px; vertical-align: middle; transition: all 0.2s ease-in-out;"
+
 	switch (iconType) {
 		case 'user-shield':
 			return `<i class="fa fa-shield mv-dashboard-icon" style="${iconStyles}"></i>`

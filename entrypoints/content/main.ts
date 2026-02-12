@@ -115,11 +115,6 @@ export async function runContentMain(ctx: unknown): Promise<void> {
 	// Initialize page width feature (applies max-width constraints if enabled)
 	await initUltrawide()
 
-	// Apply monospace font if enabled
-	if (useSettingsStore.getState().monospaceEnabled) {
-		document.documentElement.classList.add('mvp-monospace')
-	}
-
 	// =====================================================================
 	// 4. CALCULATE PAGE CONTEXT (once)
 	// Note: Mediavida is MPA, URL won't change without reload
