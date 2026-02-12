@@ -119,6 +119,7 @@ export const DOM_MARKERS = {
 		CENTERED_CONTROL_BAR: 'mvp-centered-control-bar',
 		USER_CUSTOMIZATIONS_STYLES: 'mvp-user-customizations-styles',
 		SUMMARIZER_BTN: 'mvp-summarizer-btn',
+		SUMMARIZER_MENU: 'mvp-summarizer-menu',
 		SUMMARIZER_MODAL: 'mvp-summarizer-modal-container',
 		MULTI_PAGE_SUMMARIZER_BTN: 'mvp-multi-page-summarizer-btn',
 		MULTI_PAGE_SUMMARIZER_MODAL: 'mvp-multi-page-summarizer-modal-container',

@@ -224,8 +224,7 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		}
 
 		if (threadSummarizer.status === 'fulfilled' && isFeatureEnabled(FeatureFlag.ThreadSummarizer)) {
-			threadSummarizer.value.injectSummarizerButton()
-			threadSummarizer.value.injectMultiPageSummarizerButton()
+			threadSummarizer.value.injectSummarizerMenu()
 		}
 
 		if (postSummary.status === 'fulfilled' && isFeatureEnabled(FeatureFlag.PostSummary)) {
