@@ -8,13 +8,14 @@
  * browser.storage.local is async and causes visual flash even at document_start.
  *
  * The main centered-posts feature (features/centered-posts/index.ts) handles:
- * - Control bar creation and element moving
+ * - Thread-only control bar creation and element moving
  * - Reactivity to setting changes
  * - Keeping localStorage cache in sync
  */
 import { defineContentScript } from '#imports'
 import { browser } from 'wxt/browser'
 import { EARLY_STYLE_IDS, RUNTIME_CACHE_KEYS, STORAGE_KEYS } from '@/constants'
+import { isCenteredPostsSupportedPage } from '@/lib/content-modules/utils/page-detection'
 
 interface SettingsState {
 	state: {
@@ -24,16 +25,6 @@ interface SettingsState {
 
 const STYLE_ID = EARLY_STYLE_IDS.CENTERED_POSTS
 const CACHE_KEY = RUNTIME_CACHE_KEYS.CENTERED_POSTS
-
-/**
- * Check if current page is a thread page
- * Pattern: /foro/{subforum}/{thread-slug}
- */
-function isThreadPage(): boolean {
-	const pathname = window.location.pathname
-	const segments = pathname.split('/').filter(Boolean)
-	return segments.length >= 3 && segments[0] === 'foro'
-}
 
 /**
  * CSS selectors for Mediavida layout elements
@@ -172,11 +163,11 @@ function updateCache(enabled: boolean): void {
 }
 
 export default defineContentScript({
-	matches: ['*://www.mediavida.com/foro/*/*'],
+	matches: ['*://www.mediavida.com/foro/*'],
 	runAt: 'document_start',
 
 	main() {
-		if (!isThreadPage()) {
+		if (!isCenteredPostsSupportedPage()) {
 			return
 		}
 

@@ -2,35 +2,61 @@
  * Centered Posts Mode Feature
  *
  * Hides the sidebar (.c-side) and expands posts to full width.
- * Relocates critical controls to a horizontal bar below the thread title.
+ * On thread pages, it also relocates critical controls to a horizontal bar.
  *
- * Only active on thread pages when enabled.
+ * Active on:
+ * - Thread pages (full mode with control bar)
+ * - Spy and subforum listing pages (layout-only mode)
  */
 
 import { storage } from '@wxt-dev/storage'
 import { logger } from '@/lib/logger'
 import { STORAGE_KEYS, MV_SELECTORS, EARLY_STYLE_IDS, RUNTIME_CACHE_KEYS } from '@/constants'
 import { DOM_MARKERS } from '@/constants/dom-markers'
+import { getCenteredPostsPageKind, type CenteredPostsPageKind } from '@/lib/content-modules/utils/page-detection'
 
 const STYLE_ID = DOM_MARKERS.IDS.CENTERED_POSTS_STYLES
 const EARLY_STYLE_ID = EARLY_STYLE_IDS.CENTERED_POSTS
 const CONTROL_BAR_ID = DOM_MARKERS.IDS.CENTERED_CONTROL_BAR
 const CACHE_KEY = RUNTIME_CACHE_KEYS.CENTERED_POSTS
 const SETTINGS_KEY = `local:${STORAGE_KEYS.SETTINGS}` as `local:${string}`
+const SIDE_LAYOUT_MIN_WIDTH = 1500
+const RESIZE_DEBOUNCE_MS = 120
+const SIDE_BAR_GAP_PX = 12
+const SIDE_TOP_OFFSET_PX = 92
+const SIDE_MIN_INSET_PX = 12
+const SIDE_TOP_MIN_PX = 66
+const SIDE_BAR_FALLBACK_WIDTH_PX = 332
+const SIDE_BAR_MIN_WIDTH_PX = 220
+const SIDE_BAR_MAX_WIDTH_PX = 420
+
+type ControlBarPosition = 'top' | 'side'
+
+let requestedEnabled = false
+let requestedSticky = false
+let requestedPosition: ControlBarPosition = 'top'
+let appliedPosition: ControlBarPosition | null = null
+let resizeDebounceId: number | undefined
+let resizeListenerInitialized = false
+let resizeRafId: number | undefined
+let cachedSidebarWidthPx = SIDE_BAR_FALLBACK_WIDTH_PX
+let sideStableTopPx: number | null = null
 
 interface SettingsState {
 	state: {
 		centeredPostsEnabled: boolean
 		centeredControlsSticky: boolean
+		centeredControlsPosition?: ControlBarPosition
 	}
 }
 
 /**
  * CSS styles to hide sidebar and expand posts
  * Uses 100% width - no dynamic calculations to prevent layout shift
- * @param sticky - Whether the control bar should be sticky
+ * @param sticky - Whether the control bar should be sticky (top mode only)
+ * @param position - Position mode for the control bar
  */
-function generateStyles(sticky: boolean): string {
+function generateStyles(sticky: boolean, position: ControlBarPosition): string {
 	return `
 		/* MVP Centered Posts Mode */
 
@@ -160,8 +186,9 @@ function generateStyles(sticky: boolean): string {
 			margin-top: 16px !important;
 			margin-bottom: 20px !important;
 			width: 100% !important;
-			background: var(--mv-bg-alt, #1e1e1e);
-			border: 1px solid rgba(128, 128, 128, 0.15);
+			background: var(--card, #1e1e1e);
+			color: var(--card-foreground, #e7e9ea);
+			border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
 			border-radius: var(--radius, 8px);
 			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 			box-sizing: border-box !important;
@@ -189,7 +216,7 @@ function generateStyles(sticky: boolean): string {
 		#${CONTROL_BAR_ID} .mvp-control-separator {
 			width: 1px;
 			height: 24px;
-			background: rgba(128, 128, 128, 0.25);
+			background: color-mix(in srgb, var(--border, rgba(128, 128, 128, 0.3)) 80%, transparent);
 			flex-shrink: 0;
 		}
 
@@ -227,9 +254,22 @@ function generateStyles(sticky: boolean): string {
 			display: flex !important;
 			flex-direction: row !important;
 			align-items: center !important;
+			flex-wrap: nowrap !important;
 			gap: 10px;
 			margin: 0 !important;
+			width: auto !important;
+			max-width: fit-content !important;
 			border: none !important;
+		}
+
+		/* Keep nav controls compact in top mode to avoid wrapping to next line */
+		#${CONTROL_BAR_ID} .mvp-nav-group {
+			min-width: 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-nav .pull-right,
+		#${CONTROL_BAR_ID} #topic-nav a.btn-fid {
+			display: none !important;
 		}
 
 		/* =====================================================
@@ -248,6 +288,7 @@ function generateStyles(sticky: boolean): string {
 			padding-top: 0 !important;
 			border: none !important;
 			border-top: none !important;
+			width: auto !important;
 		}
 
 		/* Main actions row (Gallery, Save, Summarize) */
@@ -256,6 +297,7 @@ function generateStyles(sticky: boolean): string {
 			flex-direction: row !important;
 			align-items: center !important;
 			gap: 6px;
+			width: auto !important;
 		}
 
 		/* Hide the separator inside control bar */
@@ -269,6 +311,7 @@ function generateStyles(sticky: boolean): string {
 			flex-direction: row !important;
 			align-items: center !important;
 			gap: 6px;
+			width: auto !important;
 		}
 
 		/* =====================================================
@@ -294,6 +337,187 @@ function generateStyles(sticky: boolean): string {
 			cursor: pointer !important;
 		}
 
+		${
+			position === 'side'
+				? `
+		/* =====================================================
+		   Side Mode - Floating rail (does not consume thread width)
+		   ===================================================== */
+		#${CONTROL_BAR_ID} {
+			position: fixed !important;
+			top: ${SIDE_TOP_OFFSET_PX}px !important;
+			left: calc(100vw - ${SIDE_BAR_FALLBACK_WIDTH_PX + SIDE_MIN_INSET_PX}px) !important;
+			right: auto !important;
+			transform: none !important;
+			z-index: 120 !important;
+			width: ${SIDE_BAR_FALLBACK_WIDTH_PX}px !important;
+			max-width: min(${SIDE_BAR_MAX_WIDTH_PX}px, calc(100vw - ${SIDE_MIN_INSET_PX * 2}px)) !important;
+			margin: 0 !important;
+			margin-top: 0 !important;
+			margin-bottom: 0 !important;
+			padding: 0 !important;
+			flex-direction: column !important;
+			flex-wrap: nowrap !important;
+			align-items: stretch !important;
+			gap: 0 !important;
+			max-height: calc(100vh - 100px) !important;
+			overflow-y: auto !important;
+			overflow-x: hidden !important;
+			background: transparent !important;
+			color: inherit !important;
+			border: none !important;
+			border-radius: 0 !important;
+			box-shadow: none !important;
+		}
+
+		#${CONTROL_BAR_ID} .mvp-control-group {
+			display: block !important;
+			width: 100% !important;
+		}
+
+		#${CONTROL_BAR_ID} .mvp-control-separator {
+			width: 100%;
+			height: 1px;
+			margin: 10px 0;
+			background: color-mix(in srgb, var(--border, #30353a) 80%, transparent);
+		}
+
+		#${CONTROL_BAR_ID} .mvp-reply-group + .mvp-control-separator {
+			display: none !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-reply,
+		#${CONTROL_BAR_ID} #more-actions,
+		#${CONTROL_BAR_ID} #topic-nav {
+			display: block !important;
+			width: 100% !important;
+			padding: 0 !important;
+			border: none !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-reply,
+		#${CONTROL_BAR_ID} #more-actions {
+			margin: 0 !important;
+			padding: 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #more-actions {
+			margin-top: 10px !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-reply a,
+		#${CONTROL_BAR_ID} #more-actions > a,
+		#${CONTROL_BAR_ID} #more-actions .post-btn {
+			margin-right: 3px !important;
+			margin-bottom: 3px !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-reply a:last-child,
+		#${CONTROL_BAR_ID} #more-actions > a:last-child,
+		#${CONTROL_BAR_ID} #more-actions .post-btn:last-child {
+			margin-right: 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-reply a > i,
+		#${CONTROL_BAR_ID} #more-actions > a > i,
+		#${CONTROL_BAR_ID} #more-actions .post-btn > i {
+			margin-right: 5px !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.MAIN_ACTIONS} #${DOM_MARKERS.IDS.GALLERY_BTN} {
+			display: inline-flex !important;
+			order: 99 !important;
+			flex-basis: auto !important;
+			align-self: flex-start !important;
+			width: auto !important;
+			max-width: none !important;
+			margin-top: 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-nav a {
+			display: inline-flex !important;
+			align-items: center !important;
+			justify-content: center !important;
+			float: none !important;
+			margin: 0 8px 0 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-nav a:last-child {
+			margin-right: 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-nav a.btn-fid,
+		#${CONTROL_BAR_ID} #topic-nav .pull-right {
+			display: none !important;
+		}
+
+		#${CONTROL_BAR_ID} #topic-reply,
+		#${CONTROL_BAR_ID} #more-actions,
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.EXTRA_ACTIONS},
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.MAIN_ACTIONS},
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.STATUS_ACTIONS} {
+			text-align: left !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.EXTRA_ACTIONS} {
+			display: flex !important;
+			flex-direction: column !important;
+			align-items: stretch !important;
+			gap: 8px !important;
+			margin-top: 12px !important;
+			padding-top: 12px !important;
+			border-top: 1px solid rgba(128, 128, 128, 0.2) !important;
+			width: 100% !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.MAIN_ACTIONS} {
+			display: flex !important;
+			flex-wrap: wrap !important;
+			align-items: center !important;
+			justify-content: flex-start !important;
+			align-content: flex-start !important;
+			width: 100% !important;
+			gap: 4px !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.MAIN_ACTIONS} > * {
+			flex: 0 0 auto !important;
+			margin: 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.EXTRA_ACTIONS_SEPARATOR} {
+			display: none !important;
+			border-top: 1px solid rgba(128, 128, 128, 0.1) !important;
+			margin: 0 !important;
+			width: 100% !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.EXTRA_ACTIONS}:has(#${DOM_MARKERS.IDS.STATUS_ACTIONS} > *) #${DOM_MARKERS.IDS.EXTRA_ACTIONS_SEPARATOR} {
+			display: block !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.STATUS_ACTIONS} {
+			display: flex !important;
+			flex-wrap: wrap !important;
+			align-items: center !important;
+			justify-content: flex-start !important;
+			align-content: flex-start !important;
+			gap: 6px !important;
+			width: 100% !important;
+			margin: 0 !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.SAVE_THREAD_CONTAINER} .mvp-save-thread-label {
+			display: none !important;
+		}
+
+		#${CONTROL_BAR_ID} #${DOM_MARKERS.IDS.SAVE_THREAD_CONTAINER} i {
+			margin-right: 0 !important;
+		}
+		`
+				: ''
+		}
+
 		/* 8. Side navigation - align with content edge (always, not just when affix) */
 		#side-nav {
 			transform: translateX(-11px) !important;
@@ -314,6 +538,96 @@ function updateCache(enabled: boolean): void {
 	} catch {
 		// localStorage might be disabled
 	}
+}
+
+function resolveControlBarPosition(
+	requested: ControlBarPosition,
+	pageKind: CenteredPostsPageKind
+): ControlBarPosition {
+	if (pageKind !== 'thread') return 'top'
+	if (requested !== 'side') return 'top'
+	return window.innerWidth >= SIDE_LAYOUT_MIN_WIDTH ? 'side' : 'top'
+}
+
+function getPrimaryThreadContainer(): HTMLElement | null {
+	return (
+		document.querySelector<HTMLElement>('#topic') ||
+		document.querySelector<HTMLElement>('#posts-wrap') ||
+		document.querySelector<HTMLElement>(MV_SELECTORS.GLOBAL.MAIN_CONTENT)
+	)
+}
+
+function getFirstThreadPost(): HTMLElement | null {
+	return (
+		document.querySelector<HTMLElement>('#posts-wrap > .post') ||
+		document.querySelector<HTMLElement>('#posts-wrap .post')
+	)
+}
+
+function clampSidebarWidth(widthPx: number): number {
+	return Math.max(SIDE_BAR_MIN_WIDTH_PX, Math.min(SIDE_BAR_MAX_WIDTH_PX, Math.round(widthPx)))
+}
+
+function measureNativeSidebarWidth(): number {
+	const sidebar = document.querySelector<HTMLElement>(MV_SELECTORS.GLOBAL.C_SIDE)
+	if (!sidebar) return cachedSidebarWidthPx
+
+	const rectWidth = sidebar.getBoundingClientRect().width
+	const computedStyle = window.getComputedStyle(sidebar)
+	const cssWidth = Number.parseFloat(computedStyle.width)
+	const cssBasis = Number.parseFloat(computedStyle.flexBasis)
+
+	const measuredWidth = [rectWidth, cssWidth, cssBasis].find(value => Number.isFinite(value) && value > 0)
+	if (measuredWidth) {
+		cachedSidebarWidthPx = clampSidebarWidth(measuredWidth)
+	}
+
+	return cachedSidebarWidthPx
+}
+
+function positionSideControlBar(): void {
+	if (appliedPosition !== 'side') return
+
+	const bar = document.getElementById(CONTROL_BAR_ID) as HTMLElement | null
+	const container = getPrimaryThreadContainer()
+	if (!bar || !container) return
+
+	const containerRect = container.getBoundingClientRect()
+	const firstPostRect = getFirstThreadPost()?.getBoundingClientRect()
+	const anchorRect = firstPostRect ?? containerRect
+	const measuredSidebarWidth = measureNativeSidebarWidth()
+	const maxWidthByViewport = Math.max(SIDE_BAR_MIN_WIDTH_PX, window.innerWidth - SIDE_MIN_INSET_PX * 2)
+	const targetWidth = Math.min(measuredSidebarWidth, maxWidthByViewport)
+
+	bar.style.setProperty('width', `${targetWidth}px`, 'important')
+	bar.style.setProperty('max-width', `${targetWidth}px`, 'important')
+
+	const barRect = bar.getBoundingClientRect()
+	const barWidth = Math.max(SIDE_BAR_MIN_WIDTH_PX, Math.round(barRect.width))
+	const preferredLeft = Math.round(anchorRect.right + SIDE_BAR_GAP_PX)
+	const maxLeft = Math.round(window.innerWidth - barWidth - SIDE_MIN_INSET_PX)
+	const clampedLeft = Math.max(SIDE_MIN_INSET_PX, Math.min(preferredLeft, maxLeft))
+
+	const barHeight = Math.max(160, Math.round(barRect.height))
+	const maxTop = Math.max(SIDE_MIN_INSET_PX, window.innerHeight - barHeight - SIDE_MIN_INSET_PX)
+	const measuredTop = firstPostRect ? Math.round(firstPostRect.top + 2) : SIDE_TOP_OFFSET_PX
+	const normalizedMeasuredTop = Math.max(SIDE_TOP_MIN_PX, measuredTop)
+	if (sideStableTopPx === null || normalizedMeasuredTop > sideStableTopPx) {
+		sideStableTopPx = normalizedMeasuredTop
+	}
+	const preferredTop = sideStableTopPx ?? normalizedMeasuredTop
+	const clampedTop = Math.max(SIDE_TOP_MIN_PX, Math.min(preferredTop, maxTop))
+
+	bar.style.left = `${clampedLeft}px`
+	bar.style.right = 'auto'
+	bar.style.top = `${clampedTop}px`
+	bar.style.transform = 'none'
+
+	// Override side-mode fallback CSS rules that use !important.
+	bar.style.setProperty('left', `${clampedLeft}px`, 'important')
+	bar.style.setProperty('right', 'auto', 'important')
+	bar.style.setProperty('top', `${clampedTop}px`, 'important')
+	bar.style.setProperty('transform', 'none', 'important')
 }
 
 /**
@@ -396,7 +710,7 @@ function createControlBar(): HTMLElement {
 /**
  * Injects the control bar into the page
  */
-function injectControlBar(): void {
+function injectControlBar(position: ControlBarPosition): void {
 	// Remove existing bar if present (and restore elements first!)
 	const existingBar = document.getElementById(CONTROL_BAR_ID)
 	if (existingBar) {
@@ -429,10 +743,18 @@ function injectControlBar(): void {
 	// Clean up inline styles from MVP containers that were designed for sidebar
 	const extraActions = bar.querySelector<HTMLElement>(`#${DOM_MARKERS.IDS.EXTRA_ACTIONS}`)
 	if (extraActions) {
-		extraActions.style.borderTop = 'none'
-		extraActions.style.marginTop = '0'
-		extraActions.style.paddingTop = '0'
-		extraActions.style.flexDirection = 'row'
+		if (position === 'side') {
+			// Preserve native sidebar-like spacing in side mode.
+			extraActions.style.borderTop = '1px solid rgba(128, 128, 128, 0.2)'
+			extraActions.style.marginTop = '12px'
+			extraActions.style.paddingTop = '12px'
+			extraActions.style.flexDirection = 'column'
+		} else {
+			extraActions.style.borderTop = 'none'
+			extraActions.style.marginTop = '0'
+			extraActions.style.paddingTop = '0'
+			extraActions.style.flexDirection = 'row'
+		}
 	}
 }
 
@@ -474,15 +796,91 @@ function removeControlBar(): void {
 }
 
 /**
+ * Reacts to viewport changes when side mode is enabled.
+ * If there is not enough lateral space, the bar falls back to top mode.
+ */
+function initResponsivePositionListener(): void {
+	if (resizeListenerInitialized) return
+	resizeListenerInitialized = true
+
+	window.addEventListener('resize', () => {
+		if (!requestedEnabled || requestedPosition !== 'side') return
+
+		const pageKind = getCenteredPostsPageKind()
+		if (pageKind !== 'thread') return
+
+		// Reposition immediately while resizing to avoid temporary overlap over posts.
+		if (resizeRafId) {
+			window.cancelAnimationFrame(resizeRafId)
+		}
+		resizeRafId = window.requestAnimationFrame(() => {
+			resizeRafId = undefined
+			const nextPosition = resolveControlBarPosition(requestedPosition, pageKind)
+			const bar = document.getElementById(CONTROL_BAR_ID) as HTMLElement | null
+
+			if (nextPosition === 'side') {
+				if (bar) {
+					bar.style.removeProperty('visibility')
+					bar.style.removeProperty('pointer-events')
+				}
+				if (appliedPosition === 'side') {
+					positionSideControlBar()
+				}
+				return
+			}
+
+			// While waiting for debounced mode switch (side -> top), hide the rail.
+			if (bar && appliedPosition === 'side') {
+				bar.style.setProperty('visibility', 'hidden', 'important')
+				bar.style.setProperty('pointer-events', 'none', 'important')
+			}
+		})
+
+		if (resizeDebounceId) {
+			window.clearTimeout(resizeDebounceId)
+		}
+
+		resizeDebounceId = window.setTimeout(() => {
+			const nextPosition = resolveControlBarPosition(requestedPosition, pageKind)
+			const bar = document.getElementById(CONTROL_BAR_ID) as HTMLElement | null
+			if (bar) {
+				bar.style.removeProperty('visibility')
+				bar.style.removeProperty('pointer-events')
+			}
+
+			if (nextPosition === appliedPosition) {
+				if (nextPosition === 'side') {
+					positionSideControlBar()
+				}
+				return
+			}
+
+			applyCenteredPosts(requestedEnabled, requestedSticky, requestedPosition)
+		}, RESIZE_DEBOUNCE_MS)
+	})
+}
+
+/**
  * Applies or removes the centered posts mode
  * @param enabled - Whether to enable centered posts
  * @param sticky - Whether the control bar should be sticky
+ * @param requestedControlPosition - Desired control bar placement
  */
-function applyCenteredPosts(enabled: boolean, sticky: boolean = false): void {
+function applyCenteredPosts(
+	enabled: boolean,
+	sticky: boolean = false,
+	requestedControlPosition: ControlBarPosition = 'top'
+): void {
 	logger.debug('CenteredPosts: applyCenteredPosts called with enabled =', enabled)
+	requestedEnabled = enabled
+	requestedSticky = sticky
+	requestedPosition = requestedControlPosition
 
 	// Update cache for next page load
 	updateCache(enabled)
+
+	const pageKind = getCenteredPostsPageKind()
+	const isSupportedPage = pageKind !== 'unsupported'
 
 	// Remove existing styles (both main and early-inject to avoid duplication)
 	const existingStyle = document.getElementById(STYLE_ID)
@@ -495,21 +893,54 @@ function applyCenteredPosts(enabled: boolean, sticky: boolean = false): void {
 		earlyStyle.remove()
 	}
 
-	if (!enabled) {
+	if (!enabled || !isSupportedPage) {
+		if (resizeDebounceId) {
+			window.clearTimeout(resizeDebounceId)
+			resizeDebounceId = undefined
+		}
+		if (resizeRafId) {
+			window.cancelAnimationFrame(resizeRafId)
+			resizeRafId = undefined
+		}
+		appliedPosition = null
+		sideStableTopPx = null
 		removeControlBar()
 		return
+	}
+
+	const resolvedPosition = resolveControlBarPosition(requestedControlPosition, pageKind)
+	if (resolvedPosition === 'side') {
+		sideStableTopPx = null
+		measureNativeSidebarWidth()
+	} else {
+		sideStableTopPx = null
 	}
 
 	// Create and inject styles
 	const styleEl = document.createElement('style')
 	styleEl.id = STYLE_ID
-	styleEl.textContent = generateStyles(sticky)
+	styleEl.textContent = generateStyles(sticky, resolvedPosition)
 	document.head.appendChild(styleEl)
 	logger.debug('CenteredPosts: Stylesheet injected with id', STYLE_ID)
 
-	// Inject control bar by MOVING native sidebar elements
-	// This preserves all event listeners since we move, not clone
-	injectControlBar()
+	if (pageKind === 'thread') {
+		// Inject control bar by MOVING native sidebar elements
+		// This preserves all event listeners since we move, not clone
+		injectControlBar(resolvedPosition)
+		appliedPosition = resolvedPosition
+
+		if (resolvedPosition === 'side') {
+			positionSideControlBar()
+			requestAnimationFrame(() => positionSideControlBar())
+			window.setTimeout(() => positionSideControlBar(), 220)
+			window.setTimeout(() => positionSideControlBar(), 900)
+		}
+		return
+	}
+
+	// Listing mode: apply layout styles only (no control bar relocation)
+	appliedPosition = null
+	removeControlBar()
 }
 
 /**
@@ -517,6 +948,8 @@ function applyCenteredPosts(enabled: boolean, sticky: boolean = false): void {
  */
 export async function initCenteredPosts(): Promise<void> {
 	try {
+		initResponsivePositionListener()
+
 		// Get initial settings
 		const raw = await storage.getItem<string | SettingsState>(SETTINGS_KEY)
 
@@ -524,7 +957,8 @@ export async function initCenteredPosts(): Promise<void> {
 			const parsed: SettingsState = typeof raw === 'string' ? JSON.parse(raw) : raw
 			const enabled = parsed?.state?.centeredPostsEnabled ?? false
 			const sticky = parsed?.state?.centeredControlsSticky ?? false
-			applyCenteredPosts(enabled, sticky)
+			const position: ControlBarPosition = parsed?.state?.centeredControlsPosition === 'side' ? 'side' : 'top'
+			applyCenteredPosts(enabled, sticky, position)
 		}
 
 		// Watch for changes
@@ -535,7 +969,8 @@ export async function initCenteredPosts(): Promise<void> {
 				const parsed: SettingsState = typeof newValue === 'string' ? JSON.parse(newValue) : newValue
 				const enabled = parsed?.state?.centeredPostsEnabled ?? false
 				const sticky = parsed?.state?.centeredControlsSticky ?? false
-				applyCenteredPosts(enabled, sticky)
+				const position: ControlBarPosition = parsed?.state?.centeredControlsPosition === 'side' ? 'side' : 'top'
+				applyCenteredPosts(enabled, sticky, position)
 			} catch (e) {
 				logger.error('CenteredPosts error parsing settings:', e)
 			}

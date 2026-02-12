@@ -17,6 +17,7 @@ import {
 	isCineForum,
 	isFavoritesPage,
 	isForumGlobalViewPage,
+	isCenteredPostsSupportedPage,
 	isBookmarksPage,
 	isForumListPage,
 	isSubforumPage,
@@ -288,8 +289,12 @@ export async function runContentMain(ctx: unknown): Promise<void> {
 
 		// Initialize user card button injection
 		initUserCardInjector()
+	}
 
-		// Initialize centered posts mode (hides sidebar, expands posts)
+	// Initialize centered posts mode:
+	// - thread pages: full mode (control bar + layout)
+	// - spy/subforum pages: layout-only mode (hide sidebar + expand content)
+	if (isCenteredPostsSupportedPage()) {
 		await initCenteredPosts()
 	}
 
