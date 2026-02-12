@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { logger } from '@/lib/logger'
 import { isThreadSaved, toggleSaveThread, watchSavedThreads } from '../logic/storage'
+import { showSavedThreadToggledToast, showSaveThreadErrorToast } from '../logic/save-toast'
 
 export function SaveThreadButton() {
 	const [isSaved, setIsSaved] = useState(false)
@@ -34,8 +35,10 @@ export function SaveThreadButton() {
 		try {
 			const nowSaved = await toggleSaveThread()
 			setIsSaved(nowSaved)
+			showSavedThreadToggledToast(nowSaved)
 		} catch (error) {
 			logger.error('Error toggling save state:', error)
+			showSaveThreadErrorToast()
 		}
 	}, [isLoading])
 

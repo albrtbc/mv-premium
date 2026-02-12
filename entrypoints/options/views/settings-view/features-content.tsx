@@ -11,6 +11,7 @@ import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Layout from 'lucide-react/dist/esm/icons/layout'
 import List from 'lucide-react/dist/esm/icons/list'
 import FolderHeart from 'lucide-react/dist/esm/icons/folder-heart'
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import Search from 'lucide-react/dist/esm/icons/search'
 import Gamepad2 from 'lucide-react/dist/esm/icons/gamepad-2'
@@ -39,6 +40,7 @@ export function FeaturesContent() {
 		threadSummarizerEnabled,
 		postSummaryEnabled,
 		saveThreadEnabled,
+		hideThreadEnabled,
 	} = useSettingsStore()
 
 	const reloadMediavidaTabs = async () => {
@@ -70,7 +72,8 @@ export function FeaturesContent() {
 				| 'pinnedPostsEnabled'
 				| 'threadSummarizerEnabled'
 				| 'postSummaryEnabled'
-				| 'saveThreadEnabled',
+				| 'saveThreadEnabled'
+				| 'hideThreadEnabled',
 			requiresReload: boolean = false
 		) =>
 		async (val: boolean) => {
@@ -234,6 +237,14 @@ export function FeaturesContent() {
 				description="Añade un botón para guardar hilos localmente y leerlos después."
 			>
 				<Switch checked={saveThreadEnabled} onCheckedChange={withToastAndReload('saveThreadEnabled', true)} />
+			</SettingRow>
+
+			<SettingRow
+				icon={<EyeOff className="h-4 w-4" />}
+				label="Ocultar Hilos"
+				description="Muestra los botones para ocultar hilos y la opción de ocultar hilos con click derecho."
+			>
+				<Switch checked={hideThreadEnabled} onCheckedChange={withToastAndReload('hideThreadEnabled', true)} />
 			</SettingRow>
 		</SettingsSection>
 	)

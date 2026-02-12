@@ -1,4 +1,4 @@
-import { slugToName, slugToTitle } from '@/lib/url-helpers'
+import { extractThreadNumericId, slugToName, slugToTitle } from '@/lib/url-helpers'
 
 const THREAD_PATH_REGEX = /^\/foro\/[^/]+\/[^/]+-\d+/
 const MV_BASE_URL = 'https://www.mediavida.com'
@@ -73,4 +73,34 @@ export function extractThreadPathFromRow(row: Element): string | null {
 	if (!threadLink) return null
 
 	return normalizeThreadPath(threadLink.getAttribute('href') || threadLink.href)
+}
+
+/**
+ * Builds a Set of numeric thread IDs from a collection of normalized thread paths.
+ * Used as a fallback matching mechanism when URL slugs differ slightly
+ * (e.g., news section uses `11-feb` while subforum uses `11feb`).
+ */
+export function buildHiddenNumericIds(hiddenPaths: Iterable<string>): Set<number> {
+	const ids = new Set<number>()
+	for (const path of hiddenPaths) {
+		const numId = extractThreadNumericId(path)
+		if (numId !== null) ids.add(numId)
+	}
+	return ids
+}
+
+/**
+ * Checks if a thread URL matches any hidden thread by full path or numeric ID fallback.
+ */
+export function isThreadUrlHidden(
+	url: string,
+	hiddenPaths: Set<string>,
+	hiddenNumericIds: Set<number>,
+): boolean {
+	const path = normalizeThreadPath(url)
+	if (!path) return false
+	if (hiddenPaths.has(path)) return true
+
+	const numericId = extractThreadNumericId(path)
+	return numericId !== null && hiddenNumericIds.has(numericId)
 }

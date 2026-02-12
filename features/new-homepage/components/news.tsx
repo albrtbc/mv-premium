@@ -1,5 +1,7 @@
 import { clsx } from 'clsx'
 import type { CSSProperties, PropsWithChildren } from 'react'
+import Bookmark from 'lucide-react/dist/esm/icons/bookmark'
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
 import { NativeFidIcon } from '@/components/native-fid-icon'
 import { getSubforumIconId } from '@/lib/subforums'
 import type { HomepageNewsItem } from '../types'
@@ -15,8 +17,18 @@ function NewsRoot({ children, className }: PropsWithChildren<{ className?: strin
 	return <div className={clsx('grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-5', className)}>{children}</div>
 }
 
-function NewsItem({ url, forumSlug, title, thumbnail, createdAt }: HomepageNewsItem) {
+function NewsItem({
+	url,
+	forumSlug,
+	title,
+	thumbnail,
+	createdAt,
+	onHide,
+	onSave,
+	isSaved,
+}: HomepageNewsItem & { onHide?: (url: string) => void; onSave?: (url: string) => void; isSaved?: (url: string) => boolean }) {
 	const forumIconId = getSubforumIconId(forumSlug)
+	const threadIsSaved = isSaved?.(url) ?? false
 
 	return (
 		<a
@@ -25,13 +37,53 @@ function NewsItem({ url, forumSlug, title, thumbnail, createdAt }: HomepageNewsI
 		>
 			{/* Image Section - Top (16:9) */}
 			<div
-				className="aspect-video w-full bg-cover bg-center transition-transform duration-500 group-hover:opacity-90"
+				className="aspect-video w-full bg-cover bg-center transition-transform duration-500 group-hover:opacity-90 relative"
 				style={
 					thumbnail
 						? { backgroundImage: `url(${thumbnail})` }
 						: { backgroundColor: 'var(--mv-bg-tertiary)' }
 				}
-			/>
+			>
+				{/* Thread action buttons (Visible on Hover) */}
+				{(onSave || onHide) && (
+					<div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+						{onSave && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.preventDefault()
+									e.stopPropagation()
+									onSave(url)
+								}}
+								className={clsx(
+									'flex h-7 w-7 items-center justify-center rounded bg-black/50 backdrop-blur-sm hover:bg-black/70',
+									threadIsSaved ? 'text-amber-300' : 'text-white'
+								)}
+								title={threadIsSaved ? 'Quitar de guardados' : 'Guardar hilo'}
+								aria-label={threadIsSaved ? 'Quitar de guardados' : 'Guardar hilo'}
+								aria-pressed={threadIsSaved}
+							>
+								<Bookmark className={clsx('h-4 w-4', threadIsSaved && 'fill-current')} />
+							</button>
+						)}
+						{onHide && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.preventDefault()
+									e.stopPropagation()
+									onHide(url)
+								}}
+								className="flex h-7 w-7 items-center justify-center rounded bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
+								title="Ocultar hilo"
+								aria-label="Ocultar hilo"
+							>
+								<EyeOff className="h-4 w-4" />
+							</button>
+						)}
+					</div>
+				)}
+			</div>
 
 			{/* Content Section - Bottom */}
 			<div className="flex flex-1 flex-col justify-between bg-table-row p-3">
@@ -46,7 +98,7 @@ function NewsItem({ url, forumSlug, title, thumbnail, createdAt }: HomepageNewsI
 					</div>
 					<div className="min-w-0 flex-1">
 						<h3
-							className="h-8 text-xs font-semibold leading-tight text-white/90 group-hover:text-white"
+							className="h-8 text-xs font-semibold leading-tight text-white/90 transition-colors group-hover:text-primary"
 							style={TWO_LINE_CLAMP_STYLE}
 							title={title}
 						>
@@ -72,16 +124,22 @@ function NewsItemList({
 	threads,
 	loading,
 	maxThreads,
+	onHide,
+	onSave,
+	isSaved,
 }: {
 	threads?: HomepageNewsItem[]
 	loading: boolean
 	maxThreads: number
+	onHide?: (url: string) => void
+	onSave?: (url: string) => void
+	isSaved?: (url: string) => boolean
 }) {
 	if (loading && (!threads || threads.length === 0)) {
 		return <>{Array.from({ length: maxThreads }, (_, i) => <NewsItemSkeleton key={i} />)}</>
 	}
 
-	return <>{threads?.slice(0, maxThreads).map(thread => <NewsItem key={thread.url} {...thread} />)}</>
+	return <>{threads?.slice(0, maxThreads).map(thread => <NewsItem key={thread.url} {...thread} onHide={onHide} onSave={onSave} isSaved={isSaved} />)}</>
 }
 
 export const News = {

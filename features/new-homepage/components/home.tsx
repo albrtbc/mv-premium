@@ -1,9 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { logger } from '@/lib/logger'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import Clock3 from 'lucide-react/dist/esm/icons/clock-3'
+import { toast } from 'sonner'
 import { NativeFidIcon } from '@/components/native-fid-icon'
+import { logger } from '@/lib/logger'
 import { getFavorites, getForumLastThreads, getLastNews, getUserLastPosts, getUsername } from '../logic/data'
 import { getLatestVisitedForums } from '../lib/visited-forums'
+import { getHiddenThreads, hideThreadFromUrl, watchHiddenThreads, type HiddenThread } from '@/features/hidden-threads/logic/storage'
+import { buildHiddenNumericIds, isThreadUrlHidden, normalizeThreadPath } from '@/features/hidden-threads/logic/thread-utils'
+import { getSavedThreads, toggleSaveThreadFromUrl, watchSavedThreads } from '@/features/saved-threads/logic/storage'
 import { getSubforumIconId } from '@/lib/subforums'
+import { slugToName } from '@/lib/url-helpers'
+import { TOAST_IDS, TOAST_TIMINGS } from '@/constants'
+import { useSettingsStore } from '@/store/settings-store'
 import type { HomepageThread, HomepageFavorite, HomepageNewsItem } from '../types'
 import { Threads } from './threads'
 import { News } from './news'
@@ -81,7 +89,9 @@ export function Home() {
 	const cached = readHomepageCache()
 
 	const [username] = useState<string | undefined>(() => getUsername())
+	const [hiddenThreads, setHiddenThreads] = useState<HiddenThread[]>([])
 	const [lastVisitedForums, setLastVisitedForums] = useState<string[]>([])
+	const [savedThreadIds, setSavedThreadIds] = useState<Set<string>>(new Set())
 
 	const [lastThreads, setLastThreads] = useState<HomepageThread[]>(() => cached?.lastThreads ?? [])
 	const [userLastPosts, setUserLastPosts] = useState<HomepageThread[]>(() => cached?.userLastPosts ?? [])
@@ -99,9 +109,80 @@ export function Home() {
 	const [newsSlideDirection, setNewsSlideDirection] = useState<'next' | 'prev'>('next')
 	const [newsAppliedSlideDirection, setNewsAppliedSlideDirection] = useState<'next' | 'prev'>('next')
 	const lastLoadedNewsPageRef = useRef(newsPage)
+	const lastThreadActionToastRef = useRef<{ key: string; at: number } | null>(null)
+	const hideThreadEnabled = useSettingsStore(state => state.hideThreadEnabled)
+	const saveThreadEnabled = useSettingsStore(state => state.saveThreadEnabled)
+
+	const hiddenIds = useMemo(() => new Set(hiddenThreads.map(t => t.id)), [hiddenThreads])
+	const hiddenNumericIds = useMemo(() => buildHiddenNumericIds(hiddenIds), [hiddenIds])
+
+	const filteredNews = useMemo(() => {
+		return newsView.items.filter(item => !isThreadUrlHidden(item.url, hiddenIds, hiddenNumericIds))
+	}, [newsView.items, hiddenIds, hiddenNumericIds])
+
+	const filteredLastThreads = useMemo(() => {
+		return lastThreads.filter(thread => !isThreadUrlHidden(thread.url, hiddenIds, hiddenNumericIds))
+	}, [lastThreads, hiddenIds, hiddenNumericIds])
+
+	const filteredUserLastPosts = useMemo(() => {
+		return userLastPosts.filter(thread => !isThreadUrlHidden(thread.url, hiddenIds, hiddenNumericIds))
+	}, [userLastPosts, hiddenIds, hiddenNumericIds])
+
+	const filteredFavorites = useMemo(() => {
+		return favorites.filter(thread => !isThreadUrlHidden(thread.url, hiddenIds, hiddenNumericIds))
+	}, [favorites, hiddenIds, hiddenNumericIds])
+	const isThreadSavedInList = (url: string): boolean => {
+		const threadId = normalizeThreadPath(url)
+		return threadId ? savedThreadIds.has(threadId) : false
+	}
+	const recentForums = useMemo(() => {
+		return lastVisitedForums
+			.map(forumSlug => ({
+				forumSlug,
+				forumName: slugToName(forumSlug),
+				iconId: getSubforumIconId(forumSlug),
+			}))
+			.filter(
+				(
+					item
+				): item is {
+					forumSlug: string
+					forumName: string
+					iconId: number
+				} => item.iconId !== null && item.iconId !== undefined
+			)
+			.slice(0, 8)
+	}, [lastVisitedForums])
 
 	useLayoutEffect(() => {
 		document.dispatchEvent(new CustomEvent(NEW_HOMEPAGE_READY_EVENT))
+	}, [])
+
+	// Load hidden threads
+	useEffect(() => {
+		let mounted = true
+		getHiddenThreads().then(threads => {
+			if (mounted) setHiddenThreads(threads)
+		})
+		return watchHiddenThreads(setHiddenThreads)
+	}, [])
+
+	// Load saved threads
+	useEffect(() => {
+		let mounted = true
+		getSavedThreads().then(threads => {
+			if (!mounted) return
+			setSavedThreadIds(new Set(threads.map(thread => thread.id)))
+		})
+
+		const unwatch = watchSavedThreads(threads => {
+			setSavedThreadIds(new Set(threads.map(thread => thread.id)))
+		})
+
+		return () => {
+			mounted = false
+			unwatch()
+		}
 	}, [])
 
 	// Sync URL bar with news page (pushState on change, popstate on back/forward)
@@ -136,16 +217,6 @@ export function Home() {
 				setLastVisitedForums(visitedForums)
 			}
 		}
-
-		void loadVisitedForums()
-
-		return () => {
-			cancelled = true
-		}
-	}, [])
-
-	useEffect(() => {
-		let cancelled = false
 
 		const loadThreads = async () => {
 			try {
@@ -187,6 +258,7 @@ export function Home() {
 		}
 
 		const loadForumBlocks = () => {
+			void loadVisitedForums()
 			void loadThreads()
 			void loadUserPosts()
 			void loadFavoritesData()
@@ -254,6 +326,54 @@ export function Home() {
 		setNewsPage(p => p + 1)
 	}
 
+	const showThreadActionToast = (type: 'success' | 'error', message: string) => {
+		const now = Date.now()
+		const key = `${type}:${message}`
+		const last = lastThreadActionToastRef.current
+
+		if (last && last.key === key && now - last.at < TOAST_TIMINGS.DEDUP_MS) {
+			return
+		}
+
+		lastThreadActionToastRef.current = { key, at: now }
+
+		if (type === 'success') {
+			toast.success(message, { id: TOAST_IDS.HOMEPAGE_THREAD_ACTION })
+			return
+		}
+
+		toast.error(message, { id: TOAST_IDS.HOMEPAGE_THREAD_ACTION })
+	}
+
+	const handleHideThread = async (url: string) => {
+		try {
+			const hidden = await hideThreadFromUrl(url)
+			if (hidden) {
+				showThreadActionToast('success', 'Hilo ocultado')
+			} else {
+				showThreadActionToast('error', 'No se pudo ocultar el hilo')
+			}
+		} catch (error) {
+			logger.error('Homepage: failed to hide thread from url', error)
+			showThreadActionToast('error', 'Error al ocultar el hilo')
+		}
+	}
+
+	const handleSaveThread = async (url: string) => {
+		try {
+			const saved = await toggleSaveThreadFromUrl(url)
+			if (saved === null) {
+				showThreadActionToast('error', 'No se pudo guardar el hilo')
+				return
+			}
+
+			showThreadActionToast('success', saved ? 'Hilo guardado' : 'Hilo eliminado de guardados')
+		} catch (error) {
+			logger.error('Homepage: failed to toggle saved thread from url', error)
+			showThreadActionToast('error', 'Error al guardar el hilo')
+		}
+	}
+
 	const newsSlideClass =
 		newsView.slideNonce === 0
 			? ''
@@ -272,7 +392,7 @@ export function Home() {
 								type="button"
 								onClick={handlePreviousNewsPage}
 								disabled={newsLoading}
-								className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+								className="text-sm text-primary transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								&#8592; Anteriores
 							</button>
@@ -281,7 +401,7 @@ export function Home() {
 							type="button"
 							onClick={handleNextNewsPage}
 							disabled={newsLoading}
-							className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+							className="text-sm text-primary transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							Siguientes &#8594;
 						</button>
@@ -289,7 +409,14 @@ export function Home() {
 				</div>
 				<div key={`news-slide-${newsView.slideNonce}`} className={newsSlideClass}>
 					<News.Root className="mt-3">
-						<News.NewsItemList threads={newsView.items} loading={newsLoading} maxThreads={MAX_NEWS} />
+						<News.NewsItemList
+							threads={filteredNews}
+							loading={newsLoading}
+							maxThreads={MAX_NEWS}
+							onHide={hideThreadEnabled ? handleHideThread : undefined}
+							onSave={saveThreadEnabled ? handleSaveThread : undefined}
+							isSaved={isThreadSavedInList}
+						/>
 					</News.Root>
 				</div>
 			</section>
@@ -298,24 +425,36 @@ export function Home() {
 				<div className="xl:col-span-2">
 					<div className="flex items-end justify-between">
 						<h2 className="text-lg font-semibold">Foro</h2>
-						<div className="flex items-center gap-2" title="Últimos foros visitados">
-							{lastVisitedForums.slice(0, 8).map(forumSlug => {
-								const iconId = getSubforumIconId(forumSlug)
-
-								return (
-									<a key={forumSlug} href={`/foro/${forumSlug}`} title={forumSlug} className="transition hover:scale-110">
-										{iconId ? (
+						{recentForums.length > 0 && (
+							<div className="flex items-center gap-2" title="Últimos foros visitados">
+								<span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+									<Clock3 className="h-3.5 w-3.5" />
+									Recientes
+								</span>
+								<div className="flex items-center gap-1.5">
+									{recentForums.map(({ forumSlug, forumName, iconId }) => (
+										<a
+											key={forumSlug}
+											href={`/foro/${forumSlug}`}
+											title={`Ir a ${forumName}`}
+											className="transition hover:scale-110"
+										>
 											<NativeFidIcon iconId={iconId} className="rounded-sm" />
-										) : (
-											<span className="inline-block h-6 w-6 rounded-sm bg-mv-bg-tertiary" />
-										)}
-									</a>
-								)
-							})}
-						</div>
+										</a>
+									))}
+								</div>
+							</div>
+						)}
 					</div>
 					<Threads.Root className="mt-3">
-						<Threads.ThreadList threads={lastThreads} loading={threadsLoading} maxThreads={MAX_THREADS} />
+						<Threads.ThreadList
+							threads={filteredLastThreads}
+							loading={threadsLoading}
+							maxThreads={MAX_THREADS}
+							onHide={hideThreadEnabled ? handleHideThread : undefined}
+							onSave={saveThreadEnabled ? handleSaveThread : undefined}
+							isSaved={isThreadSavedInList}
+						/>
 					</Threads.Root>
 				</div>
 
@@ -323,23 +462,38 @@ export function Home() {
 					<div className="flex items-end justify-between">
 						<h3 className="text-base font-semibold">Tus últimos posts</h3>
 						{username && (
-							<a href={`/id/${username}/posts`} className="text-sm text-primary hover:underline">
+							<a href={`/id/${username}/posts`} className="text-sm text-primary transition-colors hover:text-primary/80">
 								Todos
 							</a>
 						)}
 					</div>
 					<Threads.Root className="mt-3">
-						<Threads.ThreadList threads={userLastPosts} loading={userPostsLoading} maxThreads={MAX_USER_LAST_POSTS} />
+						<Threads.ThreadList
+							threads={filteredUserLastPosts}
+							loading={userPostsLoading}
+							maxThreads={MAX_USER_LAST_POSTS}
+							onHide={hideThreadEnabled ? handleHideThread : undefined}
+							onSave={saveThreadEnabled ? handleSaveThread : undefined}
+							isSaved={isThreadSavedInList}
+						/>
 					</Threads.Root>
 
 					<div className="mt-5 flex items-end justify-between">
 						<h3 className="text-base font-semibold">Favoritos</h3>
-						<a href="/foro/favoritos" className="text-sm text-primary hover:underline">
+						<a href="/foro/favoritos" className="text-sm text-primary transition-colors hover:text-primary/80">
 							Todos
 						</a>
 					</div>
 					<Threads.Root className="mt-3">
-						<Threads.ThreadList threads={favorites} loading={favoritesLoading} maxThreads={MAX_FAVORITES} />
+						<Threads.ThreadList
+							threads={filteredFavorites}
+							loading={favoritesLoading}
+							maxThreads={MAX_FAVORITES}
+							onHide={hideThreadEnabled ? handleHideThread : undefined}
+							onSave={saveThreadEnabled ? handleSaveThread : undefined}
+							isSaved={isThreadSavedInList}
+							compact
+						/>
 					</Threads.Root>
 				</div>
 			</section>
