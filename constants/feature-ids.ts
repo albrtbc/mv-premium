@@ -16,6 +16,7 @@ export const FEATURE_IDS = {
 	COMMAND_MENU: 'mvp-command-menu',
 	FAVORITES_ACTION_BAR: 'mvp-favorites-action-bar',
 	THREAD_SUMMARIZER_MODAL: 'mvp-thread-summarizer-modal',
+	MULTI_PAGE_SUMMARIZER_MODAL: 'mvp-multi-page-summarizer-modal',
 	SAVE_THREAD_BUTTON: 'mvp-save-thread-button',
 	SAVED_THREADS_PROFILE: 'mvp-saved-threads-profile',
 	WIKI_POSTS_PROFILE: 'mvp-wiki-posts-profile',

@@ -18,6 +18,12 @@
 @import './styles/editor-toolbar.css';
 @import './styles/native-overrides.css';
 
+/* Centered tables inside [center] blocks */
+.center table {
+	margin-left: auto;
+	margin-right: auto;
+}
+
 /* Muted Posts Feature */
 .mvp-muted-container {
 	color: transparent !important;

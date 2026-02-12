@@ -221,9 +221,9 @@ describe('settings-store', () => {
 
 		it('setAIModel updates AI model', () => {
 			act(() => {
-				useSettingsStore.getState().setAIModel('gemini-1.5-pro')
+				useSettingsStore.getState().setAIModel('gemini-2.5-flash-lite')
 			})
-			expect(useSettingsStore.getState().aiModel).toBe('gemini-1.5-pro')
+			expect(useSettingsStore.getState().aiModel).toBe('gemini-2.5-flash-lite')
 		})
 	})
 })

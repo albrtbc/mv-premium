@@ -7,6 +7,8 @@
  * IMPORTANT: Keep in sync with settings-schema.ts
  */
 
+import type { UserTemplates } from '@/types/templates'
+
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
@@ -14,8 +16,17 @@
 /** Theme options */
 export type ThemeMode = 'light' | 'dark' | 'system'
 
-/** AI Model options */
-export type AIModel = 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-pro'
+/** AI Model options - Gemini */
+export type GeminiModel = 'gemini-3-flash-preview' | 'gemini-2.5-flash' | 'gemini-2.5-flash-lite'
+
+/** AI Model options - Groq */
+export type GroqModel = 'llama-3.3-70b-versatile' | 'moonshotai/kimi-k2-instruct'
+
+/** AI Provider options */
+export type AIProvider = 'gemini' | 'groq'
+
+/** Combined AI model type */
+export type AIModel = GeminiModel | GroqModel
 
 /** Ultrawide mode levels */
 export type UltrawideMode = 'off' | 'wide' | 'extra-wide' | 'full'
@@ -39,7 +50,10 @@ export interface Settings {
 
 	// AI Settings
 	geminiApiKey: string
-	aiModel: AIModel
+	groqApiKey: string
+	aiModel: GeminiModel
+	groqModel: GroqModel
+	aiProvider: AIProvider
 
 	// Sync
 	syncEnabled: boolean
@@ -54,6 +68,7 @@ export interface Settings {
 
 	// Feature Toggles - Editor
 	cinemaButtonEnabled: boolean
+	gameButtonEnabled: boolean
 	gifPickerEnabled: boolean
 	draftsButtonEnabled: boolean
 	templateButtonEnabled: boolean
@@ -77,12 +92,18 @@ export interface Settings {
 
 	// UI State
 	settingsActiveTab: string
+	variablesSidebarExpandedGroups: string[]
 
 	// Layout
 	ultrawideMode: UltrawideMode
+	centeredPostsEnabled: boolean
+	centeredControlsSticky: boolean
 
 	// Keyboard Shortcuts
 	shortcuts: Record<string, string | null>
+
+	// Media Templates (null = use default)
+	mediaTemplates: UserTemplates
 }
 
 /** Partial settings for updates */

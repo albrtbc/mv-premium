@@ -86,8 +86,20 @@ const FEATURE_CONFIG: Record<FeatureFlagKey, FeatureConfig> = {
 
 	// Premium Features (always enabled by default, some need API keys)
 	[FeatureFlag.Gallery]: { settingsKey: 'galleryButtonEnabled' },
-	[FeatureFlag.PostSummary]: { settingsKey: 'postSummaryEnabled' },
-	[FeatureFlag.ThreadSummarizer]: { settingsKey: 'threadSummarizerEnabled', requiresApiKey: 'geminiApiKey' },
+	[FeatureFlag.PostSummary]: {
+		settingsKey: 'postSummaryEnabled',
+		customCheck: () => {
+			const state = useSettingsStore.getState()
+			return !!(state.geminiApiKey || state.groqApiKey)
+		},
+	},
+	[FeatureFlag.ThreadSummarizer]: {
+		settingsKey: 'threadSummarizerEnabled',
+		customCheck: () => {
+			const state = useSettingsStore.getState()
+			return !!(state.geminiApiKey || state.groqApiKey)
+		},
+	},
 	[FeatureFlag.CinemaCards]: { settingsKey: 'cinemaButtonEnabled', requiresApiKey: 'tmdbApiKey' },
 	[FeatureFlag.MediaHoverCards]: { settingsKey: 'mediaHoverCardsEnabled' },
 	[FeatureFlag.PinnedPosts]: { settingsKey: 'pinnedPostsEnabled' },
@@ -127,14 +139,14 @@ export function isFeatureEnabled(flag: FeatureFlagKey): boolean {
 		}
 	}
 
+	// Custom check (e.g., requires any AI key)
+	if (config.customCheck && !config.customCheck()) {
+		return false
+	}
+
 	// Check settings toggle
 	if (config.settingsKey) {
 		return Boolean(state[config.settingsKey as keyof typeof state])
-	}
-
-	// Custom check
-	if (config.customCheck) {
-		return config.customCheck()
 	}
 
 	return true
@@ -209,6 +221,8 @@ export function getDisabledFeatures(): Array<{ flag: FeatureFlagKey; reason: str
 			} else if (config.settingsKey) {
 				reason = `Setting '${config.settingsKey}' is disabled`
 			}
+		} else if (config.customCheck && !config.customCheck()) {
+			reason = 'Missing required API key'
 		} else if (config.settingsKey) {
 			reason = `Setting '${config.settingsKey}' is disabled`
 		}

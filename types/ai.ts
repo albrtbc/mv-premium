@@ -1,5 +1,5 @@
 /**
- * AI Service Types - Gemini API Only
+ * AI Service Types - Gemini & Groq APIs
  * Simplified for text generation (summaries, rewrites, etc.)
  */
 
@@ -11,15 +11,6 @@
  * AI Service interface - contract for Gemini implementation
  */
 export interface AIService {
-	/** Summarize the given text */
-	summarize(text: string): Promise<string>
-
-	/** Rewrite text in a specific style */
-	rewrite(text: string, style?: RewriteStyle): Promise<string>
-
-	/** Polish text - fix errors and improve clarity without changing tone */
-	polish(text: string): Promise<string>
-
 	/** Generate text from a custom prompt, optionally with context */
 	generate(prompt: string, context?: string): Promise<string>
 
@@ -33,30 +24,35 @@ export interface AIService {
 	getName(): string
 
 	/** Get the provider type */
-	getProvider(): 'gemini'
+	getProvider(): 'gemini' | 'groq'
 }
 
-/**
- * Available rewrite styles
- */
-export type RewriteStyle = 'formal' | 'casual' | 'concise' | 'detailed' | 'friendly'
+
 
 /**
- * Available Gemini models
+ * Available Gemini models (free tier)
  */
-export type AIModel =
-	| 'gemini-2.5-flash' // Newest stable - Recommended
-	| 'gemini-2.5-pro' // More powerful
+export type GeminiModel =
+	| 'gemini-3-flash-preview' // Recommended
+	| 'gemini-2.5-flash' // Stable option
 	| 'gemini-2.5-flash-lite' // Lite version
-	| 'gemini-3-flash' // Next gen preview
-	| 'gemini-2.0-flash' // Fast and stable
+
+/**
+ * Available Groq models (free tier)
+ */
+export type GroqModel = 'moonshotai/kimi-k2-instruct'
+
+/** Combined AI model type for settings */
+export type AIModel = GeminiModel | GroqModel
 
 /**
  * AI Service configuration stored in settings
  */
 export interface AIConfig {
 	geminiApiKey: string
-	aiModel: AIModel
+	groqApiKey: string
+	aiModel: GeminiModel
+	groqModel: GroqModel
 }
 
 // =============================================================================
@@ -75,22 +71,10 @@ export type ChatPart = { text: string }
 // =============================================================================
 
 /**
- * Function call extracted from Gemini response
- */
-export interface GeminiFunctionCall {
-	name: string
-	args: Record<string, unknown>
-}
-
-/**
  * Part in Gemini API response content
  */
 export interface GeminiResponsePart {
 	text?: string
-	functionCall?: {
-		name: string
-		args: Record<string, unknown>
-	}
 }
 
 /**
@@ -151,6 +135,38 @@ export interface GeminiRequestBody {
 export interface GeminiGenerationResult {
 	success: boolean
 	text?: string
-	functionCalls?: GeminiFunctionCall[]
 	error?: string
+}
+
+// =============================================================================
+// GROQ API RESPONSE TYPES (OpenAI Compatible)
+// =============================================================================
+
+export interface GroqUsage {
+	prompt_tokens: number
+	completion_tokens: number
+	total_tokens: number
+}
+
+export interface GroqChoice {
+	index: number
+	message: {
+		role: string
+		content: string
+	}
+	finish_reason: string
+}
+
+export interface GroqAPIResponse {
+	id: string
+	object: string
+	created: number
+	model: string
+	choices: GroqChoice[]
+	usage?: GroqUsage
+	error?: {
+		message: string
+		type: string
+		code: string
+	}
 }

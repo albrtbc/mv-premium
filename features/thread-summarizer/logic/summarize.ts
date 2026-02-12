@@ -1,3 +1,13 @@
+/**
+ * Single-Page Thread Summarizer
+ *
+ * Summarizes the current page of a thread in one AI call.
+ * Uses the same robustness patterns as the multi-page summarizer:
+ * - Exponential-backoff retry on 429 / Rate Limit errors
+ * - AI-powered JSON repair fallback on malformed responses
+ * - Robust avatar hydration (exact-first, strict partial matching)
+ */
+
 import { getAIService } from '@/services/ai/gemini-service'
 import { logger } from '@/lib/logger'
 import {
@@ -7,6 +17,17 @@ import {
 	formatPostsForPrompt,
 	getCurrentPageNumber,
 } from './extract-posts'
+import {
+	generateWithRetry,
+	hydrateParticipantAvatars,
+	parseJsonWithAIFallback,
+	SUMMARY_JSON_STRUCTURE,
+	isRateLimitError,
+} from './summarizer-helpers'
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 export interface ThreadSummary {
 	topic: string
@@ -18,7 +39,16 @@ export interface ThreadSummary {
 	postsAnalyzed: number
 	uniqueAuthors: number
 	pageNumber: number
+	generationMs?: number
+	modelUsed?: string
 	error?: string
+}
+
+type SummaryPayload = {
+	topic: string
+	keyPoints: string[]
+	participants: { name: string; contribution: string }[]
+	status: string
 }
 
 // =============================================================================
@@ -47,7 +77,15 @@ REGLAS ESTRICTAS:
 - El JSON debe ser valido.
 - Resume SOLO los posts que te paso.
 - Ignora posts sin contenido ("pole", "+1").
-- Responde en espanol.`
+- Incluye también el contenido que venga dentro de spoilers cuando aporte contexto.
+- No confundas apodos/rangos/títulos visuales junto al nick con el nombre del usuario: usa solo el nick real.
+- Si un post solo incluye media/embed/enlace (tweet, vídeo, etc.) sin comentario propio del autor, NO lo uses para atribuir postura personal.
+- Detecta ironía/sarcasmo y no la traduzcas como apoyo literal.
+- Si una postura es irónica o ambigua, descríbela como "ironiza con..." o "crítica sarcástica a...".
+- No uses verbos de apoyo ("defiende", "apoya", "celebra") salvo evidencia explícita y literal.
+- Si no hay certeza total de postura, usa verbos neutrales: "plantea", "argumenta", "cuestiona" o "ironiza".
+- Responde en espanol.
+- IMPORTANTE: Tu respuesta debe empezar con { y terminar con }. Sin texto antes ni despues.`
 
 // =============================================================================
 // MAIN FUNCTION
@@ -58,12 +96,11 @@ export async function summarizeCurrentThread(): Promise<ThreadSummary> {
 	const pageNumber = getCurrentPageNumber()
 	const allPagePosts = extractAllPagePosts()
 
-
 	if (allPagePosts.length === 0) {
 		return createErrorSummary(title, pageNumber, 'No se detectaron posts en esta pagina.')
 	}
 
-	// Create a map of author -> avatarUrl
+	// Build avatar map from scraped posts
 	const avatarMap = new Map<string, string>()
 	allPagePosts.forEach(post => {
 		if (post.avatarUrl && !avatarMap.has(post.author)) {
@@ -96,41 +133,23 @@ TITULO DEL HILO: ${title} ${pageInfo}
 POSTS DE ESTA PAGINA (${allPagePosts.length} posts):
 ${formattedPosts}`
 
-		const rawResponse = await aiService.generate(finalPrompt)
-		
-		// Parse JSON response safely
-		const parsedData = parseJSONResponse(rawResponse)
+		// Generate with retry on 429 errors
+		const rawResponse = await generateWithRetry(aiService, finalPrompt)
 
-		// Hydrate participants with avatars using robust matching
-		const participantsWithAvatars = parsedData.participants.map(p => {
-			const cleanName = p.name.toLowerCase().trim()
-            
-            // 1. Exact/Case-insensitive match
-			let avatarUrl = avatarMap.get(p.name) || avatarMap.get(cleanName)
-			
-			if (!avatarUrl) {
-				// 2. Fuzzy match: Find map key that contains AI name OR AI name contains map key
-                const matchedKey = Array.from(avatarMap.keys()).find(k => {
-                    const kLower = k.toLowerCase()
-                    return kLower.includes(cleanName) || cleanName.includes(kLower)
-                })
-				if (matchedKey) avatarUrl = avatarMap.get(matchedKey)
-			}
+		// Parse JSON with AI-powered repair fallback
+		const parsedData = await parseJsonWithAIFallback<SummaryPayload>(
+			rawResponse,
+			aiService,
+			'resumen de página',
+			SUMMARY_JSON_STRUCTURE
+		)
 
-            // Fix protocol-relative URLs (//mediavida...)
-            if (avatarUrl && avatarUrl.startsWith('//')) {
-                avatarUrl = 'https:' + avatarUrl
-            }
-
-			return {
-				...p,
-				avatarUrl
-			}
-		})
+		// Hydrate participants with avatars (exact-first, then strict partial)
+		const participantsWithAvatars = hydrateParticipantAvatars(parsedData.participants, avatarMap)
 
 		return {
 			...parsedData,
-            participants: participantsWithAvatars,
+			participants: participantsWithAvatars,
 			title,
 			postsAnalyzed: allPagePosts.length,
 			uniqueAuthors,
@@ -140,36 +159,29 @@ ${formattedPosts}`
 		logger.error('ThreadSummarizer error:', error)
 
 		const errorMessage = error instanceof Error ? error.message : String(error)
-		const errorMsg = errorMessage.includes('429')
-			? 'Limite de consultas IA excedido. Espera un momento.'
-			: errorMessage.includes('400')
-			? 'Contenido demasiado largo para procesar.'
-			: 'Error al generar el resumen.'
 
-		return createErrorSummary(title, pageNumber, errorMsg, allPagePosts.length, uniqueAuthors)
+		let userFriendlyError = 'Error al generar el resumen.'
+
+		if (isRateLimitError(error)) {
+			userFriendlyError =
+				'Límite de velocidad excedido. Espera un momento e inténtalo de nuevo.'
+		} else if (
+			errorMessage.includes('400') ||
+			errorMessage.includes('too large') ||
+			errorMessage.includes('context length')
+		) {
+			userFriendlyError = 'Contenido demasiado largo para procesar.'
+		} else if (errorMessage.includes('500') || errorMessage.includes('503')) {
+			userFriendlyError = 'Error temporal del servidor. Inténtalo de nuevo.'
+		}
+
+		return createErrorSummary(title, pageNumber, userFriendlyError, allPagePosts.length, uniqueAuthors)
 	}
 }
 
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-function parseJSONResponse(text: string): Omit<ThreadSummary, 'title' | 'postsAnalyzed' | 'uniqueAuthors' | 'pageNumber' | 'error'> {
-	try {
-        // Clean markdown code blocks if present
-		const cleanText = text.replace(/```json\n?|\n?```/g, '').trim()
-		return JSON.parse(cleanText)
-	} catch (e) {
-        logger.error('Failed to parse summary JSON:', text)
-		// Fallback for parsing failure
-		return {
-			topic: 'Error al procesar el formato de la respuesta.',
-			keyPoints: ['No se pudo generar un resumen estructurado.'],
-			participants: [],
-			status: 'Error de formato',
-		}
-	}
-}
 
 function createErrorSummary(title: string, pageNumber: number, error: string, posts = 0, authors = 0): ThreadSummary {
 	return {
@@ -184,4 +196,3 @@ function createErrorSummary(title: string, pageNumber: number, error: string, po
 		error,
 	}
 }
-

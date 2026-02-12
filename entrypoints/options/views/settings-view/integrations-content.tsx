@@ -16,36 +16,78 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingsSection } from '../../components/settings/settings-section'
 import { SettingRow, ApiKeyInput } from '../../components/settings'
+import { ProviderStatusBadge } from '../../components/settings/provider-status-badge'
 import { useSettingsStore } from '@/store/settings-store'
-import { getAvailableModels } from '@/services/ai/gemini-service'
+import { getAvailableModels, testGeminiConnection } from '@/services/ai/gemini-service'
+import { getAvailableGroqModels, testGroqConnection } from '@/services/ai/groq-service'
+import type { AIProvider, GeminiModel, GroqModel } from '@/store/settings-types'
 
 export function IntegrationsContent() {
 	const { imgbbApiKey, setImgbbApiKey } = useSettingsStore()
 	const [imgbbExpanded, setImgbbExpanded] = useState(false)
 
+	// Gemini state
 	const { geminiApiKey, setGeminiApiKey, aiModel, setAIModel } = useSettingsStore()
-
 	const [testingGemini, setTestingGemini] = useState(false)
 	const [geminiExpanded, setGeminiExpanded] = useState(false)
 
-	// Test Gemini connection
+	// Groq state
+	const { groqApiKey, setGroqApiKey, groqModel, setGroqModel } = useSettingsStore()
+	const [testingGroq, setTestingGroq] = useState(false)
+	const [groqExpanded, setGroqExpanded] = useState(false)
+
+	// AI Provider state
+	const { aiProvider, setAIProvider } = useSettingsStore()
+
+	// Test Gemini connection and validate selected model
 	const handleTestGemini = async () => {
 		if (!geminiApiKey) return
 		setTestingGemini(true)
 		try {
-			const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`)
-			if (response.ok) {
-				const data = await response.json()
-				const modelCount = data.models?.length || 0
-				toast.success('Conexión exitosa', { description: `${modelCount} modelos disponibles.` })
+			const result = await testGeminiConnection(geminiApiKey)
+
+			if (result.success) {
+				toast.success('Conexión exitosa', { description: result.message })
+
+				// Check if the currently selected model is available
+				if (result.availableModelIds && aiModel) {
+					const isModelAvailable = result.availableModelIds.some(
+						id => id === aiModel || id.startsWith(aiModel)
+					)
+					if (!isModelAvailable) {
+						const modelLabel = availableGeminiModels.find(m => m.value === aiModel)?.label || aiModel
+						toast.warning(`Modelo "${modelLabel}" no encontrado`, {
+							description: 'Este modelo no está disponible en tu cuenta. Considera cambiar a otro.',
+							duration: 8000,
+						})
+					}
+				}
 			} else {
-				const error = await response.json()
-				toast.error('Error de conexión', { description: error.error?.message || 'API Key inválida' })
+				toast.error('Error de conexión', { description: result.message })
 			}
 		} catch {
 			toast.error('Error de red', { description: 'No se pudo conectar con Google AI' })
 		} finally {
 			setTestingGemini(false)
+		}
+	}
+
+	// Test Groq connection
+	const handleTestGroq = async () => {
+		if (!groqApiKey) return
+		setTestingGroq(true)
+		try {
+			const result = await testGroqConnection(groqApiKey)
+
+			if (result.success) {
+				toast.success('Conexión exitosa', { description: result.message })
+			} else {
+				toast.error('Error de conexión', { description: result.message })
+			}
+		} catch {
+			toast.error('Error de red', { description: 'No se pudo conectar con Groq' })
+		} finally {
+			setTestingGroq(false)
 		}
 	}
 
@@ -57,8 +99,9 @@ export function IntegrationsContent() {
 			toast.success('Configuración guardada')
 		}
 
-	// Available Gemini models
-	const availableModels = getAvailableModels()
+	// Available models
+	const availableGeminiModels = getAvailableModels()
+	const availableGroqModels = getAvailableGroqModels()
 
 	return (
 		<SettingsSection
@@ -71,8 +114,9 @@ export function IntegrationsContent() {
 					<div className="flex gap-3">
 						<Image className="h-5 w-5 mt-0.5" />
 						<div>
-							<h4 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+							<h4 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2">
 								Alojamiento de Imágenes (Base: freeimage.host)
+								<ProviderStatusBadge isConfigured={!!imgbbApiKey} />
 							</h4>
 							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
 								{imgbbApiKey ? (
@@ -169,7 +213,10 @@ export function IntegrationsContent() {
 					<div className="flex gap-3">
 						<Sparkles className="h-5 w-5 mt-0.5 text-purple-500" />
 						<div>
-							<h4 className="text-sm font-medium leading-none">Google Gemini API</h4>
+							<h4 className="text-sm font-medium leading-none flex items-center gap-2">
+								Google Gemini API
+								<ProviderStatusBadge isConfigured={!!geminiApiKey} />
+							</h4>
 							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
 								IA en la nube con modelos potentes (gratis con límites)
 							</p>
@@ -233,18 +280,143 @@ export function IntegrationsContent() {
 
 			<Separator />
 
-			{/* Model Selection */}
+			{/* Groq API Card */}
+			<div className="flex flex-col gap-4 py-4">
+				<div className="flex items-start justify-between gap-4">
+					<div className="flex gap-3">
+						<Zap className="h-5 w-5 mt-0.5 text-orange-500" />
+						<div>
+							<h4 className="text-sm font-medium leading-none flex items-center gap-2">
+								Groq API
+								<ProviderStatusBadge isConfigured={!!groqApiKey} />
+							</h4>
+							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
+								IA ultra-rápida con Kimi K2 (gratis con límites)
+							</p>
+
+							<div className="flex items-center gap-4 mt-2">
+								<button
+									onClick={() => setGroqExpanded(!groqExpanded)}
+									className="flex items-center gap-1 text-xs text-primary hover:underline"
+								>
+									<ChevronDown className={cn('h-3 w-3 transition-transform', groqExpanded && 'rotate-180')} />
+									{groqExpanded ? 'Ocultar detalles' : 'Cómo obtener API Key'}
+								</button>
+
+								{groqApiKey && (
+									<button
+										onClick={handleTestGroq}
+										disabled={testingGroq}
+										className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-orange-500 transition-colors disabled:opacity-50"
+									>
+										{testingGroq ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+										Probar conexión
+									</button>
+								)}
+							</div>
+						</div>
+					</div>
+
+					{/* API Key Input */}
+					<div className="flex-shrink-0">
+						<ApiKeyInput value={groqApiKey} onChange={setGroqApiKey} placeholder="gsk_..." label="Groq" />
+					</div>
+				</div>
+
+				{groqExpanded && (
+					<div className="text-xs text-muted-foreground space-y-2 pl-8 border-l-2 border-muted ml-2.5 animate-in slide-in-from-top-2 duration-200">
+						<ol className="list-decimal list-inside space-y-1.5">
+							<li>
+								Ve a{' '}
+								<a
+									href="https://console.groq.com/keys"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-primary hover:underline"
+								>
+									Groq Console
+								</a>
+							</li>
+							<li>Crea una cuenta o inicia sesión</li>
+							<li>
+								Haz clic en <strong>"Create API Key"</strong>
+							</li>
+							<li>Copia la clave y pégala arriba</li>
+						</ol>
+						<p className="text-amber-500 dark:text-amber-400 mt-2 flex items-center gap-1">
+							<AlertCircle className="h-3 w-3" />
+							Groq es muy rápido. Kimi K2 tiene un límite de tokens por minuto en el plan gratuito.
+						</p>
+					</div>
+				)}
+			</div>
+
+			<Separator />
+
+			{/* AI Provider Selection */}
+			<SettingRow
+				icon={<Sparkles className="h-4 w-4 text-purple-500" />}
+				label="Proveedor IA por defecto"
+				description="Elige qué servicio usar para resumir y otras tareas IA."
+			>
+				<Select value={aiProvider} onValueChange={val => withToast(setAIProvider)(val as AIProvider)}>
+					<SelectTrigger className="w-[200px] h-auto min-h-[3rem] py-3 [&>span]:text-left">
+						<SelectValue placeholder="Seleccionar proveedor" />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="gemini" className="py-3 cursor-pointer">
+							<div className="flex flex-col gap-1.5">
+								<span className="font-semibold text-sm">Google Gemini</span>
+								<span className="text-xs text-muted-foreground leading-normal">Recomendado - Alto rendimiento</span>
+							</div>
+						</SelectItem>
+						<SelectItem value="groq" className="py-3 cursor-pointer">
+							<div className="flex flex-col gap-1.5">
+								<span className="font-semibold text-sm">Groq</span>
+								<span className="text-xs text-muted-foreground leading-normal">Ultra rápido - Kimi K2</span>
+							</div>
+						</SelectItem>
+					</SelectContent>
+				</Select>
+			</SettingRow>
+
+			{/* Model Selection - Gemini */}
 			<SettingRow
 				icon={<Settings2 className="h-4 w-4" />}
-				label="Modelo de IA"
-				description="Selecciona qué modelo de Gemini usar."
+				label="Modelo Gemini"
+				description="Modelo de Google para resumir e IA."
 			>
-				<Select value={aiModel} onValueChange={val => withToast(setAIModel)(val as typeof aiModel)}>
+				<Select value={aiModel} onValueChange={val => withToast(setAIModel)(val as GeminiModel)}>
 					<SelectTrigger className="w-[200px] h-auto min-h-[3rem] py-3 [&>span]:text-left">
 						<SelectValue placeholder="Seleccionar modelo" />
 					</SelectTrigger>
 					<SelectContent>
-						{availableModels.map(model => (
+						{availableGeminiModels.map(model => (
+							<SelectItem key={model.value} value={model.value} className="py-3 cursor-pointer">
+								<div className="flex flex-col gap-1.5">
+									<span className="font-semibold text-sm">{model.label}</span>
+									{model.description && (
+										<span className="text-xs text-muted-foreground leading-normal">{model.description}</span>
+									)}
+								</div>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</SettingRow>
+
+			{/* Model Selection - Groq */}
+			<SettingRow
+				icon={<Zap className="h-4 w-4 text-orange-500" />}
+				label="Modelo Groq"
+				description="Modelo Groq para tareas rápidas."
+			>
+				<Select value={groqModel} onValueChange={val => withToast(setGroqModel)(val as GroqModel)}>
+					<SelectTrigger className="w-[200px] h-auto min-h-[3rem] py-3 [&>span]:text-left">
+						<SelectValue placeholder="Seleccionar modelo" />
+					</SelectTrigger>
+					<SelectContent>
+						{availableGroqModels.map(model => (
 							<SelectItem key={model.value} value={model.value} className="py-3 cursor-pointer">
 								<div className="flex flex-col gap-1.5">
 									<span className="font-semibold text-sm">{model.label}</span>
@@ -260,3 +432,4 @@ export function IntegrationsContent() {
 		</SettingsSection>
 	)
 }
+

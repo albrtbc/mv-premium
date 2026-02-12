@@ -15,6 +15,9 @@ import { DraftsEmptyState } from '@/features/drafts/components/drafts-empty-stat
 import { SelectionBar } from '@/features/drafts/components/selection-bar'
 import { useDraftsView } from './use-drafts-view'
 import { DeleteDraftDialog, MoveDraftDialog, DeleteFolderDialog } from './drafts-dialogs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { MediaTemplatesView } from './media-templates-view'
+import { useSearchParams } from 'react-router-dom'
 
 // ============================================================================
 // Main Component
@@ -25,6 +28,10 @@ interface DraftsViewProps {
 }
 
 export function DraftsView({ filterType }: DraftsViewProps) {
+	// Read URL params for tab selection
+	const [searchParams, setSearchParams] = useSearchParams()
+	const defaultTab = searchParams.get('tab') === 'media' ? 'media' : 'text'
+
 	const {
 		// Data
 		folders,
@@ -86,7 +93,8 @@ export function DraftsView({ filterType }: DraftsViewProps) {
 		)
 	}
 
-	return (
+	// Main Layout Content
+	const content = (
 		<div className="flex flex-col lg:flex-row gap-6 h-full">
 			{/* Sidebar - Folders */}
 			<DraftsSidebar
@@ -260,4 +268,41 @@ export function DraftsView({ filterType }: DraftsViewProps) {
 			/>
 		</div>
 	)
+
+	if (filterType === 'template') {
+		return (
+			<Tabs
+				defaultValue={defaultTab}
+				className="h-full flex flex-col"
+				onValueChange={val => {
+					setSearchParams(prev => {
+						if (val === 'media') prev.set('tab', 'media')
+						else prev.delete('tab')
+						return prev
+					})
+				}}
+			>
+				<div className="flex items-center justify-between mb-8 shrink-0">
+					<TabsList className="grid w-full grid-cols-2 sm:w-auto h-auto p-1 bg-muted rounded-lg">
+						<TabsTrigger value="text" className="px-6 py-2 text-sm font-medium transition-all">
+							Plantillas de Texto
+						</TabsTrigger>
+						<TabsTrigger value="media" className="px-6 py-2 text-sm font-medium transition-all">
+							Creación de Contenido
+						</TabsTrigger>
+					</TabsList>
+				</div>
+
+				<TabsContent value="text" className="flex-1 min-h-0 mt-0">
+					{content}
+				</TabsContent>
+
+				<TabsContent value="media" className="flex-1 min-h-0 mt-0">
+					<MediaTemplatesView />
+				</TabsContent>
+			</Tabs>
+		)
+	}
+
+	return content
 }

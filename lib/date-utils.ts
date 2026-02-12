@@ -93,3 +93,19 @@ export function formatShortRelativeDate(timestamp: number): string {
 	if (days < 30) return `${days}d`
 	return formatDate(timestamp)
 }
+
+/**
+ * Formats a date string (ISO) or Date object to long Spanish format
+ * Example: "27 de abril de 2018"
+ */
+export function formatDateLong(value: string | Date | null | undefined): string {
+	if (!value) return ''
+	const date = typeof value === 'string' ? new Date(value) : value
+	if (isNaN(date.getTime())) return ''
+
+	return new Intl.DateTimeFormat('es-ES', {
+		day: 'numeric',
+		month: 'long',
+		year: 'numeric',
+	}).format(date)
+}

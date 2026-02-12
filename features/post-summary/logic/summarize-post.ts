@@ -1,11 +1,13 @@
 /**
  * Post Summarization Logic
  *
- * Uses Gemini AI to summarize individual post content.
+ * Uses AI (Gemini or Groq) to summarize individual post content.
  */
 
 import { getAIService } from '@/services/ai/gemini-service'
+import { parseAIJsonResponse } from '@/services/ai/shared'
 import { logger } from '@/lib/logger'
+import { cleanPostContent } from '@/features/thread-summarizer/logic/clean-post-content'
 
 // Minimum characters for a post to be "long enough" to summarize
 const MIN_POST_LENGTH = 150
@@ -43,29 +45,11 @@ export function getShortPostMessage(): string {
 
 /**
  * Extracts and cleans text from a post element, removing quotes, spoilers, and code blocks.
+ * Keeps spoiler content visible (removes only trigger links).
  * @param postBody - The post body DOM element
  */
 export function extractPostText(postBody: Element): string {
-	// Clone to avoid modifying the original
-	const clone = postBody.cloneNode(true) as Element
-
-	// Remove blockquotes (cited text) - Keep this to avoid summarizing what others said
-	clone.querySelectorAll('blockquote, .quote').forEach(el => el.remove())
-
-	// CLEANUP: Remove "Click para desplegar" or spoiler triggers if they exist as separate text nodes
-	// but KEEP the spoiler content.
-	// In MV, the structure is usually: .spoiler-wrap > a.spoiler (trigger) + div.spoiler (content)
-	// We want to remove the trigger 'a.spoiler' but keep 'div.spoiler'
-	clone.querySelectorAll('.spoiler-wrap > a.spoiler').forEach(el => el.remove())
-
-	// Remove code blocks (usually not useful for summary)
-	clone.querySelectorAll('pre, code').forEach(el => el.remove())
-
-	// Get text content
-	const text = clone.textContent || ''
-
-	// Clean up whitespace
-	return text.trim().replace(/\s+/g, ' ')
+	return cleanPostContent(postBody, { keepSpoilers: true, removeCodeBlocks: true })
 }
 
 interface PostSummaryResult {
@@ -88,26 +72,32 @@ export async function summarizePost(text: string): Promise<PostSummaryResult> {
 	const prompt = `Eres un asistente experto en resumir contenido de foros (Mediavida) en español.
 
 TAREA:
-Analiza el siguiente post y genera un JSON con "summary" y "tone".
-ADAPTACIÓN DE LONGITUD:
-- Si el post es CORTO (< 300 caracteres): Condénsalo en UNA sola frase directa.
-- Si el post es LARGO o COMPLEJO: Resume los puntos clave en 2-3 frases, asegurando no perder matices importantes (incluso si están en spoilers).
+Analiza el post y devuelve SOLO un JSON válido con "summary" y "tone".
 
-REGLAS:
-- INCLUYE el contenido de los SPOILERS en el resumen.
-- TU SALIDA DEBE SER UNICAMENTE UN JSON VÁLIDO.
-- NO uses markdown para el JSON.
-- NO uses BBCode.
-- Mantén el idioma Español.
+EJEMPLO DE SALIDA:
+{"summary": "El usuario explica cómo configurar Docker en Windows, incluyendo los pasos para WSL2 y las opciones de virtualización recomendadas.", "tone": "Didáctico y detallado"}
+
+ADAPTACIÓN DE LONGITUD (proporcional al post original):
+- Post CORTO (<300 caracteres): 1 frase directa.
+- Post MEDIO (300-800 caracteres): 2-3 frases capturando los puntos principales.
+- Post LARGO (>800 caracteres): 4-6 frases que capturen TODOS los puntos clave, matices y argumentos importantes. No sacrifiques detalle por brevedad.
+
+REGLAS CRÍTICAS:
+- SOLO JSON válido. Empieza con "{" y termina con "}". Sin markdown ni texto extra.
+- Idioma: Español.
+- El "tone" DEBE empezar con mayúscula y ser conciso (ej: "Informativo", "Crítico y frustrado", "Irónico pero constructivo").
+- Detecta ironía/sarcasmo y refléjalo en el tono si aplica. No interpretes sarcasmo como apoyo literal.
+- Si el post solo tiene media/embed/enlace sin comentario propio, indica "Comparte contenido sin comentario" en el summary.
+- Evita frases genéricas. Sé específico sobre el contenido real del post.
+- Incluye el contenido de SPOILERS si aporta contexto.
+- NO uses BBCode en tu respuesta.
 
 POST A RESUMIR:
 "${text}"`
 
 	try {
 		const rawResponse = await aiService.generate(prompt)
-		// Clean potential markdown blocks
-		const cleanJson = rawResponse.replace(/```json\n?|\n?```/g, '').trim()
-		const result = JSON.parse(cleanJson)
+		const result = parseAIJsonResponse<{ summary?: string; tone?: string }>(rawResponse)
 
 		return {
 			summary: result.summary || 'No se pudo generar el resumen.',
@@ -115,7 +105,6 @@ POST A RESUMIR:
 		}
 	} catch (e) {
 		logger.error('Error parsing summary JSON:', e)
-		// Fallback if JSON fails
 		return {
 			summary: 'Error al procesar la respuesta de la IA.',
 			tone: 'Error',

@@ -3,6 +3,7 @@
  * Provides wrappers for common BBCode operations and smart text placement.
  */
 import { logger } from '@/lib/logger'
+import { needsMultilineCenter } from '../lib/bbcode-utils'
 
 export function useTextInsertion(textarea: HTMLTextAreaElement) {
 	/**
@@ -74,9 +75,21 @@ export function useTextInsertion(textarea: HTMLTextAreaElement) {
 	const insertUnderline = () => wrapSelection('[u]', '[/u]')
 
 	/**
-	 * Insert center tags around selected text
+	 * Insert center tags around selected text.
+	 * Headings (#, ##, ###, ####) and [bar] require newlines around the center tags
+	 * to render correctly on Mediavida.
 	 */
-	const insertCenter = () => wrapSelection('[center]', '[/center]')
+	const insertCenter = () => {
+		const start = textarea.selectionStart
+		const end = textarea.selectionEnd
+		const selectedText = textarea.value.substring(start, end)
+
+		if (selectedText && needsMultilineCenter(selectedText)) {
+			wrapSelection('[center]\n', '\n[/center]')
+		} else {
+			wrapSelection('[center]', '[/center]')
+		}
+	}
 
 	/**
 	 * Insert strikethrough tags around selected text

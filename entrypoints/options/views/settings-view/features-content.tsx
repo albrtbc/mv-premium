@@ -13,6 +13,7 @@ import List from 'lucide-react/dist/esm/icons/list'
 import FolderHeart from 'lucide-react/dist/esm/icons/folder-heart'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import Search from 'lucide-react/dist/esm/icons/search'
+import Gamepad2 from 'lucide-react/dist/esm/icons/gamepad-2'
 import { browser } from 'wxt/browser'
 import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
@@ -27,6 +28,7 @@ export function FeaturesContent() {
 		newHomepageEnabled,
 		navbarSearchEnabled,
 		cinemaButtonEnabled,
+		gameButtonEnabled,
 		gifPickerEnabled,
 		draftsButtonEnabled,
 		templateButtonEnabled,
@@ -57,6 +59,7 @@ export function FeaturesContent() {
 				| 'newHomepageEnabled'
 				| 'navbarSearchEnabled'
 				| 'cinemaButtonEnabled'
+				| 'gameButtonEnabled'
 				| 'gifPickerEnabled'
 				| 'draftsButtonEnabled'
 				| 'templateButtonEnabled'
@@ -123,6 +126,14 @@ export function FeaturesContent() {
 			</SettingRow>
 
 			<SettingRow
+				icon={<Gamepad2 className="h-4 w-4" />}
+				label="Botón de Videojuegos"
+				description="Añade un botón en el editor para buscar e insertar fichas de videojuegos desde IGDB."
+			>
+				<Switch checked={gameButtonEnabled} onCheckedChange={withToastAndReload('gameButtonEnabled', true)} />
+			</SettingRow>
+
+			<SettingRow
 				icon={<ImageIcon className="h-4 w-4" />}
 				label="Selector de GIFs"
 				description="Permite buscar e insertar GIFs animados desde GIPHY directamente en el editor."
@@ -175,9 +186,9 @@ export function FeaturesContent() {
 				label="Resumidor de Hilos (IA)"
 				description={
 					<span>
-						Añade un botón para generar resúmenes de cada página del hilo usando inteligencia artificial.{' '}
+						Permite resúmenes de 1 página con el botón de resumir o hasta 30 páginas con el botón de Resumir+.{' '}
 						<span className="text-destructive font-bold block mt-1">
-							⚠️ Requiere configurar una Gemini API Key
+							⚠️ Requiere configurar una API Key de Gemini o Groq
 						</span>
 					</span>
 				}
@@ -191,7 +202,14 @@ export function FeaturesContent() {
 			<SettingRow
 				icon={<List className="h-4 w-4" />}
 				label="Resumen de Post (IA)"
-				description="Permite resumir posts individuales muy largos con un solo clic."
+        				description={
+					<span>
+						Permite resumir posts individuales muy largos con un solo clic.{' '}
+						<span className="text-destructive font-bold block mt-1">
+							⚠️ Requiere configurar una API Key de Gemini o Groq
+						</span>
+					</span>
+				}
 			>
 				<Switch checked={postSummaryEnabled} onCheckedChange={withToastAndReload('postSummaryEnabled', true)} />
 			</SettingRow>

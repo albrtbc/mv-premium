@@ -88,6 +88,16 @@ describe('image-detector', () => {
 				expect(isImageUrl('https://media.giphy.com/media/abc123/giphy.gif')).toBe(true)
 				expect(isImageUrl('https://media1.giphy.com/media/abc123/giphy.gif')).toBe(true)
 			})
+
+			it('should detect wsrv.nl image proxy URLs', () => {
+				expect(isImageUrl('https://wsrv.nl/?n=-1&output=webp&url=https%3A%2F%2Fcdn.akamai.steamstatic.com%2Fsteam%2Fapps%2F686060%2Fheader.jpg')).toBe(true)
+				expect(isImageUrl('https://wsrv.nl/?url=https://example.com/image.png&w=300')).toBe(true)
+			})
+
+			it('should detect illi.io URLs', () => {
+				expect(isImageUrl('https://illi.io/fbjryWG.png')).toBe(true)
+				expect(isImageUrl('https://illi.io/fbjLvJR.png')).toBe(true)
+			})
 		})
 
 		describe('query param detection', () => {

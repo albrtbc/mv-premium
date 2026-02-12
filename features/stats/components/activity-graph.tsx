@@ -212,12 +212,12 @@ function getSmallIcon(action: string) {
 function getActionVerb(entry: ActivityEntry, hasContext: boolean): string {
 	switch (entry.action) {
 		case 'create':
-			return 'creó un hilo en'
+			return hasContext ? 'creó un hilo en' : 'creó un hilo'
 		case 'update':
-			return 'editó un mensaje en'
+			return hasContext ? 'editó un mensaje en' : 'editó un mensaje'
 		case 'publish':
 		default:
-			return 'respondió en'
+			return hasContext ? 'respondió en' : 'respondió'
 	}
 }
 

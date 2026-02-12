@@ -23,6 +23,7 @@ import FileText from 'lucide-react/dist/esm/icons/file-text'
 import List from 'lucide-react/dist/esm/icons/list'
 import Play from 'lucide-react/dist/esm/icons/play'
 import Clapperboard from 'lucide-react/dist/esm/icons/clapperboard'
+import Gamepad2 from 'lucide-react/dist/esm/icons/gamepad-2'
 import ChartBar from 'lucide-react/dist/esm/icons/chart-bar'
 import type { ToolbarButtonConfig, SnippetConfig, ToolbarButtonGroup } from '@/types/editor'
 import { DEFAULT_TOOLBAR_BUTTONS, DEFAULT_SNIPPETS } from '@/types/editor'
@@ -89,6 +90,8 @@ interface SharedEditorToolbarProps {
 	onReplaceAll?: (text: string) => void
 	/** Document title for AI context */
 	documentTitle?: string
+	/** Hide cinema and game template buttons */
+	hideMediaTemplateButtons?: boolean
 }
 
 // ============================================================================
@@ -118,10 +121,12 @@ export function SharedEditorToolbar({
 	onGetFullContent,
 	onReplaceAll,
 	documentTitle,
+	hideMediaTemplateButtons = false,
 }: SharedEditorToolbarProps) {
 	// Feature toggles from settings
 	const gifPickerEnabled = useSettingsStore(state => state.gifPickerEnabled)
-	const cinemaButtonEnabled = useSettingsStore(state => state.cinemaButtonEnabled)
+	const cinemaButtonEnabled = useSettingsStore(state => state.cinemaButtonEnabled) && !hideMediaTemplateButtons
+	const gameButtonEnabled = useSettingsStore(state => state.gameButtonEnabled) && !hideMediaTemplateButtons
 
 	// Filter buttons by group visibility
 	const visibleButtons = buttons.filter(btn => !btn.hidden && !hideGroups.includes(btn.group))
@@ -192,7 +197,7 @@ export function SharedEditorToolbar({
 		<TooltipProvider delayDuration={300}>
 			<div
 				className={cn(
-					'flex items-center gap-1 px-2 py-1 bg-muted/50 border-b border-border overflow-x-auto [&::-webkit-scrollbar]:h-[2px] [&::-webkit-scrollbar-thumb]:bg-foreground/5 hover:[&::-webkit-scrollbar-thumb]:bg-foreground/20 [&::-webkit-scrollbar-track]:bg-transparent',
+					'flex items-center gap-1 h-9 px-2 bg-muted/50 border-b border-border overflow-x-auto [&::-webkit-scrollbar]:h-[2px] [&::-webkit-scrollbar-thumb]:bg-foreground/5 hover:[&::-webkit-scrollbar-thumb]:bg-foreground/20 [&::-webkit-scrollbar-track]:bg-transparent',
 					className
 				)}
 			>
@@ -360,6 +365,25 @@ export function SharedEditorToolbar({
 						</Tooltip>
 					)}
 
+					{gameButtonEnabled && (
+						<Tooltip>
+							<TooltipTrigger asChild className="hidden md:flex">
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-sm"
+									className="text-muted-foreground hover:text-foreground"
+									onClick={() => onDialog?.('game-template')}
+								>
+									<Gamepad2 className="h-4 w-4" />
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent side="bottom" className="text-xs">
+								Videojuegos (IGDB)
+							</TooltipContent>
+						</Tooltip>
+					)}
+
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Button
@@ -443,20 +467,22 @@ export function SharedEditorToolbar({
 					</>
 				)}
 
-				<div className="flex-grow" />
-
 				{showHistory && (
-					<div className="flex items-center gap-1 mr-2">
-						<ToolbarGroup
-							buttons={actionButtons}
-							groupKey="actions"
-							onButtonClick={handleButtonClick}
-							disabledButtons={{
-								undo: !canUndo,
-								redo: !canRedo,
-							}}
-						/>
-					</div>
+					<>
+						<div className="flex-grow" />
+						<ToolbarSeparator />
+						<div className="flex items-center gap-1">
+							<ToolbarGroup
+								buttons={actionButtons}
+								groupKey="actions"
+								onButtonClick={handleButtonClick}
+								disabledButtons={{
+									undo: !canUndo,
+									redo: !canRedo,
+								}}
+							/>
+						</div>
+					</>
 				)}
 			</div>
 		</TooltipProvider>

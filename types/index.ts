@@ -59,20 +59,52 @@ export type { ThemeColors, ThemePreset, CustomThemeState, ThemeExport } from './
 
 export { CSS_VAR_MAP, COLOR_GROUPS, COLOR_LABELS } from './theme'
 
-// AI Types (Gemini API)
+// AI Types (Gemini & Groq API)
 export type {
 	AIService,
-	RewriteStyle,
 	AIModel,
+	GeminiModel,
 	AIConfig,
 	ChatMessage,
 	ChatPart,
-	GeminiFunctionCall,
 	GeminiResponsePart,
 	GeminiCandidate,
 	GeminiAPIResponse,
 	GeminiRequestBody,
 	GeminiGenerationResult,
+
+	// Groq API
+	GroqModel,
+	GroqAPIResponse,
+	GroqChoice,
+	GroqUsage,
 } from './ai'
+
+// Template Types
+export type {
+	TemplateType,
+	TemplateBlockType,
+	FieldBlock,
+	SectionBlock,
+	RawBlock,
+	TemplateBlock,
+	MediaTemplate,
+	FieldDefinition,
+	UserTemplates,
+	MovieTemplateDataInput,
+	TVShowTemplateDataInput,
+	SeasonTemplateDataInput,
+	GameTemplateDataInput,
+	TemplateDataInput,
+} from './templates'
+
+export {
+	MOVIE_FIELDS,
+	TVSHOW_FIELDS,
+	SEASON_FIELDS,
+	GAME_FIELDS,
+	getFieldsForType,
+	DEFAULT_USER_TEMPLATES,
+} from './templates'
 
 // Note: MutedWord and PinnedPost are already exported from './storage'

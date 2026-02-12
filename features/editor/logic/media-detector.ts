@@ -19,7 +19,7 @@ const MEDIA_PATTERNS: { name: string; pattern: RegExp }[] = [
 	// YouTube
 	{
 		name: 'youtube',
-		pattern: /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)/i,
+		pattern: /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/embed\/|youtube\.com\/v\/)/i,
 	},
 	// Instagram
 	{

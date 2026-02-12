@@ -29,10 +29,16 @@ const positiveIntSchema = z.number().int().min(0)
 // =============================================================================
 
 export const aiModelSchema = z.enum([
+	'gemini-3-flash-preview',
 	'gemini-2.5-flash',
-	'gemini-2.0-flash',
-	'gemini-1.5-flash',
-	'gemini-1.5-pro',
+	'gemini-2.5-flash-lite',
+])
+
+export const groqModelSchema = z.enum([
+	'moonshotai/kimi-k2-instruct',
+])
+
+export const aiProviderSchema = z.enum(['gemini', 'groq'
 ])
 
 // =============================================================================
@@ -61,7 +67,10 @@ export const settingsSchema = z.object({
 
 	// AI Settings
 	geminiApiKey: apiKeySchema.default(''),
-	aiModel: aiModelSchema.default('gemini-2.5-flash'),
+	groqApiKey: apiKeySchema.default(''),
+	aiModel: aiModelSchema.default('gemini-3-flash-preview'),
+	groqModel: groqModelSchema.default('moonshotai/kimi-k2-instruct'),
+	aiProvider: aiProviderSchema.default('gemini'),
 
 	// Sync
 	syncEnabled: z.boolean().default(false),
@@ -83,9 +92,12 @@ export const settingsSchema = z.object({
 
 	// UI State
 	settingsActiveTab: z.string().default('integrations'),
+	variablesSidebarExpandedGroups: z.array(z.string()).default([]),
 
 	// Layout
 	ultrawideMode: ultrawideSchema.default('off'),
+	centeredPostsEnabled: z.boolean().default(false),
+	centeredControlsSticky: z.boolean().default(false),
 })
 
 // =============================================================================
@@ -124,10 +136,7 @@ export function safeValidateSettings(data: unknown): Settings | null {
 /**
  * Validates a single setting value.
  */
-export function validateSettingValue<K extends SettingsKey>(
-	key: K,
-	value: unknown
-): Settings[K] | null {
+export function validateSettingValue<K extends SettingsKey>(key: K, value: unknown): Settings[K] | null {
 	const shape = settingsSchema.shape[key]
 	const result = shape.safeParse(value)
 	return result.success ? (result.data as Settings[K]) : null

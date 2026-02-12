@@ -11,5 +11,8 @@ export { useUploadState, type UseUploadStateOptions, type UseUploadStateReturn }
 export { useTextEditor } from './use-text-editor'
 export { useThemeColors } from './use-theme-colors'
 
+// AI hooks
+export { useAIModelLabel } from './use-ai-model-label'
+
 // Editor-specific hooks
 export { useEditorHistory, useEditorSelection, useEditorShortcuts } from './editor'

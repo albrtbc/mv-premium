@@ -194,3 +194,24 @@ export function unwrapBBCode(
 export function getFormatById(id: string): FormatTag | undefined {
 	return FORMAT_TAGS.find(f => f.id === id)
 }
+
+// ============================================================================
+// Center Wrapping Helpers
+// ============================================================================
+
+/**
+ * Pattern that matches headings (#, ##, ###, ####) and [bar] tags.
+ * These elements require [center] tags on separate lines to render correctly on Mediavida.
+ */
+const BLOCK_ELEMENT_PATTERN = /^(?:#{1,4}\s|\[bar\])/im
+
+/**
+ * Checks if text contains block-level elements (headings or [bar] tags)
+ * that need multiline center wrapping to render correctly on Mediavida.
+ *
+ * On Mediavida, `[center]# Title[/center]` renders as raw text,
+ * but `[center]\n# Title\n[/center]` renders the heading centered.
+ */
+export function needsMultilineCenter(text: string): boolean {
+	return BLOCK_ELEMENT_PATTERN.test(text)
+}

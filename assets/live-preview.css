@@ -190,6 +190,19 @@
 	color: #ddd;
 }
 
+.mv-live-preview__content .center .table-wrap {
+	display: inline-block;
+	max-width: 100%;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.mv-live-preview__content .center table {
+	width: auto;
+	margin-left: auto;
+	margin-right: auto;
+}
+
 /* CITAS */
 .mv-live-preview__content .quote {
 	border-left: 3px solid #6d28d9;

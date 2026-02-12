@@ -3,27 +3,51 @@
  * Right panel showing live BBCode preview with Mediavida styling
  */
 
+import { Badge } from '@/components/ui/badge'
 import { MVPreview } from '@/components/preview-system'
 import { cn } from '@/lib/utils'
 import type { PreviewPanelProps } from './types'
 
-export function PreviewPanel({ content, boldColor, theme, showPreview, previewRef }: PreviewPanelProps) {
+export function PreviewPanel({
+	content,
+	boldColor,
+	theme,
+	showPreview,
+	previewRef,
+	badgeText,
+	badgeTone = 'neutral',
+}: PreviewPanelProps) {
+	const badgeToneClass =
+		badgeTone === 'custom'
+			? 'border-primary/30 bg-primary/10 text-primary'
+			: badgeTone === 'default'
+			? 'border-border/60 bg-muted/50 text-muted-foreground'
+			: 'border-border/50 bg-muted/30 text-foreground/80'
+
 	return (
 		<div
 			className={cn(
-				'hidden xl:flex flex-col rounded-r-lg border border-l-0 dark:bg-card overflow-hidden shrink-0 shadow-sm transition-all duration-500 ease-in-out',
+				'hidden lg:flex h-full flex-col rounded-r-lg border border-l-0 dark:bg-card overflow-hidden shrink-0 shadow-sm transition-all duration-500 ease-in-out',
 				showPreview ? 'w-[700px] opacity-100 border-l border-border' : 'w-0 opacity-0 border-0'
 			)}
 		>
 			{/* Header */}
 			<div
 				className={cn(
-					'h-10 shrink-0 border-b flex items-center justify-between bg-border px-4 dark:bg-background transition-opacity duration-300',
+					'h-9 shrink-0 border-b flex items-center justify-between bg-muted/60 px-4 dark:bg-muted/30 transition-opacity duration-300',
 					showPreview ? 'opacity-100' : 'opacity-0'
 				)}
 			>
-				<span className="text-xs font-bold text-muted-foreground tracking-widest uppercase font-mediavida">Vista Previa</span>
-				<span className="text-xs text-muted-foreground font-mediavida">Estilo Mediavida</span>
+				<span className="text-xs font-bold text-foreground/80 tracking-widest uppercase font-mediavida">
+					Vista Previa
+				</span>
+				{badgeText ? (
+					<Badge variant="outline" className={cn('font-mono text-xs', badgeToneClass)}>
+						{badgeText}
+					</Badge>
+				) : (
+					<span className="text-xs text-muted-foreground font-mediavida">Estilo Mediavida</span>
+				)}
 			</div>
 
 			{/* Preview Content */}

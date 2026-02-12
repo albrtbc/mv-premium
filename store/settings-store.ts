@@ -48,7 +48,10 @@ interface SettingsActions {
 
 	// AI Settings
 	setGeminiApiKey: (key: string) => void
+	setGroqApiKey: (key: string) => void
 	setAIModel: (model: Settings['aiModel']) => void
+	setGroqModel: (model: Settings['groqModel']) => void
+	setAIProvider: (provider: Settings['aiProvider']) => void
 
 	// Sync
 	setSyncEnabled: (enabled: boolean) => void
@@ -64,9 +67,11 @@ interface SettingsActions {
 
 	// UI State
 	setSettingsActiveTab: (tab: string) => void
+	setVariablesSidebarExpandedGroups: (groups: string[]) => void
 
 	// Layout
 	setUltrawideMode: (mode: Settings['ultrawideMode']) => void
+	setCenteredPostsEnabled: (enabled: boolean) => void
 
 	// Keyboard Shortcuts
 	setShortcut: (actionId: string, keyCombo: string | null) => void
@@ -151,10 +156,10 @@ export const useSettingsStore = create<SettingsState>()(
 			// Theme & Appearance
 			setTheme: theme => set({ theme }),
 			setBoldColor: color => {
-			set({ boldColor: color })
-			// Also write to the separate key that content script watches
-			storage.setItem(`local:${STORAGE_KEYS.BOLD_COLOR}`, color)
-		},
+				set({ boldColor: color })
+				// Also write to the separate key that content script watches
+				storage.setItem(`local:${STORAGE_KEYS.BOLD_COLOR}`, color)
+			},
 			setBoldColorEnabled: enabled => {
 				set({ boldColorEnabled: enabled })
 				// Also write to separate key for content script
@@ -169,7 +174,10 @@ export const useSettingsStore = create<SettingsState>()(
 
 			// AI Settings
 			setGeminiApiKey: key => set({ geminiApiKey: key }),
+			setGroqApiKey: key => set({ groqApiKey: key }),
 			setAIModel: model => set({ aiModel: model }),
+			setGroqModel: model => set({ groqModel: model }),
+			setAIProvider: provider => set({ aiProvider: provider }),
 
 			// Sync
 			setSyncEnabled: enabled => set({ syncEnabled: enabled }),
@@ -186,9 +194,11 @@ export const useSettingsStore = create<SettingsState>()(
 
 			// UI State
 			setSettingsActiveTab: tab => set({ settingsActiveTab: tab }),
+			setVariablesSidebarExpandedGroups: groups => set({ variablesSidebarExpandedGroups: groups }),
 
 			// Layout
 			setUltrawideMode: mode => set({ ultrawideMode: mode }),
+			setCenteredPostsEnabled: enabled => set({ centeredPostsEnabled: enabled }),
 
 			// Keyboard Shortcuts
 			setShortcut: (actionId, keyCombo) =>

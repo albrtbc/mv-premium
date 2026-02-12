@@ -26,6 +26,21 @@ interface PendingThreadCreation {
 	timestamp: number
 }
 
+// Pending reply data structure
+interface PendingReply {
+	title: string
+	subforum: string
+	url: string
+	timestamp: number
+}
+
+// Pending post edit data structure (for edits from post.php)
+interface PendingPostEdit {
+	subforum: string
+	url: string
+	timestamp: number
+}
+
 /**
  * Computes the normalized base URL for the current thread, excluding anchors and pagination.
  */
@@ -52,7 +67,7 @@ function isPostPhpEditPage(): boolean {
  * Matches both /nuevo-hilo and /foro/{subforum}/nuevo-hilo
  */
 function isNewThreadPage(): boolean {
-	return window.location.pathname.includes(MV_URLS.NEW_THREAD)
+	return window.location.pathname.includes('/nuevo-hilo')
 }
 
 /**
@@ -71,10 +86,20 @@ function getThreadInfo(): { title: string; subforum: string; url: string } {
 	const brandSubforumEl = document.querySelector<HTMLAnchorElement>(MV_SELECTORS.THREAD.BRAND_SUBFORUM)
 	const subforumFromBrand = brandSubforumEl?.textContent?.trim() || ''
 
-	// Fallback: get from document title
 	let title = titleFromHeader
 	let subforum = subforumFromBrand
 
+	// Fallback: try direct h1 in brand section (Mediavida structure for new threads)
+	if (!title) {
+		const h1El = document.querySelector<HTMLHeadingElement>('.brand h1, #title h1')
+		const h1Text = h1El?.textContent?.trim() || ''
+		// Avoid using "Editar mensaje" as the title
+		if (h1Text && !h1Text.toLowerCase().includes('editar')) {
+			title = h1Text
+		}
+	}
+
+	// Final fallback: get from document title
 	if (!title) {
 		const docTitle = document.title
 		const parts = docTitle.split(' - ')
@@ -173,8 +198,9 @@ function getEditPageInfo(): { title: string; subforum: string; url: string; need
  * Get subforum name from nuevo-hilo page
  */
 function getSubforumFromNewThread(): string {
-	const subforumEl = document.querySelector<HTMLElement>(MV_SELECTORS.THREAD.SUBFORUM_ALL)
-	return subforumEl?.textContent?.trim() || ''
+	// Extract from .brand .section a (matches the thread page structure)
+	const brandSectionEl = document.querySelector<HTMLAnchorElement>('.brand .section a, #title .section a')
+	return brandSectionEl?.textContent?.trim() || ''
 }
 
 /**
@@ -261,25 +287,26 @@ export function setupPostTracker(): void {
 				if (isPostPhpEdit) {
 					const info = getEditPageInfo()
 
-					// Fetch real title async, then track
-					if (info.needsTitleFetch && info.url) {
-						fetchRealThreadTitle(info.url).then(realTitle => {
+					// Save pending edit to be completed on the redirected thread page
+					// This avoids the async fetch issue where the page navigates before the fetch completes
+					if (info.url) {
+						const pending: PendingPostEdit = {
+							subforum: info.subforum,
+							url: info.url,
+							timestamp: Date.now(),
+						}
+						try {
+							sessionStorage.setItem(STORAGE_KEYS.PENDING_POST_EDIT, JSON.stringify(pending))
+						} catch {
+							// If sessionStorage fails, track immediately without title
 							trackActivity({
 								type: 'post',
 								action: 'update',
-								title: realTitle || '',
+								title: '',
 								context: info.subforum || '',
 								url: info.url,
 							}).catch(() => {})
-						})
-					} else {
-						trackActivity({
-							type: 'post',
-							action: 'update',
-							title: '',
-							context: info.subforum || '',
-							url: info.url,
-						}).catch(() => {})
+						}
 					}
 				} else {
 					// Inline edit button - we already have thread info
@@ -293,16 +320,27 @@ export function setupPostTracker(): void {
 					}).catch(() => {})
 				}
 			} else {
-				// Reply: get thread info
+				// Reply: use deferred tracking to survive page navigation
 				const threadInfo = getThreadInfo()
 
-				trackActivity({
-					type: 'post',
-					action: 'publish',
+				const pending: PendingReply = {
 					title: threadInfo.title,
-					context: threadInfo.subforum,
+					subforum: threadInfo.subforum,
 					url: threadInfo.url,
-				}).catch(() => {})
+					timestamp: Date.now(),
+				}
+				try {
+					sessionStorage.setItem(STORAGE_KEYS.PENDING_REPLY, JSON.stringify(pending))
+				} catch {
+					// If sessionStorage fails, track immediately (best effort)
+					trackActivity({
+						type: 'post',
+						action: 'publish',
+						title: threadInfo.title,
+						context: threadInfo.subforum,
+						url: threadInfo.url,
+					}).catch(() => {})
+				}
 			}
 		}
 
@@ -367,3 +405,95 @@ export function completePendingThreadCreation(): void {
 		} catch {}
 	}
 }
+
+/**
+ * Checks for and completes any pending post edit tracking.
+ * Should be called on thread page load.
+ * 
+ * This handles the case where a user edits from post.php - we couldn't get the
+ * thread title there because the page only shows "Editar mensaje", so we save
+ * the pending edit and complete it here where we have access to the real title.
+ */
+export function completePendingPostEdit(): void {
+	try {
+		const pendingJson = sessionStorage.getItem(STORAGE_KEYS.PENDING_POST_EDIT)
+		if (!pendingJson) return
+
+		const pending: PendingPostEdit = JSON.parse(pendingJson)
+
+		// Only complete if within 30 seconds (to avoid stale data)
+		const MAX_AGE_MS = 30000
+		if (Date.now() - pending.timestamp > MAX_AGE_MS) {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_POST_EDIT)
+			return
+		}
+
+		// Check if we're on the same thread that was edited
+		const currentUrl = getThreadBaseUrl()
+		const pendingUrl = pending.url.replace(/\/\d+$/, '').replace(/\/$/, '') // Normalize
+		const normalizedCurrent = currentUrl.replace(/\/\d+$/, '').replace(/\/$/, '')
+
+		// Only complete if we're on the edited thread
+		if (!normalizedCurrent.includes(pendingUrl.split('/foro/')[1]?.split('/')[1] || '')) {
+			// Not on the same thread, don't complete yet
+			return
+		}
+
+		// Get the thread title from the current page
+		const threadInfo = getThreadInfo()
+
+		// Complete the tracking with the real title
+		trackActivity({
+			type: 'post',
+			action: 'update',
+			title: threadInfo.title || '',
+			context: pending.subforum || threadInfo.subforum,
+			url: pending.url,
+		}).catch(() => {})
+
+		// Clear the pending flag
+		sessionStorage.removeItem(STORAGE_KEYS.PENDING_POST_EDIT)
+	} catch {
+		// Clear if any error
+		try {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_POST_EDIT)
+		} catch {}
+	}
+}
+
+/**
+ * Checks for and completes any pending reply tracking.
+ * Should be called on thread page load to finalize deferred reply tracking.
+ */
+export function completePendingReply(): void {
+	try {
+		const pendingJson = sessionStorage.getItem(STORAGE_KEYS.PENDING_REPLY)
+		if (!pendingJson) return
+
+		const pending: PendingReply = JSON.parse(pendingJson)
+
+		// Only complete if within 30 seconds (to avoid stale data)
+		const MAX_AGE_MS = 30000
+		if (Date.now() - pending.timestamp > MAX_AGE_MS) {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_REPLY)
+			return
+		}
+
+		trackActivity({
+			type: 'post',
+			action: 'publish',
+			title: pending.title,
+			context: pending.subforum,
+			url: pending.url,
+		}).catch(() => {})
+
+		// Clear the pending flag
+		sessionStorage.removeItem(STORAGE_KEYS.PENDING_REPLY)
+	} catch {
+		// Clear if any error
+		try {
+			sessionStorage.removeItem(STORAGE_KEYS.PENDING_REPLY)
+		} catch {}
+	}
+}
+

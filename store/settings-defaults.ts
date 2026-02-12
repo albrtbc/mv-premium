@@ -7,6 +7,7 @@
  * IMPORTANT: Keep in sync with settings-schema.ts
  */
 import type { Settings } from './settings-types'
+import { DEFAULT_USER_TEMPLATES } from '@/types/templates'
 
 /** Default settings values */
 export const DEFAULT_SETTINGS: Settings = {
@@ -24,7 +25,10 @@ export const DEFAULT_SETTINGS: Settings = {
 
 	// AI Settings
 	geminiApiKey: '',
-	aiModel: 'gemini-2.5-flash',
+	groqApiKey: '',
+	aiModel: 'gemini-3-flash-preview',
+	groqModel: 'moonshotai/kimi-k2-instruct',
+	aiProvider: 'gemini',
 
 	// Sync
 	syncEnabled: false,
@@ -39,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 	// Feature Toggles - Editor
 	cinemaButtonEnabled: true,
+	gameButtonEnabled: true,
 	gifPickerEnabled: true,
 	draftsButtonEnabled: true,
 	templateButtonEnabled: true,
@@ -61,12 +66,18 @@ export const DEFAULT_SETTINGS: Settings = {
 
 	// UI State
 	settingsActiveTab: 'integrations',
+	variablesSidebarExpandedGroups: [],
 
 	// Layout
 	ultrawideMode: 'off',
+	centeredPostsEnabled: false,
+	centeredControlsSticky: false,
 
 	// Keyboard Shortcuts
 	shortcuts: {},
+
+	// Media Templates (null = use default)
+	mediaTemplates: DEFAULT_USER_TEMPLATES,
 }
 
 /**

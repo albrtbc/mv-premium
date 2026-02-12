@@ -15,7 +15,12 @@ export interface SteamGameDetails {
 	appId: number
 	name: string
 	headerImage: string
-	shortDescription: string
+	/**
+	 * Best Spanish description available from Steam.
+	 * Priority: about_the_game text (stripped HTML) → short_description fallback.
+	 * May be empty if Steam has no text for this game.
+	 */
+	description: string
 	isFree: boolean
 	price: string | null
 	originalPrice: string | null
@@ -26,6 +31,8 @@ export interface SteamGameDetails {
 	genres: string[]
 	metacriticScore: number | null
 	metacriticUrl: string | null
+	screenshots: string[]
+	steamLibraryHeaderUrl: string
 }
 
 interface SteamPriceOverview {
@@ -47,6 +54,8 @@ interface SteamApiResponse {
 			required_age: number
 			is_free: boolean
 			short_description: string
+			detailed_description?: string
+			about_the_game?: string
 			header_image: string
 			website: string | null
 			developers?: string[]
@@ -61,6 +70,7 @@ interface SteamApiResponse {
 				score: number
 				url: string
 			}
+			screenshots?: Array<{ id: number; path_thumbnail: string; path_full: string }>
 		}
 	}
 }
@@ -74,6 +84,32 @@ const memoryCache = new Map<number, { data: SteamGameDetails; timestamp: number 
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/**
+ * Strip HTML tags from Steam's detailed_description and convert to clean text.
+ * Preserves paragraph structure with line breaks.
+ */
+function stripHtmlToPlainText(html: string): string {
+	if (!html) return ''
+
+	return (
+		html
+			// Replace block-level elements with newlines
+			.replace(/<\/?(h[1-6]|p|div|br|li|ul|ol|tr)[^>]*>/gi, '\n')
+			// Remove all remaining HTML tags
+			.replace(/<[^>]+>/g, '')
+			// Decode common HTML entities
+			.replace(/&amp;/g, '&')
+			.replace(/&lt;/g, '<')
+			.replace(/&gt;/g, '>')
+			.replace(/&quot;/g, '"')
+			.replace(/&#39;/g, "'")
+			.replace(/&nbsp;/g, ' ')
+			// Collapse multiple newlines
+			.replace(/\n{3,}/g, '\n\n')
+			.trim()
+	)
+}
 
 /**
  * Extract Steam App ID from various URL formats
@@ -125,8 +161,8 @@ function setCachedGame(appId: number, data: SteamGameDetails): void {
  * Fetch game details from Steam API
  *
  * @internal
- * ⚠️ SOLO PARA USO EN BACKGROUND SCRIPT
- * No importar directamente en componentes UI. Usar fetchSteamGameDetailsViaBackground.
+ * ⚠️ USE ONLY IN BACKGROUND SCRIPT
+ * Do not import directly in UI components. Use fetchSteamGameDetailsViaBackground.
  */
 export async function fetchSteamGameDetails(appId: number): Promise<SteamGameDetails | null> {
 	// Check memory cache first
@@ -154,11 +190,14 @@ export async function fetchSteamGameDetails(appId: number): Promise<SteamGameDet
 
 		const data = appData.data
 
+		const aboutText = stripHtmlToPlainText(data.about_the_game || '')
+
 		const gameDetails: SteamGameDetails = {
 			appId,
 			name: data.name,
 			headerImage: data.header_image,
-			shortDescription: data.short_description,
+			// Use about_the_game text if available, otherwise fall back to short_description
+			description: aboutText || data.short_description || '',
 			isFree: data.is_free,
 			price: data.price_overview?.final_formatted || null,
 			originalPrice: data.price_overview?.initial_formatted || null,
@@ -169,6 +208,8 @@ export async function fetchSteamGameDetails(appId: number): Promise<SteamGameDet
 			genres: data.genres?.map(g => g.description) || [],
 			metacriticScore: data.metacritic?.score || null,
 			metacriticUrl: data.metacritic?.url || null,
+			screenshots: data.screenshots?.map(s => s.path_full) || [],
+			steamLibraryHeaderUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_header_2x.jpg`,
 		}
 
 		// Cache the result in memory

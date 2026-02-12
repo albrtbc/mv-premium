@@ -35,6 +35,7 @@ import { UsersView } from './views/users-view'
 import { SettingsView } from './views/settings-view'
 import MutedPostsView from './views/muted-posts-view'
 import { WhatsNewView } from './views/whats-new-view'
+
 import React from 'react'
 
 /**
@@ -45,6 +46,7 @@ const routeLabels: Record<string, string> = {
 
 	drafts: 'Borradores',
 	templates: 'Plantillas',
+	'template-editor': 'Plantillas de Fichas',
 	'muted-posts': 'Palabras Silenciadas',
 	favorites: 'Subforos Favoritos',
 	subforums: 'Subforos',
@@ -91,10 +93,12 @@ function DynamicBreadcrumb() {
 						<BreadcrumbSeparator className="hidden md:block" />
 						<BreadcrumbItem>
 							{item.isLast ? (
-								<BreadcrumbPage>{item.label}</BreadcrumbPage>
+								<BreadcrumbPage className="font-medium text-primary">{item.label}</BreadcrumbPage>
 							) : (
 								<BreadcrumbLink asChild>
-									<Link to={item.path}>{item.label}</Link>
+									<Link to={item.path} className="hover:text-primary transition-colors">
+										{item.label}
+									</Link>
 								</BreadcrumbLink>
 							)}
 						</BreadcrumbItem>
@@ -179,12 +183,10 @@ function QuickNavButtons() {
 }
 
 import { initGlobalThemeListener } from '@/lib/theme/injector'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClient } from './lib/query-client'
 
 export default function OptionsApp() {
 	const location = useLocation()
-	
+
 	// Initialize global theme listener (font, radius, colors)
 	useEffect(() => {
 		const cleanup = initGlobalThemeListener()
@@ -197,50 +199,57 @@ export default function OptionsApp() {
 		location.pathname.includes('/templates/new') ||
 		location.pathname.includes('/templates/edit')
 
+	const isMediaTemplatesEditor =
+		location.pathname === '/templates' && new URLSearchParams(location.search).get('tab') === 'media'
+
 	return (
-		<QueryClientProvider client={queryClient}>
-			<SidebarProvider>
-				<AppSidebar />
-				<SidebarInset>
-					{/* Header with trigger and breadcrumb */}
-					<header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-						<SidebarTrigger className="-ml-1" />
-						<Separator orientation="vertical" className="mr-2 h-4" />
-						<DynamicBreadcrumb />
+		<SidebarProvider>
+			<AppSidebar />
+			<SidebarInset className="overflow-x-hidden">
+				{/* Header with trigger and breadcrumb */}
+				<header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+					<SidebarTrigger className="-ml-1" />
+					<Separator orientation="vertical" className="mr-2 h-4" />
+					<DynamicBreadcrumb />
 
-						{/* Spacer */}
-						<div className="flex-1" />
+					{/* Spacer */}
+					<div className="flex-1" />
 
-						{/* Quick navigation to Mediavida */}
-						<QuickNavButtons />
-					</header>
+					{/* Quick navigation to Mediavida */}
+					<QuickNavButtons />
+				</header>
 
-					{/* Main content area with routes - constrained width for readability */}
-					<main className="flex-1 overflow-auto p-6">
-						<div className={cn('w-full mx-auto transition-all duration-300', isEditorView ? 'max-w-[1600px]' : 'max-w-7xl')}>
-							<Routes>
-								<Route path="/" element={<HomeView />} />
-								<Route path="/subforums" element={<SubforumsView />} />
-								{/* Borradores */}
-								<Route path="/drafts" element={<DraftsView filterType="draft" />} />
-								<Route path="/drafts/new" element={<DraftEditorView docType="draft" />} />
-								<Route path="/drafts/edit/:id" element={<DraftEditorView docType="draft" />} />
-								{/* Plantillas */}
-								<Route path="/templates" element={<DraftsView filterType="template" />} />
-								<Route path="/templates/new" element={<DraftEditorView docType="template" />} />
-								<Route path="/templates/edit/:id" element={<DraftEditorView docType="template" />} />
-								{/* Otros */}
-								<Route path="/muted-posts" element={<MutedPostsView />} />
-								<Route path="/users" element={<UsersView />} />
-								<Route path="/settings" element={<SettingsView />} />
+				{/* Main content area with routes - constrained width for readability */}
+				<main className="flex-1 overflow-auto p-6">
+					<div
+						className={cn(
+							'w-full mx-auto transition-all duration-300',
+							isEditorView || isMediaTemplatesEditor ? 'max-w-[1600px]' : 'max-w-7xl'
+						)}
+					>
+						<Routes>
+							<Route path="/" element={<HomeView />} />
+							<Route path="/subforums" element={<SubforumsView />} />
+							{/* Drafts */}
+							<Route path="/drafts" element={<DraftsView filterType="draft" />} />
+							<Route path="/drafts/new" element={<DraftEditorView docType="draft" />} />
+							<Route path="/drafts/edit/:id" element={<DraftEditorView docType="draft" />} />
+							{/* Snippets */}
+							<Route path="/templates" element={<DraftsView filterType="template" />} />
+							<Route path="/templates/new" element={<DraftEditorView docType="template" />} />
+							<Route path="/templates/edit/:id" element={<DraftEditorView docType="template" />} />
 
-								<Route path="/whats-new" element={<WhatsNewView />} />
-								<Route path="/shortcuts" element={<Navigate to="/settings?tab=shortcuts" replace />} />
-							</Routes>
-						</div>
-					</main>
-				</SidebarInset>
-			</SidebarProvider>
-		</QueryClientProvider>
+							{/* Others */}
+							<Route path="/muted-posts" element={<MutedPostsView />} />
+							<Route path="/users" element={<UsersView />} />
+							<Route path="/settings" element={<SettingsView />} />
+
+							<Route path="/whats-new" element={<WhatsNewView />} />
+							<Route path="/shortcuts" element={<Navigate to="/settings?tab=shortcuts" replace />} />
+						</Routes>
+					</div>
+				</main>
+			</SidebarInset>
+		</SidebarProvider>
 	)
 }
