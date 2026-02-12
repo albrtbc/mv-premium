@@ -98,6 +98,7 @@ export const settingsSchema = z.object({
 	ultrawideMode: ultrawideSchema.default('off'),
 	centeredPostsEnabled: z.boolean().default(false),
 	centeredControlsSticky: z.boolean().default(false),
+	centeredControlsCompact: z.boolean().default(false),
 })
 
 // =============================================================================

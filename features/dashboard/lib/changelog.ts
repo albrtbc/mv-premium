@@ -21,6 +21,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
 	{
+		version: '1.3.1',
+		date: '2026-02-12',
+		title: 'Barra de Controles Compacta y Nueva Homepage',
+		summary:
+			'Nueva opción de barra compacta para posts centrados y dashboard personalizado con noticias, hilos recientes y favoritos.',
+		changes: [
+			{
+				type: 'feature',
+				description: 'Barra compacta: Nueva opción que reduce la barra de controles a una sola línea más pequeña.',
+				category: 'Diseño',
+			},
+			{
+				type: 'feature',
+				description:
+					'Nueva Homepage: Dashboard personalizado con noticias, últimos hilos del foro, tus últimos posts y favoritos.',
+				category: 'Experiencia',
+			},
+			{
+				type: 'feature',
+				description:
+					'Foros visitados recientemente: Accesos directos a tus subforos más visitados desde la homepage.',
+				category: 'Experiencia',
+			},
+		],
+	},
+	{
 		version: '1.3.0',
 		date: '2026-02-09',
 		title: 'IA Multiprovider y Media Templates',

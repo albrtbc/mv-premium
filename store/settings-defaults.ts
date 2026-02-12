@@ -72,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	ultrawideMode: 'off',
 	centeredPostsEnabled: false,
 	centeredControlsSticky: false,
+	centeredControlsCompact: false,
 
 	// Keyboard Shortcuts
 	shortcuts: {},

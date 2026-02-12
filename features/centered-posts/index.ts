@@ -22,6 +22,7 @@ interface SettingsState {
 	state: {
 		centeredPostsEnabled: boolean
 		centeredControlsSticky: boolean
+		centeredControlsCompact: boolean
 	}
 }
 
@@ -29,8 +30,9 @@ interface SettingsState {
  * CSS styles to hide sidebar and expand posts
  * Uses 100% width - no dynamic calculations to prevent layout shift
  * @param sticky - Whether the control bar should be sticky
+ * @param compact - Whether the control bar should use compact mode
  */
-function generateStyles(sticky: boolean): string {
+function generateStyles(sticky: boolean, compact: boolean = false): string {
 	return `
 		/* MVP Centered Posts Mode */
 
@@ -152,19 +154,20 @@ function generateStyles(sticky: boolean): string {
 		#${CONTROL_BAR_ID} {
 			display: flex !important;
 			flex-direction: row !important;
-			flex-wrap: wrap !important;
-			gap: 12px;
+			flex-wrap: ${compact ? 'nowrap' : 'wrap'} !important;
+			gap: ${compact ? '8px' : '12px'};
 			align-items: center;
 			justify-content: flex-start;
-			padding: 12px 16px !important;
-			margin-top: 16px !important;
-			margin-bottom: 20px !important;
+			padding: ${compact ? '6px 12px' : '12px 16px'} !important;
+			margin-top: ${compact ? '8px' : '16px'} !important;
+			margin-bottom: ${compact ? '10px' : '20px'} !important;
 			width: 100% !important;
 			background: var(--mv-bg-alt, #1e1e1e);
 			border: 1px solid rgba(128, 128, 128, 0.15);
 			border-radius: var(--radius, 8px);
 			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 			box-sizing: border-box !important;
+			${compact ? 'overflow: hidden !important;' : ''}
 			${
 				sticky
 					? `
@@ -181,16 +184,31 @@ function generateStyles(sticky: boolean): string {
 			display: flex !important;
 			flex-direction: row !important;
 			align-items: center !important;
-			gap: 8px;
+			gap: ${compact ? '6px' : '8px'};
 			flex-shrink: 0;
 		}
 
 		/* Vertical Separator between groups */
 		#${CONTROL_BAR_ID} .mvp-control-separator {
 			width: 1px;
-			height: 24px;
+			height: ${compact ? '18px' : '24px'};
 			background: rgba(128, 128, 128, 0.25);
 			flex-shrink: 0;
+		}
+
+		${
+			compact
+				? `
+		/* Compact mode: reduce button/link sizes */
+		#${CONTROL_BAR_ID} a,
+		#${CONTROL_BAR_ID} button,
+		#${CONTROL_BAR_ID} [role='button'] {
+			font-size: 13px !important;
+			padding-top: 4px !important;
+			padding-bottom: 4px !important;
+		}
+		`
+				: ''
 		}
 
 		/* =====================================================
@@ -477,8 +495,9 @@ function removeControlBar(): void {
  * Applies or removes the centered posts mode
  * @param enabled - Whether to enable centered posts
  * @param sticky - Whether the control bar should be sticky
+ * @param compact - Whether the control bar should use compact mode
  */
-function applyCenteredPosts(enabled: boolean, sticky: boolean = false): void {
+function applyCenteredPosts(enabled: boolean, sticky: boolean = false, compact: boolean = false): void {
 	logger.debug('CenteredPosts: applyCenteredPosts called with enabled =', enabled)
 
 	// Update cache for next page load
@@ -503,7 +522,7 @@ function applyCenteredPosts(enabled: boolean, sticky: boolean = false): void {
 	// Create and inject styles
 	const styleEl = document.createElement('style')
 	styleEl.id = STYLE_ID
-	styleEl.textContent = generateStyles(sticky)
+	styleEl.textContent = generateStyles(sticky, compact)
 	document.head.appendChild(styleEl)
 	logger.debug('CenteredPosts: Stylesheet injected with id', STYLE_ID)
 
@@ -524,7 +543,8 @@ export async function initCenteredPosts(): Promise<void> {
 			const parsed: SettingsState = typeof raw === 'string' ? JSON.parse(raw) : raw
 			const enabled = parsed?.state?.centeredPostsEnabled ?? false
 			const sticky = parsed?.state?.centeredControlsSticky ?? false
-			applyCenteredPosts(enabled, sticky)
+			const compact = parsed?.state?.centeredControlsCompact ?? false
+			applyCenteredPosts(enabled, sticky, compact)
 		}
 
 		// Watch for changes
@@ -535,7 +555,8 @@ export async function initCenteredPosts(): Promise<void> {
 				const parsed: SettingsState = typeof newValue === 'string' ? JSON.parse(newValue) : newValue
 				const enabled = parsed?.state?.centeredPostsEnabled ?? false
 				const sticky = parsed?.state?.centeredControlsSticky ?? false
-				applyCenteredPosts(enabled, sticky)
+				const compact = parsed?.state?.centeredControlsCompact ?? false
+				applyCenteredPosts(enabled, sticky, compact)
 			} catch (e) {
 				logger.error('CenteredPosts error parsing settings:', e)
 			}

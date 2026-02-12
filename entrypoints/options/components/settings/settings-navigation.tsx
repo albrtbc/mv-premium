@@ -9,6 +9,7 @@ import Images from 'lucide-react/dist/esm/icons/images'
 import Clock from 'lucide-react/dist/esm/icons/clock'
 import Maximize from 'lucide-react/dist/esm/icons/maximize'
 import Pin from 'lucide-react/dist/esm/icons/pin'
+import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2'
 import { useSettingsStore } from '@/store/settings-store'
 import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -29,6 +30,7 @@ export function SettingsNavigation() {
 		nativeLiveDelayEnabled,
 		centeredPostsEnabled,
 		centeredControlsSticky,
+		centeredControlsCompact,
 		setSetting,
 		updateSettings,
 	} = useSettingsStore()
@@ -177,10 +179,11 @@ export function SettingsNavigation() {
 					checked={centeredPostsEnabled}
 					onCheckedChange={(checked) => {
 						if (!checked) {
-							// Reset sticky controls if main feature is disabled (Atomic update)
+							// Reset sub-options if main feature is disabled (Atomic update)
 							updateSettings({
 								centeredPostsEnabled: false,
 								centeredControlsSticky: false,
+								centeredControlsCompact: false,
 							})
 						} else {
 							setSetting('centeredPostsEnabled', true)
@@ -199,30 +202,56 @@ export function SettingsNavigation() {
 			</SettingRow>
 
 			{centeredPostsEnabled && (
-				<SettingRow
-					icon={<Pin className="h-4 w-4" />}
-					label="Barra de controles fija"
-					description="La barra de controles permanece visible al hacer scroll."
-					className="ml-6 border-l-2 border-primary/30 pl-4"
-				>
-					<Switch
-						checked={centeredControlsSticky}
-						onCheckedChange={(checked) => {
-							setSetting('centeredControlsSticky', checked)
-							
-							// Reload with slight delay
-							setTimeout(() => {
-								reloadMediavidaTabs()
-							}, 100)
+				<>
+					<SettingRow
+						icon={<Pin className="h-4 w-4" />}
+						label="Barra de controles fija"
+						description="La barra de controles permanece visible al hacer scroll."
+						className="ml-6 border-l-2 border-primary/30 pl-4"
+					>
+						<Switch
+							checked={centeredControlsSticky}
+							onCheckedChange={(checked) => {
+								setSetting('centeredControlsSticky', checked)
 
-							toast.success(
-								checked
-									? 'Barra de controles fija activada'
-									: 'Configuración guardada'
-							)
-						}}
-					/>
-				</SettingRow>
+								// Reload with slight delay
+								setTimeout(() => {
+									reloadMediavidaTabs()
+								}, 100)
+
+								toast.success(
+									checked
+										? 'Barra de controles fija activada'
+										: 'Configuración guardada'
+								)
+							}}
+						/>
+					</SettingRow>
+
+					<SettingRow
+						icon={<Minimize2 className="h-4 w-4" />}
+						label="Barra compacta"
+						description="Reduce el tamaño de la barra de controles a una sola línea."
+						className="ml-6 border-l-2 border-primary/30 pl-4"
+					>
+						<Switch
+							checked={centeredControlsCompact}
+							onCheckedChange={(checked) => {
+								setSetting('centeredControlsCompact', checked)
+
+								setTimeout(() => {
+									reloadMediavidaTabs()
+								}, 100)
+
+								toast.success(
+									checked
+										? 'Barra compacta activada'
+										: 'Configuración guardada'
+								)
+							}}
+						/>
+					</SettingRow>
+				</>
 			)}
 		</SettingsSection>
 	)
