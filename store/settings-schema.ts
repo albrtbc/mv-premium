@@ -80,6 +80,9 @@ export const settingsSchema = z.object({
 	liveThreadEnabled: z.boolean().default(false),
 	nativeLiveDelayEnabled: z.boolean().default(true),
 
+	// Feature Toggles - Content
+	improvedUpvotesEnabled: z.boolean().default(true),
+
 	// Feature Toggles - Appearance
 	newHomepageEnabled: z.boolean().default(false),
 

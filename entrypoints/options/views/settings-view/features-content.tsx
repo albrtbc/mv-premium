@@ -11,6 +11,7 @@ import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Layout from 'lucide-react/dist/esm/icons/layout'
 import List from 'lucide-react/dist/esm/icons/list'
 import FolderHeart from 'lucide-react/dist/esm/icons/folder-heart'
+import ThumbsUp from 'lucide-react/dist/esm/icons/thumbs-up'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import Search from 'lucide-react/dist/esm/icons/search'
 import Gamepad2 from 'lucide-react/dist/esm/icons/gamepad-2'
@@ -32,6 +33,7 @@ export function FeaturesContent() {
 		gifPickerEnabled,
 		draftsButtonEnabled,
 		templateButtonEnabled,
+		improvedUpvotesEnabled,
 		mediaHoverCardsEnabled,
 		pinnedPostsEnabled,
 		threadSummarizerEnabled,
@@ -63,6 +65,7 @@ export function FeaturesContent() {
 				| 'gifPickerEnabled'
 				| 'draftsButtonEnabled'
 				| 'templateButtonEnabled'
+				| 'improvedUpvotesEnabled'
 				| 'mediaHoverCardsEnabled'
 				| 'pinnedPostsEnabled'
 				| 'threadSummarizerEnabled'
@@ -164,6 +167,14 @@ export function FeaturesContent() {
 				<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Contenido</h3>
 				<p className="text-xs text-muted-foreground">Estos cambios requieren recargar las pestañas de Mediavida.</p>
 			</div>
+
+			<SettingRow
+				icon={<ThumbsUp className="h-4 w-4" />}
+				label="Manitas Mejoradas"
+				description="Muestra avatares de los usuarios que han dado manita a cada post, con carga lazy y código de colores."
+			>
+				<Switch checked={improvedUpvotesEnabled} onCheckedChange={withToastAndReload('improvedUpvotesEnabled', true)} />
+			</SettingRow>
 
 			<SettingRow
 				icon={<Sparkles className="h-4 w-4" />}

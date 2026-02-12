@@ -39,6 +39,7 @@ export const FeatureFlag = {
 	NativeLiveDelay: 'native-live-delay',
 
 	// Premium/Advanced Features (enabled by default)
+	ImprovedUpvotes: 'improved-upvotes',
 	Gallery: 'gallery',
 	PostSummary: 'post-summary',
 	ThreadSummarizer: 'thread-summarizer',
@@ -85,6 +86,7 @@ const FEATURE_CONFIG: Record<FeatureFlagKey, FeatureConfig> = {
 	[FeatureFlag.NativeLiveDelay]: { settingsKey: 'nativeLiveDelayEnabled' },
 
 	// Premium Features (always enabled by default, some need API keys)
+	[FeatureFlag.ImprovedUpvotes]: { settingsKey: 'improvedUpvotesEnabled' },
 	[FeatureFlag.Gallery]: { settingsKey: 'galleryButtonEnabled' },
 	[FeatureFlag.PostSummary]: {
 		settingsKey: 'postSummaryEnabled',

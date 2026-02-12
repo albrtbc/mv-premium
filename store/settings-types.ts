@@ -74,6 +74,7 @@ export interface Settings {
 	templateButtonEnabled: boolean
 
 	// Feature Toggles - Content
+	improvedUpvotesEnabled: boolean
 	mediaHoverCardsEnabled: boolean
 	pinnedPostsEnabled: boolean
 	threadSummarizerEnabled: boolean

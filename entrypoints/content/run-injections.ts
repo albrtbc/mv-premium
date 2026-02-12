@@ -174,6 +174,13 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 			}
 		)
 
+		// Improved Upvotes - Enhances native upvote display with avatars
+		if (isFeatureEnabled(FeatureFlag.ImprovedUpvotes)) {
+			import('@/features/improved-upvotes').then(({ injectImprovedUpvotes }) => {
+				injectImprovedUpvotes()
+			})
+		}
+
 		// Parallel load thread features using allSettled to prevent single failure from breaking all
 		const results = await Promise.allSettled([
 			import('@/features/pinned-posts/logic/pin-posts'),

@@ -27,6 +27,9 @@ export const FEATURE_IDS = {
 	MEDIA_HOVER_CARD: 'mvp-media-hover-card',
 	NATIVE_LIVE_DELAY_CONTROL: 'mvp-native-live-delay-control',
 
+	// Improved Upvotes
+	IMPROVED_UPVOTES_PREFIX: 'mvp-improved-upvotes-',
+
 	// Dynamic Feature Prefixes (used with ID/Counter)
 	FAVORITE_SUBFORUM_BTN_PREFIX: 'mvp-favorite-subforum-btn-',
 	POST_SUMMARY_POPOVER_PREFIX: 'mvp-post-summary-popover-',
