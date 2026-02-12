@@ -49,6 +49,9 @@ export const MV_SELECTORS = {
 		/** Preview container */
 		PREVIEW_CONTAINER: '#preview',
 		PREVIEW_CONTAINER_ID: 'preview',
+		/** Submit button inside preview modal ("Editar") */
+		PREVIEW_SUBMIT_BUTTON: '#prsubmit',
+		PREVIEW_SUBMIT_BUTTON_ID: 'prsubmit',
 		/** Submit button */
 		SUBMIT_BUTTON: '#btsubmit',
 		SUBMIT_BUTTON_ID: 'btsubmit',

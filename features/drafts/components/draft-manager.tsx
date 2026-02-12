@@ -271,7 +271,7 @@ export function DraftManager({ textarea }: DraftManagerProps) {
 
 		// Setup Submit Listener (mark as submitting)
 		const form = textarea.form
-		const handleSubmit = () => {
+		const markAsSubmitting = () => {
 			// Mark as submitting to prevent beforeunload alert
 			isSubmittingRef.current = true
 			// Reset initial content to current content so beforeunload won't detect changes
@@ -280,10 +280,30 @@ export function DraftManager({ textarea }: DraftManagerProps) {
 			setStatus('idle')
 			setShow(false)
 		}
+		const handleSubmit = () => {
+			markAsSubmitting()
+		}
+
+		// Native preview modal uses an <a id="prsubmit">Editar</a> trigger that can bypass
+		// form submit listeners in some browsers (notably Firefox).
+		const handlePreviewModalSubmit = (event: MouseEvent) => {
+			const target = event.target
+			if (!(target instanceof Element)) return
+
+			const isPreviewSubmitClick = Boolean(target.closest(MV_SELECTORS.GLOBAL.PREVIEW_SUBMIT_BUTTON))
+			if (!isPreviewSubmitClick) return
+
+			const currentContent = textarea.value.trim()
+			const hasChanges = currentContent !== initialContentRef.current && currentContent !== ''
+			if (!hasChanges) return
+
+			markAsSubmitting()
+		}
 
 		if (form) {
 			form.addEventListener('submit', handleSubmit)
 		}
+		document.addEventListener('click', handlePreviewModalSubmit, true)
 
 		// Listen for custom event to open drafts list
 		const handleOpenDrafts = () => {
@@ -320,6 +340,7 @@ export function DraftManager({ textarea }: DraftManagerProps) {
 			if (form) {
 				form.removeEventListener('submit', handleSubmit)
 			}
+			document.removeEventListener('click', handlePreviewModalSubmit, true)
 			textarea.removeEventListener(DOM_MARKERS.EVENTS.OPEN_DRAFTS, handleOpenDrafts)
 			textarea.removeEventListener(DOM_MARKERS.EVENTS.SAVE_DRAFT, handleManualSave)
 			unregisterDirtyChecker()
