@@ -5,11 +5,12 @@
  * NOTE: These tests focus on the pure functions and logic patterns.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { STORAGE_KEYS } from '@/constants'
 
 // Re-implement the core logic for testing (without browser dependencies)
 const COMPRESSED_MARKER = '__LZB64__'
 const LEGACY_MARKER = '__LZ__'
-const COMPRESSED_KEYS = ['mvp-activity', 'mvp-drafts']
+const COMPRESSED_KEYS = [STORAGE_KEYS.ACTIVITY, STORAGE_KEYS.DRAFTS]
 
 function shouldCompress(key: string): boolean {
 	return COMPRESSED_KEYS.some(k => key.includes(k))
@@ -26,13 +27,13 @@ function isCompressedLegacy(value: unknown): value is string {
 describe('compressed-storage', () => {
 	describe('shouldCompress', () => {
 		it('should return true for activity data key', () => {
-			expect(shouldCompress('local:mvp-activity')).toBe(true)
-			expect(shouldCompress('mvp-activity-v2')).toBe(true)
+			expect(shouldCompress(`local:${STORAGE_KEYS.ACTIVITY}`)).toBe(true)
+			expect(shouldCompress(`${STORAGE_KEYS.ACTIVITY}-v2`)).toBe(true)
 		})
 
 		it('should return true for drafts data key', () => {
-			expect(shouldCompress('local:mvp-drafts')).toBe(true)
-			expect(shouldCompress('mvp-drafts-backup')).toBe(true)
+			expect(shouldCompress(`local:${STORAGE_KEYS.DRAFTS}`)).toBe(true)
+			expect(shouldCompress(`${STORAGE_KEYS.DRAFTS}-backup`)).toBe(true)
 		})
 
 		it('should return false for other keys', () => {
