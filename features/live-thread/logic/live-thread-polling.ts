@@ -9,6 +9,19 @@ import { MV_SELECTORS, DOM_MARKERS } from '@/constants'
 import { logger } from '@/lib/logger'
 import { reinitializeEmbeds, setupGlobalEmbedListener } from '@/lib/content-modules/utils/reinitialize-embeds'
 import { type PostInfo, type LiveStatus, POLL_INTERVALS, MAX_VISIBLE_POSTS, saveLiveState } from './live-thread-state'
+import {
+	LIVE_THREAD_DELAY_OPTIONS,
+	clearLiveThreadDelayQueue,
+	enqueueLiveThreadPost,
+	getLiveThreadDelay,
+	getLiveThreadDelayQueueSize,
+	loadLiveThreadDelayPreference,
+	onLiveThreadDelayQueueSizeChange,
+	resetLiveThreadDelayRuntime,
+	setLiveThreadDelay,
+	setLiveThreadDelayEnabled,
+	setLiveThreadDelayRevealCallback,
+} from './live-thread-delay'
 
 // =============================================================================
 // CONSTANTS
@@ -165,6 +178,49 @@ export function resetPollingState(): void {
 	currentPollInterval = POLL_INTERVALS.NORMAL
 	consecutiveErrors = 0
 	knownTotalPages = 1
+	clearLiveThreadDelayQueue({ reveal: false })
+}
+
+// =============================================================================
+// LIVE DELAY CONTROLS
+// =============================================================================
+
+export async function initializeLiveThreadDelay(enabled: boolean): Promise<void> {
+	setLiveThreadDelayRevealCallback((post, pageNum) => {
+		insertPostAtTop(post.html, true, pageNum)
+	})
+
+	setLiveThreadDelayEnabled(enabled)
+	clearLiveThreadDelayQueue({ reveal: false })
+
+	if (!enabled) return
+	await loadLiveThreadDelayPreference()
+}
+
+export function disposeLiveThreadDelay(): void {
+	clearLiveThreadDelayQueue({ reveal: false })
+	onLiveThreadDelayQueueSizeChange(null)
+	resetLiveThreadDelayRuntime()
+}
+
+export function getLiveThreadDelayOptions() {
+	return LIVE_THREAD_DELAY_OPTIONS
+}
+
+export function getCurrentLiveThreadDelay(): number {
+	return getLiveThreadDelay()
+}
+
+export function getCurrentLiveThreadDelayQueueSize(): number {
+	return getLiveThreadDelayQueueSize()
+}
+
+export function onLiveThreadDelayQueueChange(callback: ((size: number) => void) | null): void {
+	onLiveThreadDelayQueueSizeChange(callback)
+}
+
+export async function updateLiveThreadDelay(delayMs: number): Promise<void> {
+	await setLiveThreadDelay(delayMs)
 }
 
 // =============================================================================
@@ -471,7 +527,10 @@ export async function pollForNewPosts(): Promise<number> {
 
 		// Insert posts in reverse order (oldest first so newest ends up at top)
 		for (let i = newPosts.length - 1; i >= 0; i--) {
-			insertPostAtTop(newPosts[i].html, true, knownTotalPages)
+			const shouldQueue = enqueueLiveThreadPost(newPosts[i], knownTotalPages)
+			if (!shouldQueue) {
+				insertPostAtTop(newPosts[i].html, true, knownTotalPages)
+			}
 		}
 
 		lastSeenPostNum = Math.max(...newPosts.map(p => p.num), lastSeenPostNum)

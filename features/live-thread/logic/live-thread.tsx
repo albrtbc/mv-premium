@@ -32,12 +32,15 @@ import {
 	setIsLiveActive,
 	getIsLiveActive,
 	setStatusCallback,
+	initializeLiveThreadDelay,
+	disposeLiveThreadDelay,
 	loadInitialPosts,
 	startPolling,
 	stopPolling,
 	resetPollingState,
 } from './live-thread-polling'
 import { setupFormInterceptor, cleanupFormInterceptor } from './live-thread-editor'
+import { LiveDelayControl } from '../components/live-delay-control'
 
 // Import CSS for live thread (injected globally)
 import '../styles/live-thread.css'
@@ -54,6 +57,7 @@ const HEADER_FEATURE_ID = FEATURE_IDS.LIVE_THREAD_HEADER
 // =============================================================================
 
 let isInfiniteScrollActive = false // Whether infinite scroll is currently active
+let isLiveThreadDelayEnabled = true // Whether delay control is enabled in settings
 
 // =============================================================================
 // REACT COMPONENTS
@@ -91,6 +95,8 @@ function LiveHeader({ onStop }: { onStop: () => void }) {
 
 			{/* Right: Actions */}
 			<div className="mvp-live-actions">
+				{isLiveThreadDelayEnabled && <LiveDelayControl />}
+
 				<button onClick={handleToggleReply} className={cn('mvp-live-btn', isReplyOpen ? 'btn-active' : 'btn-primary')}>
 					{isReplyOpen ? 'Cerrar' : 'Responder'}
 				</button>
@@ -189,6 +195,8 @@ async function startLiveMode(): Promise<void> {
 		editorWrapper.innerHTML = '<div style="min-height: 0;"></div>'
 	}
 
+	await initializeLiveThreadDelay(isLiveThreadDelayEnabled)
+
 	// Mount React header
 	mountFeature(HEADER_FEATURE_ID, appContainer, <LiveHeader onStop={stopLiveMode} />)
 
@@ -233,6 +241,7 @@ async function stopLiveMode(): Promise<void> {
 	)
 
 	stopPolling()
+	disposeLiveThreadDelay()
 	cleanupFormInterceptor()
 	restoreForm()
 
@@ -276,6 +285,7 @@ export async function injectLiveThreadButton(): Promise<void> {
 	const { getSettings } = await import('@/store/settings-store')
 	const settings = await getSettings()
 	if (settings.liveThreadEnabled !== true) return
+	isLiveThreadDelayEnabled = settings.liveThreadDelayEnabled !== false
 
 	const threadId = getThreadIdFromUrl() || ''
 	if (!threadId) return
