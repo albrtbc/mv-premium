@@ -34,7 +34,7 @@ function NewsItem({ url, forumSlug, title, thumbnail, createdAt }: HomepageNewsI
 			/>
 
 			{/* Content Section - Bottom */}
-			<div className="flex flex-1 flex-col justify-between bg-mv-bg-secondary p-3">
+			<div className="flex flex-1 flex-col justify-between bg-table-row p-3">
 				{/* Title & Icon */}
 				<div className="flex items-start gap-2">
 					<div className="shrink-0 pt-1">

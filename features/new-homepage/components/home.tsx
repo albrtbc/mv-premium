@@ -272,7 +272,7 @@ export function Home() {
 								type="button"
 								onClick={handlePreviousNewsPage}
 								disabled={newsLoading}
-								className="text-sm text-mv-blue hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+								className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
 							>
 								&#8592; Anteriores
 							</button>
@@ -281,7 +281,7 @@ export function Home() {
 							type="button"
 							onClick={handleNextNewsPage}
 							disabled={newsLoading}
-							className="text-sm text-mv-blue hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+							className="text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
 						>
 							Siguientes &#8594;
 						</button>
@@ -323,7 +323,7 @@ export function Home() {
 					<div className="flex items-end justify-between">
 						<h3 className="text-base font-semibold">Tus últimos posts</h3>
 						{username && (
-							<a href={`/id/${username}/posts`} className="text-sm text-mv-blue hover:underline">
+							<a href={`/id/${username}/posts`} className="text-sm text-primary hover:underline">
 								Todos
 							</a>
 						)}
@@ -334,7 +334,7 @@ export function Home() {
 
 					<div className="mt-5 flex items-end justify-between">
 						<h3 className="text-base font-semibold">Favoritos</h3>
-						<a href="/foro/favoritos" className="text-sm text-mv-blue hover:underline">
+						<a href="/foro/favoritos" className="text-sm text-primary hover:underline">
 							Todos
 						</a>
 					</div>
