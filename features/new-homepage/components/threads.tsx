@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import type { PropsWithChildren } from 'react'
+import { type PropsWithChildren, useEffect, useRef, useState } from 'react'
 import Bookmark from 'lucide-react/dist/esm/icons/bookmark'
 import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
 import { NativeFidIcon } from '@/components/native-fid-icon'
@@ -181,6 +181,46 @@ function ThreadList({
 	compact?: boolean
 	showUnreadFallback?: boolean
 }) {
+	// Track the first load to prevent animation on initial render
+	const firstLoadRef = useRef(true)
+	const previousThreadsRef = useRef<HomepageItemBase[]>([])
+	const [newThreadUrls, setNewThreadUrls] = useState<Set<string>>(new Set())
+
+	useEffect(() => {
+		if (loading || !threads) return
+
+		if (firstLoadRef.current) {
+			firstLoadRef.current = false
+			previousThreadsRef.current = threads
+			return
+		}
+
+		// Calculate distinct threads at the top that are different from the previous top
+		const currentTopUrsl = threads.slice(0, 5).map(t => t.url)
+		const previousTopUrls = previousThreadsRef.current.slice(0, 5).map(t => t.url)
+		
+		const newlyAppearedAtTop = new Set<string>()
+		
+		
+		// If the top thread URL is different, it's a candidate for animation
+		for (const url of currentTopUrsl) {
+			if (!previousTopUrls.includes(url)) {
+				newlyAppearedAtTop.add(url)
+			}
+		}
+
+		if (newlyAppearedAtTop.size > 0) {
+			setNewThreadUrls(newlyAppearedAtTop)
+			const timer = setTimeout(() => {
+				setNewThreadUrls(new Set())
+			}, 1000)
+			previousThreadsRef.current = threads
+			return () => clearTimeout(timer)
+		}
+		
+		previousThreadsRef.current = threads
+	}, [threads, loading])
+	
 	if (loading) {
 		const skeletonCount = Math.min(maxThreads, 8)
 		return <>{Array.from({ length: skeletonCount }, (_, i) => <ThreadSkeleton key={i} />)}</>
@@ -189,15 +229,21 @@ function ThreadList({
 	return (
 		<>
 			{threads?.slice(0, maxThreads).map(thread => (
-				<ThreadItem
+				<div
 					key={thread.url}
-					{...(thread as HomepageThread)}
-					onHide={onHide}
-					onSave={onSave}
-					isSaved={isSaved}
-					compact={compact}
-					showUnreadFallback={showUnreadFallback}
-				/>
+					className={clsx({
+						'animate-in fade-in slide-in-from-top-2 duration-500': newThreadUrls.has(thread.url),
+					})}
+				>
+					<ThreadItem
+						{...(thread as HomepageThread)}
+						onHide={onHide}
+						onSave={onSave}
+						isSaved={isSaved}
+						compact={compact}
+						showUnreadFallback={showUnreadFallback}
+					/>
+				</div>
 			))}
 		</>
 	)
