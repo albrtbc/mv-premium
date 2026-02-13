@@ -43,11 +43,20 @@ function generateStyles(): string {
 	return `
 		/* MVP Centered Posts Early Inject */
 
-		/* Hide Sidebar immediately */
+		/* Keep sidebar measurable for native MV scripts (e.g. floating video sizing),
+		   but fully invisible/non-interactive for centered mode */
 		${SELECTORS.C_SIDE},
 		.wrw > .c-side,
 		#main .c-side {
-			display: none !important;
+			display: block !important;
+			position: absolute !important;
+			top: 0 !important;
+			right: 0 !important;
+			visibility: hidden !important;
+			opacity: 0 !important;
+			pointer-events: none !important;
+			height: 0 !important;
+			overflow: hidden !important;
 		}
 
 		/* Content wrapper - force full width */
