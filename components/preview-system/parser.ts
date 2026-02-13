@@ -601,6 +601,17 @@ export async function parseBBCode(input: string): Promise<string> {
 		return placeholder
 	})
 
+	// 2.1. Protect MV inline code BBCode: [c]...[/c]
+	// Same visual intent as inline code, but using Mediavida's BBCode shortcut.
+	processedInput = processedInput.replace(/\[c\]([\s\S]*?)\[\/c\]/gi, (_, code) => {
+		const placeholder = `__INLINE_CODE_${codeBlocks.length}__`
+		codeBlocks.push({
+			placeholder,
+			htmlPromise: `<code class="inline">${escapeHtml(code)}</code>`,
+		})
+		return placeholder
+	})
+
 	// 3. Escape HTML
 	let html = escapeHtml(processedInput)
 

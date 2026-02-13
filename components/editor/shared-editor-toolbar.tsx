@@ -32,6 +32,7 @@ import {
 	ToolbarSeparator,
 	getToolbarIcon,
 	CODE_LANGUAGES,
+	INLINE_C_CODE_LANGUAGE_ID,
 	LIST_TYPES,
 	HEADER_TYPES,
 	EmojiPicker,
@@ -148,6 +149,15 @@ export function SharedEditorToolbar({
 
 	// Handle code language selection
 	const handleCodeInsert = (langId: string) => {
+		if (langId === INLINE_C_CODE_LANGUAGE_ID) {
+			if (onWrapSelection) {
+				onWrapSelection('[c]', '[/c]')
+			} else {
+				onInsertSnippet?.('[c]{{cursor}}[/c]')
+			}
+			return
+		}
+
 		const template = langId ? `[code=${langId}]\n{{cursor}}\n[/code]` : `[code]\n{{cursor}}\n[/code]`
 		onInsertSnippet?.(template)
 	}
