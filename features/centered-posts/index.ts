@@ -39,6 +39,7 @@ const FLOATING_VIDEO_CLOSE_BUTTON_CLASS = 'mvp-centered-floating-video-dismiss-b
 const FLOATING_VIDEO_INTERACTING_CLASS = 'mvp-centered-floating-video-interacting'
 const FLOATING_VIDEO_IFRAME_SELECTOR =
 	"iframe[src*='youtube.com'], iframe[src*='youtube-nocookie.com'], iframe[src*='youtu.be']"
+const FLOATING_VIDEO_INTERACTIONS_STYLE_ID = 'mvp-floating-video-interactions-styles'
 const FLOATING_VIDEO_VAR_RIGHT = '--mvp-centered-video-right'
 const FLOATING_VIDEO_VAR_WIDTH = '--mvp-centered-video-width'
 const FLOATING_VIDEO_VAR_HEIGHT = '--mvp-centered-video-height'
@@ -737,6 +738,133 @@ function generateStyles(sticky: boolean, position: ControlBarPosition): string {
 	`
 }
 
+function generateFloatingVideoInteractionStyles(): string {
+	const nativeCloseSelectors = FLOATING_VIDEO_CLOSE_SELECTORS.split(',')
+		.map(selector => `.${FLOATING_VIDEO_CLASS} ${selector.trim()}`)
+		.join(',\n\t\t')
+
+	return `
+		/* Floating video interactions (available on any thread page) */
+		${nativeCloseSelectors} {
+			display: none !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS}.${FLOATING_VIDEO_INTERACTING_CLASS} iframe {
+			pointer-events: none !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS} .${FLOATING_VIDEO_DRAG_HANDLE_CLASS} {
+			position: absolute !important;
+			left: 8px !important;
+			right: auto !important;
+			top: 6px !important;
+			height: 24px !important;
+			padding: 0 7px !important;
+			min-width: 24px !important;
+			border-radius: 999px !important;
+			border: 1px solid rgba(255, 255, 255, 0.2) !important;
+			background: linear-gradient(180deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.42)) !important;
+			backdrop-filter: blur(2px);
+			display: inline-flex !important;
+			align-items: center !important;
+			gap: 6px !important;
+			cursor: move !important;
+			opacity: 0 !important;
+			transform: translateY(-4px);
+			pointer-events: none !important;
+			transition: opacity 140ms ease, transform 140ms ease !important;
+			z-index: ${FLOATING_VIDEO_Z_INDEX + 1} !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS}:hover .${FLOATING_VIDEO_DRAG_HANDLE_CLASS},
+		.${FLOATING_VIDEO_CLASS}.${FLOATING_VIDEO_INTERACTING_CLASS} .${FLOATING_VIDEO_DRAG_HANDLE_CLASS} {
+			opacity: 1 !important;
+			transform: translateY(0);
+			pointer-events: auto !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS} .${FLOATING_VIDEO_DRAG_HANDLE_CLASS}::before {
+			content: "::";
+			color: rgba(255, 255, 255, 0.9);
+			font-size: 11px;
+			letter-spacing: 1px;
+			font-weight: 700;
+		}
+
+		.${FLOATING_VIDEO_CLASS} .${FLOATING_VIDEO_DRAG_LABEL_CLASS} {
+			display: none !important;
+			font-size: 10px !important;
+			letter-spacing: 0.2px !important;
+			text-transform: uppercase !important;
+			color: rgba(255, 255, 255, 0.85) !important;
+			pointer-events: none !important;
+			user-select: none !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS} .${FLOATING_VIDEO_DRAG_HANDLE_CLASS}:hover .${FLOATING_VIDEO_DRAG_LABEL_CLASS},
+		.${FLOATING_VIDEO_CLASS}.${FLOATING_VIDEO_INTERACTING_CLASS} .${FLOATING_VIDEO_DRAG_LABEL_CLASS} {
+			display: inline !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS} .${FLOATING_VIDEO_RESIZE_HANDLE_CLASS} {
+			position: absolute !important;
+			right: 5px !important;
+			bottom: 5px !important;
+			width: 22px !important;
+			height: 22px !important;
+			border-right: 2px solid rgba(255, 255, 255, 0.85) !important;
+			border-bottom: 2px solid rgba(255, 255, 255, 0.85) !important;
+			border-bottom-right-radius: 3px !important;
+			background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.35) 50%) !important;
+			cursor: nwse-resize !important;
+			opacity: 0 !important;
+			transform: scale(0.92);
+			pointer-events: none !important;
+			transition: opacity 140ms ease, transform 140ms ease !important;
+			z-index: ${FLOATING_VIDEO_Z_INDEX + 1} !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS}:hover .${FLOATING_VIDEO_RESIZE_HANDLE_CLASS},
+		.${FLOATING_VIDEO_CLASS}.${FLOATING_VIDEO_INTERACTING_CLASS} .${FLOATING_VIDEO_RESIZE_HANDLE_CLASS} {
+			opacity: 1 !important;
+			transform: scale(1);
+			pointer-events: auto !important;
+		}
+
+		.${FLOATING_VIDEO_CLASS} .${FLOATING_VIDEO_CLOSE_BUTTON_CLASS} {
+			position: absolute !important;
+			top: 6px !important;
+			right: 6px !important;
+			width: 22px !important;
+			height: 22px !important;
+			border: 0 !important;
+			border-radius: 999px !important;
+			background: rgba(0, 0, 0, 0.65) !important;
+			color: #fff !important;
+			display: inline-flex !important;
+			align-items: center !important;
+			justify-content: center !important;
+			font-size: 14px !important;
+			line-height: 1 !important;
+			cursor: pointer !important;
+			z-index: ${FLOATING_VIDEO_Z_INDEX + 2} !important;
+		}
+	`
+}
+
+function ensureFloatingVideoInteractionStyles(): void {
+	if (document.getElementById(FLOATING_VIDEO_INTERACTIONS_STYLE_ID)) return
+
+	const style = document.createElement('style')
+	style.id = FLOATING_VIDEO_INTERACTIONS_STYLE_ID
+	style.textContent = generateFloatingVideoInteractionStyles()
+	document.head.appendChild(style)
+}
+
+function removeFloatingVideoInteractionStyles(): void {
+	document.getElementById(FLOATING_VIDEO_INTERACTIONS_STYLE_ID)?.remove()
+}
+
 /**
  * Updates localStorage cache for instant access on next page load
  */
@@ -1229,13 +1357,18 @@ function refreshFloatingVideoTargets(): void {
 
 function updateFloatingVideoLayout(): void {
 	const pageKind = getCenteredPostsPageKind()
-	if (!requestedEnabled || pageKind !== 'thread') {
+	if (pageKind !== 'thread') {
 		clearFloatingVideoTargets()
 		clearFloatingVideoCssVars()
 		return
 	}
 
-	updateFloatingVideoCssVars()
+	// Keep centered mode dynamic sizing only when centered layout is active.
+	if (requestedEnabled) {
+		updateFloatingVideoCssVars()
+	} else {
+		clearFloatingVideoCssVars()
+	}
 	refreshFloatingVideoTargets()
 }
 
@@ -1253,6 +1386,8 @@ function handleFloatingVideoViewportChange(): void {
 }
 
 function startFloatingVideoGuard(): void {
+	ensureFloatingVideoInteractionStyles()
+
 	if (!floatingVideoListenersAttached) {
 		window.addEventListener('scroll', handleFloatingVideoViewportChange, { passive: true })
 		window.addEventListener('resize', handleFloatingVideoViewportChange)
@@ -1294,6 +1429,7 @@ function stopFloatingVideoGuard(): void {
 
 	clearFloatingVideoTargets()
 	clearFloatingVideoCssVars()
+	removeFloatingVideoInteractionStyles()
 }
 
 /**
@@ -1573,7 +1709,11 @@ function applyCenteredPosts(
 		appliedPosition = null
 		sideStableTopPx = null
 		removeControlBar()
-		stopFloatingVideoGuard()
+		if (pageKind === 'thread') {
+			startFloatingVideoGuard()
+		} else {
+			stopFloatingVideoGuard()
+		}
 		return
 	}
 
@@ -1633,6 +1773,8 @@ export async function initCenteredPosts(): Promise<void> {
 			const sticky = parsed?.state?.centeredControlsSticky ?? false
 			const position: ControlBarPosition = parsed?.state?.centeredControlsPosition === 'side' ? 'side' : 'top'
 			applyCenteredPosts(enabled, sticky, position)
+		} else {
+			applyCenteredPosts(false, false, 'top')
 		}
 
 		// Watch for changes
