@@ -541,6 +541,31 @@ html[data-theme='light'] #mvp-live-editor-wrapper #post-editor .editor-controls 
 	filter: none !important;
 }
 
+/* Premium toolbar buttons: override native live-thread hover coloring */
+#mvp-live-editor-wrapper #post-editor .editor-controls .mvp-toolbar-btn:hover {
+	background: rgba(128, 128, 128, 0.25) !important;
+	color: var(--primary, #fc8f22) !important;
+}
+
+#mvp-live-editor-wrapper #post-editor .editor-controls .mvp-toolbar-btn:hover i,
+#mvp-live-editor-wrapper #post-editor .editor-controls .mvp-toolbar-btn:hover .fa {
+	color: inherit !important;
+}
+
+#mvp-live-editor-wrapper #post-editor .editor-controls .mvp-toolbar-btn:hover svg,
+#mvp-live-editor-wrapper #post-editor .editor-controls .mvp-toolbar-btn:hover svg * {
+	color: inherit !important;
+	stroke: currentColor !important;
+	fill: none !important;
+	filter: none !important;
+}
+
+.light #mvp-live-editor-wrapper #post-editor .editor-controls .mvp-toolbar-btn:hover,
+html[data-theme='light'] #mvp-live-editor-wrapper #post-editor .editor-controls .mvp-toolbar-btn:hover {
+	background: rgba(0, 0, 0, 0.1) !important;
+	color: var(--foreground, #000000) !important;
+}
+
 /* Hide undo/redo buttons in Live mode - they appear incorrectly */
 #mvp-live-editor-wrapper #post-editor .editor-controls button[data-cmd='undo'],
 #mvp-live-editor-wrapper #post-editor .editor-controls button[data-cmd='redo'],
