@@ -129,6 +129,8 @@ const POST_ALLOWED_ATTRS = [
 
 const LIVE_YOUTUBE_EMBED_SELECTOR = '.youtube_lite, .embed.yt, [data-s9e-mediaembed="youtube"]'
 const LIVE_YOUTUBE_WIRED_ATTR = 'data-mvp-live-youtube-wired'
+const LIVE_LIKES_HREF_ATTR = 'data-mvp-likes-href'
+const LIVE_LIKES_MODAL_ID = 'mvp-live-likes-modal'
 
 /**
  * Sanitize post HTML using DOMPurify directly (sync)
@@ -153,6 +155,7 @@ let consecutiveErrors = 0
 let knownTotalPages = 1
 let statusUpdateCallback: ((status: LiveStatus) => void) | null = null
 let timestampIntervalId: ReturnType<typeof setInterval> | null = null
+let likeButtonDelegationCleanup: (() => void) | null = null
 
 const TIMESTAMP_UPDATE_INTERVAL = 10000 // Update timestamps every 10 seconds
 
@@ -428,6 +431,120 @@ function reinitializeMvScripts(embedScope?: HTMLElement): void {
 	updateRelativeTimestamps()
 }
 
+function getCurrentThreadNumericId(): string | null {
+	let path = window.location.pathname
+	path = path.replace(/\/live\/?$/i, '')
+	const match = path.match(/-(\d+)(?:\/\d+)?\/?$/)
+	return match?.[1] ?? null
+}
+
+function normalizeLiveLikeButtons(container: HTMLElement): void {
+	const currentThreadId = getCurrentThreadNumericId()
+	const likeButtons = container.querySelectorAll<HTMLAnchorElement>('a.btnmola[href]')
+	likeButtons.forEach(btn => {
+		let href = btn.getAttribute('href')
+		if (!href) return
+		if (currentThreadId) {
+			href = href.replace(/tid=\d+/i, `tid=${currentThreadId}`)
+		}
+		btn.setAttribute(LIVE_LIKES_HREF_ATTR, href)
+		btn.removeAttribute('href')
+		btn.style.cursor = 'pointer'
+	})
+}
+
+function showLiveLikesModal(html: string): void {
+	const existing = document.getElementById(LIVE_LIKES_MODAL_ID)
+	if (existing) existing.remove()
+
+	const modal = document.createElement('div')
+	modal.id = LIVE_LIKES_MODAL_ID
+	modal.innerHTML = `
+		<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;">
+			<div style="background:#2d2d2d;border-radius:8px;max-width:500px;width:90%;max-height:80vh;overflow:auto;position:relative;box-shadow:0 4px 20px rgba(0,0,0,0.5);">
+				<button id="${LIVE_LIKES_MODAL_ID}-close" style="position:absolute;top:12px;right:12px;background:none;border:none;color:#888;font-size:20px;cursor:pointer;padding:4px 8px;line-height:1;">&times;</button>
+				<div style="padding:20px 24px;" class="mvp-likes-content">${html}</div>
+			</div>
+		</div>
+	`
+
+	const style = document.createElement('style')
+	style.textContent = `
+		#${LIVE_LIKES_MODAL_ID} .mvp-likes-content > *:first-child {
+			margin-bottom: 16px !important;
+			padding-bottom: 12px !important;
+			border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+		}
+		#${LIVE_LIKES_MODAL_ID} .mvp-likes-content img {
+			margin: 2px !important;
+		}
+	`
+	modal.appendChild(style)
+	document.body.appendChild(modal)
+
+	const closeBtn = document.getElementById(`${LIVE_LIKES_MODAL_ID}-close`)
+	const closeModal = () => modal.remove()
+	closeBtn?.addEventListener('click', closeModal)
+	modal.addEventListener('click', e => {
+		if (e.target === modal.firstElementChild) closeModal()
+	})
+	document.addEventListener('keydown', function handler(e) {
+		if (e.key === 'Escape') {
+			closeModal()
+			document.removeEventListener('keydown', handler)
+		}
+	})
+}
+
+function setupLikeButtonDelegation(): void {
+	if (likeButtonDelegationCleanup) return
+
+	const handler = async (e: Event) => {
+		const target = e.target as HTMLElement | null
+		const likeButton = target?.closest(`a.btnmola[${LIVE_LIKES_HREF_ATTR}]`) as HTMLAnchorElement | null
+		if (!likeButton) return
+
+		e.preventDefault()
+		e.stopPropagation()
+		if ('stopImmediatePropagation' in e && typeof e.stopImmediatePropagation === 'function') {
+			e.stopImmediatePropagation()
+		}
+
+		const href = likeButton.getAttribute(LIVE_LIKES_HREF_ATTR)
+		if (!href) return
+
+		const url = href.startsWith('/') ? `${window.location.origin}${href}` : href
+
+		try {
+			const response = await fetch(url, {
+				credentials: 'include',
+				headers: {
+					Accept: 'text/html',
+					'X-Requested-With': 'XMLHttpRequest',
+				},
+			})
+			if (!response.ok) {
+				logger.error('LiveThread likes fetch failed:', response.status)
+				return
+			}
+			const html = await response.text()
+			showLiveLikesModal(html)
+		} catch (error) {
+			logger.error('LiveThread likes fetch error:', error)
+		}
+	}
+
+	document.addEventListener('click', handler, true)
+	likeButtonDelegationCleanup = () => {
+		document.removeEventListener('click', handler, true)
+	}
+}
+
+function cleanupLikeButtonDelegation(): void {
+	likeButtonDelegationCleanup?.()
+	likeButtonDelegationCleanup = null
+}
+
 function dispatchLiveContentInjectedEvent(postCount: number, page?: number, isInitial = false): void {
 	window.dispatchEvent(
 		new CustomEvent(DOM_MARKERS.EVENTS.CONTENT_INJECTED, {
@@ -493,6 +610,8 @@ export function insertPostAtTop(postHtml: string, animate = true, pageNum?: numb
 	const newElement = tempDiv.firstElementChild as HTMLElement
 
 	if (newElement) {
+		normalizeLiveLikeButtons(newElement)
+
 		// Set the page number for pinning feature to pick up
 		if (pageNum) {
 			newElement.setAttribute('data-mv-page', String(pageNum))
@@ -572,6 +691,7 @@ export async function loadInitialPosts(): Promise<void> {
 		tempDiv.innerHTML = sanitizedHtmls[i]
 		const el = tempDiv.firstElementChild as HTMLElement
 		if (el) {
+			normalizeLiveLikeButtons(el)
 			// Set the page number for pinning feature to pick up
 			el.setAttribute('data-mv-page', String(latestPosts[i].pageNum))
 			postsWrap.appendChild(el)
@@ -672,6 +792,7 @@ function handleVisibilityChange(): void {
 export function startPolling(): void {
 	// Set up global listener for embed resize messages (Twitter, etc.)
 	setupGlobalEmbedListener()
+	setupLikeButtonDelegation()
 
 	document.addEventListener('visibilitychange', handleVisibilityChange)
 	currentPollInterval = POLL_INTERVALS.NORMAL
@@ -704,4 +825,5 @@ export function stopPolling(): void {
 	}
 	stopTimestampUpdater()
 	document.removeEventListener('visibilitychange', handleVisibilityChange)
+	cleanupLikeButtonDelegation()
 }
