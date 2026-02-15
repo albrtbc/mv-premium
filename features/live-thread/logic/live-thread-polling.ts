@@ -428,6 +428,19 @@ function reinitializeMvScripts(embedScope?: HTMLElement): void {
 	updateRelativeTimestamps()
 }
 
+function dispatchLiveContentInjectedEvent(postCount: number, page?: number, isInitial = false): void {
+	window.dispatchEvent(
+		new CustomEvent(DOM_MARKERS.EVENTS.CONTENT_INJECTED, {
+			detail: {
+				postCount,
+				page: page ?? knownTotalPages,
+				isLive: true,
+				isInitial,
+			},
+		})
+	)
+}
+
 /**
  * Updates all visible timestamps to show relative time (e.g., "5s", "2m", "1h").
  * This is our own implementation that doesn't depend on Mediavida's scripts.
@@ -471,7 +484,7 @@ function formatRelativeTime(seconds: number): string {
  * @param animate - Whether to apply the new post animation
  * @param pageNum - The page number this post belongs to (for pinning feature)
  */
-export function insertPostAtTop(postHtml: string, animate = true, pageNum?: number): void {
+export function insertPostAtTop(postHtml: string, animate = true, pageNum?: number, notifyContentInjected = true): void {
 	const postsWrap = document.getElementById(MV_SELECTORS.THREAD.POSTS_CONTAINER_ID)
 	if (!postsWrap) return
 
@@ -507,6 +520,10 @@ export function insertPostAtTop(postHtml: string, animate = true, pageNum?: numb
 		}
 
 		reinitializeMvScripts(newElement)
+
+		if (notifyContentInjected) {
+			dispatchLiveContentInjectedEvent(1, pageNum)
+		}
 	}
 }
 
@@ -569,6 +586,7 @@ export async function loadInitialPosts(): Promise<void> {
 
 	await saveLiveState({ enabled: true, lastSeenPostNum, timestamp: Date.now() })
 	reinitializeMvScripts(postsWrap)
+	dispatchLiveContentInjectedEvent(latestPosts.length, knownTotalPages, true)
 	statusUpdateCallback?.('connected')
 }
 
@@ -617,12 +635,13 @@ export async function pollForNewPosts(): Promise<number> {
 		for (let i = newPosts.length - 1; i >= 0; i--) {
 			const shouldQueue = enqueueLiveThreadPost(newPosts[i], knownTotalPages)
 			if (!shouldQueue) {
-				insertPostAtTop(newPosts[i].html, true, knownTotalPages)
+				insertPostAtTop(newPosts[i].html, true, knownTotalPages, false)
 			}
 		}
 
 		lastSeenPostNum = Math.max(...newPosts.map(p => p.num), lastSeenPostNum)
 		await saveLiveState({ enabled: true, lastSeenPostNum, timestamp: Date.now() })
+		dispatchLiveContentInjectedEvent(newPosts.length, knownTotalPages)
 	}
 
 	const newInterval = calculatePollInterval()
