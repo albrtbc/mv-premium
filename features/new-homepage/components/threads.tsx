@@ -5,6 +5,7 @@ import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
 import { NativeFidIcon } from '@/components/native-fid-icon'
 import { getSubforumIconId } from '@/lib/subforums'
 import type { HomepageItemBase, HomepageThread } from '../types'
+import { formatRelativeTime, useRelativeTimeTick } from '../hooks/use-relative-time'
 
 function abbrevNumberToInt(value: string): number {
 	const match = value.match(/^(\d+(\.\d+)?)([kK])?$/)
@@ -33,6 +34,7 @@ function ThreadItem({
 	urlSinceLastVisit,
 	title,
 	lastActivityAt,
+	lastActivityTimestamp,
 	responsesSinceLastVisit,
 	totalResponses,
 	hasLive,
@@ -125,7 +127,7 @@ function ThreadItem({
 							{totalResponses}
 						</span>
 						<span title="Tiempo desde la última respuesta" className="w-8 text-right text-muted-foreground">
-							{lastActivityAt}
+							{lastActivityTimestamp ? formatRelativeTime(lastActivityTimestamp) : lastActivityAt}
 						</span>
 					</div>
 				)}
@@ -182,6 +184,7 @@ function ThreadList({
 	showUnreadFallback?: boolean
 }) {
 	// Track the first load to prevent animation on initial render
+	useRelativeTimeTick(5_000)
 	const firstLoadRef = useRef(true)
 	const previousThreadsRef = useRef<HomepageItemBase[]>([])
 	const [newThreadUrls, setNewThreadUrls] = useState<Set<string>>(new Set())

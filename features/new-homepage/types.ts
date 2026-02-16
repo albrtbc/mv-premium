@@ -11,6 +11,8 @@ export interface HomepageThread extends HomepageItemBase {
 	urlSinceLastVisit?: string | null
 	responsesSinceLastVisit?: number
 	lastActivityAt?: string
+	/** Absolute epoch ms computed from MV's relative time string at scrape time */
+	lastActivityTimestamp?: number
 	/** Abbreviated string like "1.2k" or "350" */
 	totalResponses?: string
 }

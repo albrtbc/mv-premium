@@ -45,6 +45,23 @@ export function getUsername(): string | undefined {
 	return document.querySelector('#user-data span')?.textContent?.trim() || undefined
 }
 
+/**
+ * Converts MV's relative time string (e.g. "18s", "2m", "3h", "5d") into
+ * an absolute epoch timestamp (ms) by subtracting the delta from Date.now().
+ */
+function parseMvRelativeTime(text: string): number | undefined {
+	const match = text.match(/^(\d+)\s*(s|m|h|d)$/i)
+	if (!match) return undefined
+
+	const value = parseInt(match[1], 10)
+	const unit = match[2].toLowerCase()
+
+	const multipliers: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }
+	const deltaMs = value * (multipliers[unit] ?? 0)
+
+	return Date.now() - deltaMs
+}
+
 export function parseThreadTable(doc: Document): HomepageThread[] {
 	const threads: HomepageThread[] = []
 
@@ -72,6 +89,7 @@ export function parseThreadTable(doc: Document): HomepageThread[] {
 			responsesSinceLastVisit,
 			totalResponses,
 			lastActivityAt,
+			lastActivityTimestamp: parseMvRelativeTime(lastActivityAt),
 			hasLive,
 		})
 	})
