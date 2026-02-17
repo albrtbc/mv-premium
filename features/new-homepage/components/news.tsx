@@ -107,7 +107,7 @@ function NewsItem({
 					</div>
 					<div className="min-w-0 flex-1">
 						<h3
-							className="h-8 text-xs font-semibold leading-tight text-white/90 transition-colors group-hover:text-primary"
+							className="h-8 text-xs font-semibold leading-tight text-foreground transition-colors group-hover:text-primary"
 							style={TWO_LINE_CLAMP_STYLE}
 							title={title}
 						>
@@ -117,7 +117,7 @@ function NewsItem({
 				</div>
 
 				{/* Date & Author */}
-                <div className="mt-2 flex h-4 items-center justify-between text-[10px] text-white/60">
+                <div className="mt-2 flex h-4 items-center justify-between text-[10px] text-muted-foreground">
                     <span className="truncate max-w-[60%]">
                         <span className="text-primary">{author}</span>
                     </span>

@@ -385,7 +385,7 @@ export function Home() {
 				: 'animate-[mvp-news-slide-in-prev_260ms_ease-out]'
 
 	return (
-		<div className="mx-auto w-full max-w-[1280px] p-4 text-mv-text-primary">
+		<div className="mx-auto w-full max-w-[1280px] p-4 text-foreground">
 			<section>
 				<div className="flex items-end justify-between">
 					<h1 className="text-lg font-semibold">Noticias</h1>
@@ -475,9 +475,7 @@ export function Home() {
 							threads={filteredUserLastPosts}
 							loading={userPostsLoading}
 							maxThreads={MAX_USER_LAST_POSTS}
-							onHide={hideThreadEnabled ? handleHideThread : undefined}
-							onSave={saveThreadEnabled ? handleSaveThread : undefined}
-							isSaved={isThreadSavedInList}
+							compact
 						/>
 					</Threads.Root>
 
@@ -492,9 +490,6 @@ export function Home() {
 							threads={filteredFavorites}
 							loading={favoritesLoading}
 							maxThreads={MAX_FAVORITES}
-							onHide={hideThreadEnabled ? handleHideThread : undefined}
-							onSave={saveThreadEnabled ? handleSaveThread : undefined}
-							isSaved={isThreadSavedInList}
 							compact
 						/>
 					</Threads.Root>
