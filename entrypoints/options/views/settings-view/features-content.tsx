@@ -12,9 +12,12 @@ import Layout from 'lucide-react/dist/esm/icons/layout'
 import List from 'lucide-react/dist/esm/icons/list'
 import FolderHeart from 'lucide-react/dist/esm/icons/folder-heart'
 import ThumbsUp from 'lucide-react/dist/esm/icons/thumbs-up'
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import Search from 'lucide-react/dist/esm/icons/search'
 import Gamepad2 from 'lucide-react/dist/esm/icons/gamepad-2'
+import Package from 'lucide-react/dist/esm/icons/package'
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
 import { browser } from 'wxt/browser'
 import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
@@ -35,10 +38,12 @@ export function FeaturesContent() {
 		templateButtonEnabled,
 		improvedUpvotesEnabled,
 		mediaHoverCardsEnabled,
+		steamBundleInlineCardsEnabled,
 		pinnedPostsEnabled,
 		threadSummarizerEnabled,
 		postSummaryEnabled,
 		saveThreadEnabled,
+		hideThreadEnabled,
 	} = useSettingsStore()
 
 	const reloadMediavidaTabs = async () => {
@@ -67,10 +72,12 @@ export function FeaturesContent() {
 				| 'templateButtonEnabled'
 				| 'improvedUpvotesEnabled'
 				| 'mediaHoverCardsEnabled'
+				| 'steamBundleInlineCardsEnabled'
 				| 'pinnedPostsEnabled'
 				| 'threadSummarizerEnabled'
 				| 'postSummaryEnabled'
-				| 'saveThreadEnabled',
+				| 'saveThreadEnabled'
+				| 'hideThreadEnabled',
 			requiresReload: boolean = false
 		) =>
 		async (val: boolean) => {
@@ -98,8 +105,28 @@ export function FeaturesContent() {
 
 			<SettingRow
 				icon={<HomeIcon className="h-4 w-4" />}
-				label="Nueva Homepage"
-				description="Reemplaza la página de inicio de Mediavida con un dashboard personalizado mostrando noticias, hilos recientes, tus últimos posts y favoritos."
+				label="Homepage de MV Premium"
+				description={
+					<div className="space-y-2 pr-1">
+						<p className="m-0 leading-relaxed">
+							Reemplaza la portada nativa por una homepage personalizada de MV Premium con noticias y actividad del foro.
+						</p>
+						<div className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
+							<p className="m-0 text-[11px] leading-snug font-medium text-foreground/90">
+								Todos los créditos del diseño visual original de esta homepage pertenecen a MV-Ignited.
+							</p>
+							<a
+								href="https://www.mediavida.com/foro/dev/mv-ignited-2024-tampoco-me-dejo-mediavida-extension-709386"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="mt-1 inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15 hover:underline"
+							>
+								Ver MV-Ignited (diseño original)
+								<ExternalLink className="h-3 w-3" />
+							</a>
+						</div>
+					</div>
+				}
 			>
 				<Switch checked={newHomepageEnabled} onCheckedChange={withToastAndReload('newHomepageEnabled', true)} />
 			</SettingRow>
@@ -185,6 +212,17 @@ export function FeaturesContent() {
 			</SettingRow>
 
 			<SettingRow
+				icon={<Package className="h-4 w-4" />}
+				label="Cards de Bundles de Steam"
+				description="Muestra tarjetas inline para enlaces de bundles de Steam en editores y vistas previas. No afecta a las cards de juegos individuales."
+			>
+				<Switch
+					checked={steamBundleInlineCardsEnabled}
+					onCheckedChange={withToastAndReload('steamBundleInlineCardsEnabled', true)}
+				/>
+			</SettingRow>
+
+			<SettingRow
 				icon={<Pin className="h-4 w-4" />}
 				label="Posts Anclados"
 				description="Permite anclar posts importantes y verlos en un panel lateral."
@@ -228,9 +266,17 @@ export function FeaturesContent() {
 			<SettingRow
 				icon={<FolderHeart className="h-4 w-4" />}
 				label="Guardar Hilo"
-				description="Añade un botón para guardar hilos localmente y leerlos después."
+				description="Muestra botones de guardar en listados y noticias. El botón de guardar dentro del hilo y el click derecho siempre están activos."
 			>
 				<Switch checked={saveThreadEnabled} onCheckedChange={withToastAndReload('saveThreadEnabled', true)} />
+			</SettingRow>
+
+			<SettingRow
+				icon={<EyeOff className="h-4 w-4" />}
+				label="Ocultar Hilos"
+				description="Muestra botones para ocultar hilos en listados. La opción de ocultar con click derecho siempre está activa."
+			>
+				<Switch checked={hideThreadEnabled} onCheckedChange={withToastAndReload('hideThreadEnabled', true)} />
 			</SettingRow>
 		</SettingsSection>
 	)

@@ -1,20 +1,30 @@
-const STORAGE_KEY = 'mvp-latest-visited-forums'
+import { storage } from '@wxt-dev/storage'
+import { STORAGE_KEYS } from '@/constants'
 
-export function getLatestVisitedForums(): string[] {
+const MAX_RECENT_FORUMS = 20
+
+const recentForumsStorage = storage.defineItem<string[]>(`local:${STORAGE_KEYS.HOMEPAGE_RECENT_FORUMS}`, {
+	defaultValue: [],
+})
+
+export async function getLatestVisitedForums(): Promise<string[]> {
 	try {
-		const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
-		return Array.isArray(parsed) ? parsed : []
+		const value = await recentForumsStorage.getValue()
+		if (!Array.isArray(value)) return []
+		return value.filter((forum): forum is string => typeof forum === 'string')
 	} catch {
 		return []
 	}
 }
 
-export function setLatestVisitedForum(forum: string): void {
+export async function setLatestVisitedForum(forumSlug: string): Promise<void> {
+	if (!forumSlug) return
+
 	try {
-		const existing = getLatestVisitedForums()
-		const updated = [forum, ...existing.filter(f => f !== forum)]
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(0, 20)))
+		const current = await getLatestVisitedForums()
+		const updated = [forumSlug, ...current.filter(forum => forum !== forumSlug)]
+		await recentForumsStorage.setValue(updated.slice(0, MAX_RECENT_FORUMS))
 	} catch {
-		// localStorage may be full or unavailable
+		// Ignore storage errors (quota/unavailable)
 	}
 }

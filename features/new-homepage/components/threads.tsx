@@ -1,119 +1,253 @@
 import { clsx } from 'clsx'
-import type { PropsWithChildren } from 'react'
-import { getIconClassBySlug } from '../lib/forum-icons'
-import type { HomepageThread } from '../types'
+import { type PropsWithChildren, useEffect, useRef, useState } from 'react'
+import Bookmark from 'lucide-react/dist/esm/icons/bookmark'
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off'
+import { NativeFidIcon } from '@/components/native-fid-icon'
+import { getSubforumIconId } from '@/lib/subforums'
+import type { HomepageItemBase, HomepageThread } from '../types'
+import { formatRelativeTime, useRelativeTimeTick } from '../hooks/use-relative-time'
 
-function abbrevNumberToInt(str: string): number {
-	const match = str.match(/^(\d+(\.\d+)?)([kK])?$/)
+function abbrevNumberToInt(value: string): number {
+	const match = value.match(/^(\d+(\.\d+)?)([kK])?$/)
 	if (!match) return 0
 
 	const numPart = parseFloat(match[1])
-	const unit = match[3]
-
-	switch (unit) {
-		case 'k':
-		case 'K':
-			return Math.round(numPart * 1000)
-		default:
-			return Math.round(numPart)
+	if (match[3]?.toLowerCase() === 'k') {
+		return Math.round(numPart * 1000)
 	}
+
+	return Math.round(numPart)
 }
 
 function ThreadsRoot({ children, className }: PropsWithChildren<{ className?: string }>) {
-	return <div className={clsx(className, 'grid grid-cols-1 shadow gap-y-0.5 rounded')}>{children}</div>
-}
-
-function ThreadItem(props: HomepageThread) {
-	const { url, urlSinceLastVisit, title, lastActivityAt, responsesSinceLastVisit, totalResponses, hasLive, forumSlug } =
-		props
-
-	const totalResponsesAsInt = totalResponses ? abbrevNumberToInt(totalResponses) : 0
-
 	return (
-		<div className="flex justify-between relative bg-mv-surface first:rounded-t last:rounded-b">
-			<div className="flex cursor-pointer flex-1 items-center gap-2 p-2 hover:bg-opacity-50 transition duration-150">
-				<a
-					href={`/foro/${forumSlug}`}
-					title={`Ir a ${forumSlug}`}
-				>
-					<i className={clsx('fid', getIconClassBySlug(forumSlug))} />
-				</a>
-				<a href={url} className="flex-1 line-clamp-2 hover:underline" title={`Ir al inicio de ${title}`}>
-					{title}
-				</a>
-				<div className="flex items-center justify-center gap-2 mr-2">
-					{hasLive && (
-						<a
-							href={`${url}/live`}
-							title="Ir al live"
-							className="hover:scale-125 transition duration-200 mr-1 bg-red-500 text-white rounded-xs px-0.5 w-3 h-3 rounded-full hover:bg-opacity-75"
-						/>
-					)}
-					<div
-						title="Total respuestas"
-						className={clsx('w-8 text-right', {
-							'text-gray-400 dark:text-gray-600': totalResponsesAsInt < 100,
-							'text-gray-600 dark:text-gray-400':
-								totalResponsesAsInt >= 100 && totalResponsesAsInt <= 1000,
-							'text-orange-500': totalResponsesAsInt > 1000 && totalResponsesAsInt <= 10000,
-							'text-purple-500': totalResponsesAsInt > 10000,
-						})}
-					>
-						{totalResponses}
-					</div>
-					<div title="Tiempo desde el último mensaje" className="w-8 text-right text-gray-500">
-						{lastActivityAt}
-					</div>
-				</div>
-			</div>
-			{responsesSinceLastVisit && urlSinceLastVisit ? (
-				<a
-					title="Respuestas desde la última visita"
-					href={urlSinceLastVisit}
-					className={clsx(
-						'w-10 cursor-pointer hover:bg-opacity-75 transition duration-200 text-white text-xs font-medium flex items-center justify-center',
-						{
-							'bg-blue-400': responsesSinceLastVisit < 10,
-							'bg-blue-500': responsesSinceLastVisit >= 10 && responsesSinceLastVisit <= 30,
-							'bg-orange-500': responsesSinceLastVisit > 30 && responsesSinceLastVisit <= 99,
-							'bg-red-500': responsesSinceLastVisit > 99,
-						}
-					)}
-				>
-					{responsesSinceLastVisit > 99 ? '+99' : responsesSinceLastVisit}
-				</a>
-			) : (
-				<div
-					title="Sin respuestas desde la última visita"
-					className="bg-mv-surface-high w-10 text-gray-300 dark:text-gray-600 text-xs font-medium flex items-center justify-center"
-				>
-					/
-				</div>
-			)}
+		<div
+			className={clsx('grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-table-border bg-[var(--table-border)] shadow-sm', className)}
+		>
+			{children}
 		</div>
 	)
 }
 
+function ThreadItem({
+	url,
+	urlSinceLastVisit,
+	title,
+	lastActivityAt,
+	lastActivityTimestamp,
+	responsesSinceLastVisit,
+	totalResponses,
+	hasLive,
+	forumSlug,
+	onHide,
+	onSave,
+	isSaved,
+	compact,
+	showUnreadFallback,
+}: HomepageThread & {
+	onHide?: (url: string) => void
+	onSave?: (url: string) => void
+	isSaved?: (url: string) => boolean
+	compact?: boolean
+	showUnreadFallback?: boolean
+}) {
+	const totalResponsesAsInt = totalResponses ? abbrevNumberToInt(totalResponses) : 0
+	const forumIconId = getSubforumIconId(forumSlug)
+	const threadIsSaved = isSaved?.(url) ?? false
+	const unreadUrl = responsesSinceLastVisit && urlSinceLastVisit ? urlSinceLastVisit : null
+	const unreadCount = responsesSinceLastVisit && urlSinceLastVisit ? responsesSinceLastVisit : null
+	const shouldShowStats = !compact && Boolean(hasLive || totalResponses || lastActivityAt)
+
+	return (
+		<div className="group/thread flex justify-between bg-table-row text-[var(--table-row-foreground)] transition-colors hover:bg-table-row-hover!">
+			<div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
+				<a href={`/foro/${forumSlug}`} title={`Ir a ${forumSlug}`} className="shrink-0 transition hover:opacity-80">
+					{forumIconId ? (
+						<NativeFidIcon iconId={forumIconId} className="rounded-sm" />
+					) : (
+						<span className="inline-block h-6 w-6 rounded-sm bg-mv-bg-tertiary" />
+					)}
+				</a>
+				<a href={url} className="min-w-0 flex-1 truncate text-sm transition-colors hover:text-primary group-hover/thread:text-primary" title={title}>
+					{title}
+				</a>
+
+				{/* Thread action buttons (Visible on Hover) */}
+				{(onSave || onHide) && (
+					<div className="invisible flex shrink-0 items-center gap-1 opacity-0 group-hover/thread:visible group-hover/thread:opacity-100">
+						{onSave && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.preventDefault()
+									e.stopPropagation()
+									onSave(url)
+								}}
+								className={clsx('flex h-6 w-6 items-center justify-center rounded hover:bg-mv-bg-hover', {
+									'text-amber-400 hover:text-amber-300': threadIsSaved,
+									'text-muted-foreground hover:text-foreground': !threadIsSaved,
+								})}
+								title={threadIsSaved ? 'Quitar de guardados' : 'Guardar hilo'}
+								aria-label={threadIsSaved ? 'Quitar de guardados' : 'Guardar hilo'}
+								aria-pressed={threadIsSaved}
+							>
+								<Bookmark className={clsx('h-3.5 w-3.5', threadIsSaved && 'fill-current')} />
+							</button>
+						)}
+						{onHide && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.preventDefault()
+									e.stopPropagation()
+									onHide(url)
+								}}
+								className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-mv-bg-hover hover:text-foreground"
+								title="Ocultar hilo"
+								aria-label="Ocultar hilo"
+							>
+								<EyeOff className="h-3.5 w-3.5" />
+							</button>
+						)}
+					</div>
+				)}
+
+				{shouldShowStats && (
+					<div className="flex shrink-0 items-center gap-2 text-xs">
+						{hasLive && <a href={`${url}/live`} title="Abrir live" className="h-2.5 w-2.5 rounded-full bg-red-500" />}
+						<span
+							title="Total de respuestas"
+							className={clsx('w-10 text-right font-medium', {
+								'text-muted-foreground': totalResponsesAsInt < 100,
+								'text-foreground/80': totalResponsesAsInt >= 100 && totalResponsesAsInt <= 1000,
+								'text-orange-400': totalResponsesAsInt > 1000 && totalResponsesAsInt <= 10000,
+								'text-purple-400': totalResponsesAsInt > 10000,
+							})}
+						>
+							{totalResponses}
+						</span>
+						<span title="Tiempo desde la última respuesta" className="w-8 text-right text-muted-foreground">
+							{lastActivityTimestamp ? formatRelativeTime(lastActivityTimestamp) : lastActivityAt}
+						</span>
+					</div>
+				)}
+			</div>
+
+				{unreadUrl && unreadCount ? (
+					<a
+						href={unreadUrl}
+						title="Respuestas nuevas"
+						className={clsx(
+							'flex w-10 shrink-0 items-center justify-center text-xs font-semibold text-white transition hover:opacity-90',
+							{
+								'bg-blue-500': unreadCount < 30,
+								'bg-orange-500': unreadCount >= 30 && unreadCount <= 99,
+								'bg-red-500': unreadCount > 99,
+							}
+						)}
+					>
+						{unreadCount > 99 ? '+99' : unreadCount}
+					</a>
+				) : showUnreadFallback !== false ? (
+					<div
+						title="Sin respuestas nuevas"
+						className="flex w-10 shrink-0 items-center justify-center bg-[var(--table-row-alt)] text-xs text-muted-foreground"
+					>
+						/
+					</div>
+				) : null}
+			</div>
+		)
+}
+
 function ThreadSkeleton() {
-	return <div className="bg-mv-surface first:rounded-t last:rounded-b min-h-[40px] animate-pulse" />
+	return <div className="h-10 animate-pulse bg-table-row" />
 }
 
 function ThreadList({
 	threads,
 	loading,
 	maxThreads,
+	onHide,
+	onSave,
+	isSaved,
+	compact,
+	showUnreadFallback,
 }: {
-	threads?: HomepageThread[]
+	threads?: HomepageItemBase[]
 	loading: boolean
 	maxThreads: number
+	onHide?: (url: string) => void
+	onSave?: (url: string) => void
+	isSaved?: (url: string) => boolean
+	compact?: boolean
+	showUnreadFallback?: boolean
 }) {
+	// Track the first load to prevent animation on initial render
+	useRelativeTimeTick(5_000)
+	const firstLoadRef = useRef(true)
+	const previousThreadsRef = useRef<HomepageItemBase[]>([])
+	const [newThreadUrls, setNewThreadUrls] = useState<Set<string>>(new Set())
+
+	useEffect(() => {
+		if (loading || !threads) return
+
+		if (firstLoadRef.current) {
+			firstLoadRef.current = false
+			previousThreadsRef.current = threads
+			return
+		}
+
+		// Calculate distinct threads at the top that are different from the previous top
+		const currentTopUrsl = threads.slice(0, 5).map(t => t.url)
+		const previousTopUrls = previousThreadsRef.current.slice(0, 5).map(t => t.url)
+		
+		const newlyAppearedAtTop = new Set<string>()
+		
+		
+		// If the top thread URL is different, it's a candidate for animation
+		for (const url of currentTopUrsl) {
+			if (!previousTopUrls.includes(url)) {
+				newlyAppearedAtTop.add(url)
+			}
+		}
+
+		if (newlyAppearedAtTop.size > 0) {
+			setNewThreadUrls(newlyAppearedAtTop)
+			const timer = setTimeout(() => {
+				setNewThreadUrls(new Set())
+			}, 1000)
+			previousThreadsRef.current = threads
+			return () => clearTimeout(timer)
+		}
+		
+		previousThreadsRef.current = threads
+	}, [threads, loading])
+	
+	if (loading) {
+		const skeletonCount = Math.min(maxThreads, 8)
+		return <>{Array.from({ length: skeletonCount }, (_, i) => <ThreadSkeleton key={i} />)}</>
+	}
+
 	return (
 		<>
-			{loading
-				? [...Array(maxThreads).keys()].map(i => <ThreadSkeleton key={i} />)
-				: threads
-						?.slice(0, maxThreads)
-						.map(thread => <ThreadItem key={thread.url} {...thread} />)}
+			{threads?.slice(0, maxThreads).map(thread => (
+				<div
+					key={thread.url}
+					className={clsx({
+						'animate-in fade-in slide-in-from-top-2 duration-500': newThreadUrls.has(thread.url),
+					})}
+				>
+					<ThreadItem
+						{...(thread as HomepageThread)}
+						onHide={onHide}
+						onSave={onSave}
+						isSaved={isSaved}
+						compact={compact}
+						showUnreadFallback={showUnreadFallback}
+					/>
+				</div>
+			))}
 		</>
 	)
 }

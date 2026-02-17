@@ -37,7 +37,9 @@ export const DEFAULT_SETTINGS: Settings = {
 	infiniteScrollEnabled: false,
 	autoInfiniteScrollEnabled: false,
 	liveThreadEnabled: false,
+	newHomepageEnabled: false,
 	nativeLiveDelayEnabled: true,
+	liveThreadDelayEnabled: true,
 	galleryButtonEnabled: true,
 	navbarSearchEnabled: true,
 
@@ -51,13 +53,12 @@ export const DEFAULT_SETTINGS: Settings = {
 	// Feature Toggles - Content
 	improvedUpvotesEnabled: true,
 	mediaHoverCardsEnabled: true,
+	steamBundleInlineCardsEnabled: true,
 	pinnedPostsEnabled: true,
 	threadSummarizerEnabled: true,
 	postSummaryEnabled: true,
 	saveThreadEnabled: true,
-	// Feature Toggles - Appearance
-	newHomepageEnabled: false,
-
+	hideThreadEnabled: true,
 	// Feature Toggles - Users
 	mutedWordsEnabled: false,
 	mutedWords: [],
@@ -74,6 +75,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	centeredPostsEnabled: false,
 	centeredControlsSticky: false,
 	centeredControlsCompact: false,
+	centeredControlsPosition: 'top',
 
 	// Keyboard Shortcuts
 	shortcuts: {},
