@@ -1,9 +1,12 @@
-name: Release
+name: Manual Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        required: true
+        type: string
+        description: 'Tag name (e.g. v1.4.3)'
 
 concurrency:
   group: release-${{ github.ref }}
@@ -22,6 +25,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,21 +55,19 @@ jobs:
       - name: Zip Chrome extension
         run: |
           cd .output/chrome-mv3
-          zip -r ../../mv-premium-chrome-${{ github.ref_name }}.zip .
+          zip -r ../../mv-premium-chrome-${{ inputs.tag_name }}.zip .
 
       - name: Zip Firefox extension
         run: |
           cd .output/firefox-mv2
-          zip -r ../../mv-premium-firefox-${{ github.ref_name }}.zip .
+          zip -r ../../mv-premium-firefox-${{ inputs.tag_name }}.zip .
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag_name }}
           files: |
-            mv-premium-chrome-${{ github.ref_name }}.zip
-            mv-premium-firefox-${{ github.ref_name }}.zip
+            mv-premium-chrome-${{ inputs.tag_name }}.zip
+            mv-premium-firefox-${{ inputs.tag_name }}.zip
           generate_release_notes: true
           draft: true
-          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

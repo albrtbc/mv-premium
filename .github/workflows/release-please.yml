@@ -1,0 +1,78 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build-and-release:
+    name: Build & Attach Artifacts
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Build for Chrome
+        run: npm run build:chrome
+
+      - name: Build for Firefox
+        run: npm run build:firefox
+
+      - name: Zip Chrome extension
+        run: |
+          cd .output/chrome-mv3
+          zip -r ../../mv-premium-chrome-${{ needs.release-please.outputs.tag_name }}.zip .
+
+      - name: Zip Firefox extension
+        run: |
+          cd .output/firefox-mv2
+          zip -r ../../mv-premium-firefox-${{ needs.release-please.outputs.tag_name }}.zip .
+
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: |
+            mv-premium-chrome-${{ needs.release-please.outputs.tag_name }}.zip
+            mv-premium-firefox-${{ needs.release-please.outputs.tag_name }}.zip
