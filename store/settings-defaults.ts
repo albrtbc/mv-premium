@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	improvedUpvotesEnabled: true,
 	mediaHoverCardsEnabled: true,
 	steamBundleInlineCardsEnabled: true,
+	twitterLiteEmbedsEnabled: false,
 	pinnedPostsEnabled: true,
 	threadSummarizerEnabled: true,
 	postSummaryEnabled: true,

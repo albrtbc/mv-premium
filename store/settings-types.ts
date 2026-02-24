@@ -82,6 +82,7 @@ export interface Settings {
 	improvedUpvotesEnabled: boolean
 	mediaHoverCardsEnabled: boolean
 	steamBundleInlineCardsEnabled: boolean
+	twitterLiteEmbedsEnabled: boolean
 	pinnedPostsEnabled: boolean
 	threadSummarizerEnabled: boolean
 	postSummaryEnabled: boolean

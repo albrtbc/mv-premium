@@ -16,7 +16,7 @@ import { DraftManager } from '@/features/drafts/components/draft-manager'
 import {
 	isAlreadyInjected,
 	markAsInjected,
-	mountFeature,
+	mountFeatureWithBoundary,
 	isFeatureMounted,
 } from '@/lib/content-modules/utils/react-helpers'
 import { DistributedEditorToolbar } from '../components/distributed-editor-toolbar'
@@ -43,10 +43,17 @@ export function injectCharacterCounter(): void {
 	)
 
 	textareas.forEach(textarea => {
+		const ta = textarea as HTMLTextAreaElement
+		const isPrivateMessageTextarea =
+			ta.matches(MV_SELECTORS.MESSAGES.TEXTAREA) || Boolean(ta.closest('.pm-compose, .pm-reply'))
+
+		// PM compose/reply uses a submit button in the same wrapper; counter overlaps in these layouts.
+		// We explicitly disable it there.
+		if (isPrivateMessageTextarea) return
+
 		if (isAlreadyInjected(textarea, COUNTER_MARKER)) return
 		markAsInjected(textarea, COUNTER_MARKER)
 
-		const ta = textarea as HTMLTextAreaElement
 		ta.style.resize = 'vertical'
 
 		const counter = document.createElement('div')
@@ -188,7 +195,7 @@ export async function injectDraftAutosave(): Promise<void> {
 			parent.appendChild(host)
 
 			const featureId = `${FEATURE_IDS.DRAFT_MANAGER_PREFIX}${++draftCounter}`
-			mountFeature(featureId, host, createElement(DraftManager, { textarea: textarea as HTMLTextAreaElement }))
+			mountFeatureWithBoundary(featureId, host, createElement(DraftManager, { textarea: textarea as HTMLTextAreaElement }), 'Gestor de Borradores')
 		}
 	})
 }
@@ -256,13 +263,14 @@ export function injectEditorToolbar(): void {
 
 		const featureId = `${FEATURE_IDS.TOOLBAR_PREFIX}${toolbarCounter}`
 		if (!isFeatureMounted(featureId)) {
-			mountFeature(
+			mountFeatureWithBoundary(
 				featureId,
 				stateHost,
 				createElement(DistributedEditorToolbar, {
 					textarea,
 					toolbarContainer: container as HTMLElement,
-				})
+				}),
+				'Barra de Editor'
 			)
 		}
 	})
@@ -421,13 +429,14 @@ export function injectEditorToolbar(): void {
 
 		const featureId = `${FEATURE_IDS.TOOLBAR_FALLBACK_PREFIX}${++toolbarCounter}`
 		if (!isFeatureMounted(featureId)) {
-			mountFeature(
+			mountFeatureWithBoundary(
 				featureId,
 				host,
 				createElement(DistributedEditorToolbar, {
 					textarea: textarea as HTMLTextAreaElement,
 					toolbarContainer: container,
-				})
+				}),
+				'Barra de Editor'
 			)
 		}
 	})

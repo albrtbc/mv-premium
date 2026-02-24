@@ -19,6 +19,8 @@ web-ext.config.ts
 
 # Claude Code
 .claude/
+.agent/
+LOCAL_GIT_WORKFLOW.md
 
 # Editor directories and files
 .vscode/*

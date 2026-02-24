@@ -87,6 +87,7 @@ export const settingsSchema = z.object({
 	improvedUpvotesEnabled: z.boolean().default(true),
 	mediaHoverCardsEnabled: z.boolean().default(true),
 	steamBundleInlineCardsEnabled: z.boolean().default(true),
+	twitterLiteEmbedsEnabled: z.boolean().default(false),
 
 	// Feature Toggles - Users
 	mutedWordsEnabled: z.boolean().default(false),

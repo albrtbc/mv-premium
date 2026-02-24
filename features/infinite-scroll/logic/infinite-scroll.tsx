@@ -15,9 +15,9 @@ import { PageIndicator } from '../components/page-indicator'
 import { PageDivider } from '../components/page-divider'
 import { InfiniteScrollButton } from '../components/scroll-toggle-button'
 import { ShadowWrapper } from '@/components/shadow-wrapper'
-import { getSettings } from '@/store/settings-store'
+import { getSettings, useSettingsStore } from '@/store/settings-store'
 import {
-	mountFeature,
+	mountFeatureWithBoundary,
 	unmountFeature,
 	isFeatureMounted,
 	updateFeature,
@@ -235,12 +235,13 @@ async function injectPosts(posts: Element[], pageNum: number): Promise<void> {
 	// Mount PageDivider
 	const dividerId = `${FEATURE_IDS.INFINITE_SCROLL_DIVIDER_PREFIX}${++dividerCounter}`
 	dividerContainer.setAttribute('data-feature-id', dividerId)
-	mountFeature(
+	mountFeatureWithBoundary(
 		dividerId,
 		dividerContainer,
 		<ShadowWrapper>
 			<PageDivider pageNumber={pageNum} />
-		</ShadowWrapper>
+		</ShadowWrapper>,
+		'Divisor de Página'
 	)
 
 	// Get current thread ID from URL for fixing like button handlers
@@ -294,7 +295,9 @@ async function injectPosts(posts: Element[], pageNum: number): Promise<void> {
 	)
 
 	// Reinitialize embeds (Twitter, Instagram, etc.) in the newly loaded content
-	reinitializeEmbeds(pageBlockContainer)
+	reinitializeEmbeds(pageBlockContainer, {
+		twitterLiteMode: useSettingsStore.getState().twitterLiteEmbedsEnabled === true,
+	})
 
 	scheduleWindowManagement()
 }
@@ -383,12 +386,13 @@ function reloadPage(block: PageBlock): void {
 	if (dividerContainer) {
 		const dividerId = dividerContainer.getAttribute('data-feature-id')
 		if (dividerId) {
-			mountFeature(
+			mountFeatureWithBoundary(
 				dividerId,
 				dividerContainer,
 				<ShadowWrapper>
 					<PageDivider pageNumber={block.page} />
-				</ShadowWrapper>
+				</ShadowWrapper>,
+				'Divisor de Página'
 			)
 			block.dividerFeatureId = dividerId
 		}
@@ -401,7 +405,9 @@ function reloadPage(block: PageBlock): void {
 	logger.debug(`Reloaded page ${block.page}`)
 
 	// Reinitialize embeds in the reloaded content
-	reinitializeEmbeds(container)
+	reinitializeEmbeds(container, {
+		twitterLiteMode: useSettingsStore.getState().twitterLiteEmbedsEnabled === true,
+	})
 
 	window.dispatchEvent(
 		new CustomEvent(DOM_MARKERS.EVENTS.CONTENT_INJECTED, {
@@ -601,7 +607,7 @@ async function createIndicator(): Promise<void> {
 		sideNav.appendChild(container)
 	}
 
-	mountFeature(INDICATOR_FEATURE_ID, container, getIndicatorElement())
+	mountFeatureWithBoundary(INDICATOR_FEATURE_ID, container, getIndicatorElement(), 'Indicador de Scroll')
 }
 
 function getIndicatorElement() {
@@ -976,7 +982,7 @@ export async function injectInfiniteScroll(_ctx?: unknown): Promise<void> {
 	isAutoMode = settings.autoInfiniteScrollEnabled === true && !isNativeLiveThreadPage()
 
 	setupModeExclusionListeners()
-	mountFeature(BUTTON_FEATURE_ID, container, getButtonElement())
+	mountFeatureWithBoundary(BUTTON_FEATURE_ID, container, getButtonElement(), 'Botón Scroll Infinito')
 
 	// Auto-activate if auto mode is enabled
 	if (isAutoMode) {

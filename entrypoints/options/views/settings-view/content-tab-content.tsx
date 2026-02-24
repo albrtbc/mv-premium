@@ -2,6 +2,7 @@
  * Content Tab Content - Bold color + page width settings + dashboard icon
  */
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
+import MessageSquare from 'lucide-react/dist/esm/icons/message-square'
 import Settings2 from 'lucide-react/dist/esm/icons/settings-2'
 
 import LayoutDashboard from 'lucide-react/dist/esm/icons/layout-dashboard'
@@ -29,7 +30,15 @@ const DASHBOARD_ICON_OPTIONS: { value: DashboardIcon; label: string; icon: React
 ]
 
 export function ContentTabContent() {
-	const { boldColor, boldColorEnabled, setBoldColor, setBoldColorEnabled, dashboardIcon, setSetting } =
+	const {
+		boldColor,
+		boldColorEnabled,
+		twitterLiteEmbedsEnabled,
+		setBoldColor,
+		setBoldColorEnabled,
+		dashboardIcon,
+		setSetting,
+	} =
 		useSettingsStore()
 
 	return (
@@ -52,6 +61,22 @@ export function ContentTabContent() {
 						}}
 					/>
 				</div>
+			</SettingRow>
+
+			<Separator />
+
+			<SettingRow
+				icon={<MessageSquare className="h-4 w-4" />}
+				label="Tweets Lite"
+				description="Reemplaza los iframes de X/Twitter por tarjetas ligeras con avatar, texto, imágenes, tweets citados e hilos. Carga más rápido y se ve siempre."
+			>
+				<Switch
+					checked={twitterLiteEmbedsEnabled}
+					onCheckedChange={checked => {
+						setSetting('twitterLiteEmbedsEnabled', checked)
+						toast.success(checked ? 'Modo ligero de tweets activado' : 'Configuración guardada')
+					}}
+				/>
 			</SettingRow>
 
 			<Separator />
