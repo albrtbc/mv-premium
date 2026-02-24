@@ -1,5 +1,6 @@
 import type { TwitterLiteCardData } from './types'
 import { TWITTER_LITE_CSS, TWITTER_LITE_STYLE_ID } from './styles'
+import { isMVDarkMode } from '@/lib/theme-utils'
 
 // Icons (Lucide)
 const X_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`
@@ -87,6 +88,7 @@ function parseTweetText(text: string): string {
 export function createTwitterLiteCard(data: TwitterLiteCardData, loading = false): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.className = 'mvp-twitter-lite-card';
+    if (!isMVDarkMode()) wrapper.classList.add('mvp-twitter-lite-light');
 
     // Click anywhere to open tweet
     wrapper.addEventListener('click', (e) => {

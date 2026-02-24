@@ -30,7 +30,7 @@ export const TWITTER_LITE_CSS = `
     cursor: pointer;
 }
 
-:root:not(.dark) .mvp-twitter-lite-card {
+.mvp-twitter-lite-card.mvp-twitter-lite-light {
     --twl-bg: #ffffff;
     --twl-bg-hover: #f7f9f9;
     --twl-border: #cfd9de;
