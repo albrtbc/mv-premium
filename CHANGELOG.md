@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/albrtbc/mv-premium/compare/v1.5.0...v1.5.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* **twitter-lite:** adapt embed cards to light/dark theme ([9f84bf9](https://github.com/albrtbc/mv-premium/commit/9f84bf913aa0e1e2f17282b41572031ced5657d2))
+
 ## [1.5.0](https://github.com/albrtbc/mv-premium/compare/v1.4.2...v1.5.0) (2026-02-24)
 
 
