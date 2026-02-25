@@ -23,6 +23,8 @@ interface ShadowWrapperProps {
 	className?: string
 	errorVariant?: 'full' | 'compact' | 'minimal'
 	noErrorBoundary?: boolean
+	/** When set, overrides the extension's stored theme (e.g. to follow MV's native theme) */
+	themeOverride?: 'dark' | 'light'
 }
 
 /**
@@ -38,8 +40,10 @@ export function ShadowWrapper({
 	className,
 	errorVariant = 'compact',
 	noErrorBoundary = false,
+	themeOverride,
 }: ShadowWrapperProps) {
-	const theme = useStoredTheme()
+	const storedTheme = useStoredTheme()
+	const theme = themeOverride ?? storedTheme
 	const cleanupRef = useRef<(() => void) | null>(null)
 
 	const handleShadowRoot = useCallback((shadowRoot: ShadowRoot) => {

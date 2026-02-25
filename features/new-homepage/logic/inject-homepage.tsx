@@ -4,6 +4,7 @@ import { FEATURE_IDS } from '@/constants/feature-ids'
 import { DOM_MARKERS } from '@/constants/dom-markers'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { isFeatureMounted, mountFeatureWithBoundary } from '@/lib/content-modules/utils/react-helpers'
+import { isMVDarkMode } from '@/lib/theme-utils'
 import { Home } from '../components/home'
 
 export function injectHomepage(): void {
@@ -12,6 +13,8 @@ export function injectHomepage(): void {
 
 	const mainElement = document.getElementById('main')
 	if (!mainElement) return
+
+	const mvDark = isMVDarkMode()
 
 	mainElement.replaceChildren()
 
@@ -23,6 +26,7 @@ export function injectHomepage(): void {
 		FEATURE_IDS.NEW_HOMEPAGE,
 		container,
 		createElement(ShadowWrapper, {
+			themeOverride: mvDark ? 'dark' : 'light',
 			children: createElement(Home),
 		}),
 		'Nueva Portada'

@@ -60,7 +60,7 @@ export function ShadowRoot({
 	}, [])
 
 	return (
-		<div ref={hostRef} className={cn('w-full', className, themeClassName)}>
+		<div ref={hostRef} className={cn('w-full', className)}>
 			{shadowRoot &&
 				createPortal(
 					<>
