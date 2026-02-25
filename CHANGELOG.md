@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.2](https://github.com/albrtbc/mv-premium/compare/v1.5.1...v1.5.2) (2026-02-25)
+
+
+### Bug Fixes
+
+* **homepage:** use MV native theme instead of extension theme for new homepage ([0b714f7](https://github.com/albrtbc/mv-premium/commit/0b714f75c626692279f3a172144b77155ba840f5))
+* **twitter-lite:** detect MV native theme instead of extension theme for card colors ([ab77cee](https://github.com/albrtbc/mv-premium/commit/ab77cee5835eed7988851156a828c7a6d1fa7c40))
+
 ## [1.5.1](https://github.com/albrtbc/mv-premium/compare/v1.5.0...v1.5.1) (2026-02-24)
 
 
