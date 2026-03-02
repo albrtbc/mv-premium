@@ -7,6 +7,11 @@ export const TWITTER_LITE_CSS = `
     --twl-border: #38444d;
     --twl-text: #e7e9ea;
     --twl-text-secondary: #8b98a5;
+    --twl-metric-value-color: var(--twl-text);
+    --twl-metric-like-icon: #f91880;
+    --twl-metric-retweet-icon: #00ba7c;
+    --twl-metric-reply-icon: #1d9bf0;
+    --twl-metric-quote-icon: #1d9bf0;
     --twl-img-bg: #000;
     --twl-hover-overlay: rgba(255, 255, 255, 0.06);
     --twl-hover-overlay-subtle: rgba(255, 255, 255, 0.03);
@@ -30,7 +35,7 @@ export const TWITTER_LITE_CSS = `
     cursor: pointer;
 }
 
-.mvp-twitter-lite-card.mvp-twitter-lite-light {
+:root:not(.dark) .mvp-twitter-lite-card {
     --twl-bg: #ffffff;
     --twl-bg-hover: #f7f9f9;
     --twl-border: #cfd9de;
@@ -39,6 +44,29 @@ export const TWITTER_LITE_CSS = `
     --twl-img-bg: #f5f5f5;
     --twl-hover-overlay: rgba(0, 0, 0, 0.03);
     --twl-hover-overlay-subtle: rgba(0, 0, 0, 0.03);
+}
+
+/* Explicit runtime theme classes (computed from surrounding MV post colors). */
+:root .mvp-twitter-lite-card.mvp-twitter-lite-theme-light {
+    --twl-bg: #ffffff;
+    --twl-bg-hover: #f7f9f9;
+    --twl-border: #cfd9de;
+    --twl-text: #0f1419;
+    --twl-text-secondary: #536471;
+    --twl-img-bg: #f5f5f5;
+    --twl-hover-overlay: rgba(0, 0, 0, 0.03);
+    --twl-hover-overlay-subtle: rgba(0, 0, 0, 0.03);
+}
+
+:root .mvp-twitter-lite-card.mvp-twitter-lite-theme-dark {
+    --twl-bg: #15202b;
+    --twl-bg-hover: #1a2d3d;
+    --twl-border: #38444d;
+    --twl-text: #e7e9ea;
+    --twl-text-secondary: #8b98a5;
+    --twl-img-bg: #000;
+    --twl-hover-overlay: rgba(255, 255, 255, 0.06);
+    --twl-hover-overlay-subtle: rgba(255, 255, 255, 0.03);
 }
 
 .mvp-twitter-lite-card:hover {
@@ -416,26 +444,26 @@ export const TWITTER_LITE_CSS = `
 }
 
 .mvp-twitter-lite-metric-value {
-    color: var(--twl-text);
+    color: var(--twl-metric-value-color, var(--twl-text));
     font-weight: 700;
     font-size: 13px;
 }
 
 /* Metric-specific icon colors */
 .mvp-twitter-lite-metric--like .mvp-twitter-lite-metric-icon {
-    color: #f91880;
+    color: var(--twl-metric-like-icon);
 }
 
 .mvp-twitter-lite-metric--retweet .mvp-twitter-lite-metric-icon {
-    color: #00ba7c;
+    color: var(--twl-metric-retweet-icon);
 }
 
 .mvp-twitter-lite-metric--reply .mvp-twitter-lite-metric-icon {
-    color: #1d9bf0;
+    color: var(--twl-metric-reply-icon);
 }
 
 .mvp-twitter-lite-metric--quote .mvp-twitter-lite-metric-icon {
-    color: #1d9bf0;
+    color: var(--twl-metric-quote-icon);
 }
 
 /* Avatar representation (dot or image placeholder) */
