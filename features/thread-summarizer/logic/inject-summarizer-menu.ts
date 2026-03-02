@@ -17,6 +17,7 @@ import {
 import { createElement } from 'react'
 import { SummaryModal } from '../components/summary-modal'
 import { MultiPageSummaryModal } from '../components/multi-page-summary-modal'
+import { getActiveUserFilter } from './extract-posts'
 
 // =============================================================================
 // STYLES
@@ -101,16 +102,36 @@ function injectStyles(): void {
 	styleInjected = true
 }
 
+function getDropdownLabels(): { single: string; multi: string; mainText: string; mainTooltip: string } {
+	const filter = getActiveUserFilter()
+	if (filter) {
+		return {
+			single: `\u{1F50D} Analizar @${filter}`,
+			multi: `\u{1F50D} Analizar+ @${filter}`,
+			mainText: `Analizar @${filter}`,
+			mainTooltip: `Analizar a ${filter} en este hilo con IA`,
+		}
+	}
+	return {
+		single: '\u{1F4C4} Resumir p\u00E1gina actual',
+		multi: '\u{1F4DA} Resumen+ (multi-p\u00E1gina)',
+		mainText: 'Resumir',
+		mainTooltip: 'Resumir hilo con IA',
+	}
+}
+
 function createDropdown(buttonEl: HTMLAnchorElement): HTMLDivElement {
 	const dropdown = document.createElement('div')
 	dropdown.id = DOM_MARKERS.IDS.SUMMARIZER_MENU
 	dropdown.className = 'mvp-summarizer-dropdown'
 
-	// Option 1: Resumir página actual
+	const labels = getDropdownLabels()
+
+	// Option 1: Single page
 	const singlePage = document.createElement('a')
 	singlePage.className = 'mvp-summarizer-dropdown-item'
 	singlePage.href = 'javascript:void(0);'
-	singlePage.textContent = '\u{1F4C4} Resumir p\u00E1gina actual'
+	singlePage.textContent = labels.single
 	singlePage.addEventListener('click', (e) => {
 		e.preventDefault()
 		e.stopPropagation()
@@ -118,11 +139,11 @@ function createDropdown(buttonEl: HTMLAnchorElement): HTMLDivElement {
 		openModal(FEATURE_IDS.THREAD_SUMMARIZER_MODAL, DOM_MARKERS.IDS.SUMMARIZER_MODAL, SummaryModal)
 	})
 
-	// Option 2: Resumen+ (multi-página)
+	// Option 2: Multi-page
 	const multiPage = document.createElement('a')
 	multiPage.className = 'mvp-summarizer-dropdown-item'
 	multiPage.href = 'javascript:void(0);'
-	multiPage.textContent = '\u{1F4DA} Resumen+ (multi-p\u00E1gina)'
+	multiPage.textContent = labels.multi
 	multiPage.addEventListener('click', (e) => {
 		e.preventDefault()
 		e.stopPropagation()
@@ -187,12 +208,14 @@ export function injectSummarizerMenu(): void {
 
 	injectStyles()
 
+	const labels = getDropdownLabels()
+
 	createThreadActionButton({
 		id: DOM_MARKERS.IDS.SUMMARIZER_BTN,
 		icon: 'fa-magic',
-		text: 'Resumir',
-		tooltip: 'Resumir hilo con IA',
-		ariaLabel: 'Abrir men\u00FA de resumen con inteligencia artificial',
+		text: labels.mainText,
+		tooltip: labels.mainTooltip,
+		ariaLabel: labels.mainTooltip,
 		onClick: (_e, button) => {
 			toggleDropdown(button)
 		},

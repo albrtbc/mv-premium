@@ -1,6 +1,5 @@
 import type { TwitterLiteCardData } from './types'
 import { TWITTER_LITE_CSS, TWITTER_LITE_STYLE_ID } from './styles'
-import { isMVDarkMode } from '@/lib/theme-utils'
 
 const TWITTER_LITE_THEME_LIGHT_CLASS = 'mvp-twitter-lite-theme-light'
 const TWITTER_LITE_THEME_DARK_CLASS = 'mvp-twitter-lite-theme-dark'
@@ -271,7 +270,7 @@ function parseTweetText(text: string): string {
 export function createTwitterLiteCard(data: TwitterLiteCardData, loading = false): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.className = 'mvp-twitter-lite-card';
-    if (!isMVDarkMode()) wrapper.classList.add('mvp-twitter-lite-light');
+    syncTwitterLiteCardTheme(wrapper);
 
     // Click anywhere to open tweet
     wrapper.addEventListener('click', (e) => {
