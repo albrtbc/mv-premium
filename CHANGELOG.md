@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.0](https://github.com/albrtbc/mv-premium/compare/v1.5.2...v1.6.0) (2026-03-02)
+
+
+### Features
+
+* bump version to 1.5.0 and add changelog entry ([fb56739](https://github.com/albrtbc/mv-premium/commit/fb567391f5b7caea7a0e3b019ed6a767dc23022c))
+* **thread-summarizer:** add per-user analysis mode for filtered threads ([3f80995](https://github.com/albrtbc/mv-premium/commit/3f8099568e1d612e746114b0891098e2e1ff15ea))
+* **thread-summarizer:** improve user analysis prompt variety and reduce repetition ([3ec33b6](https://github.com/albrtbc/mv-premium/commit/3ec33b6bc8d24a2446b1fd3e7548ee8df5d55a69))
+
+
+### Bug Fixes
+
+* **centered-posts:** keep user hover card above sticky control bar ([9a8d1f3](https://github.com/albrtbc/mv-premium/commit/9a8d1f3f25ecc670022bdd67102c5d7f1c943962))
+* **firefox:** delay Twitter Lite embed initialization on thread pages to avoid MV post action handler race ([48d50a7](https://github.com/albrtbc/mv-premium/commit/48d50a7c7ef05675cc2757863e245163eb193a5f))
+* resolve post-merge compatibility issues ([4f75758](https://github.com/albrtbc/mv-premium/commit/4f75758e45339d4e5f6b77723125baf69c941ad7))
+* **thread-summarizer:** normalize numeric post refs to #N in user analysis output ([db8db23](https://github.com/albrtbc/mv-premium/commit/db8db2306a40ababa06b3fe4462627c7ec631cdf))
+
 ## [1.5.2](https://github.com/albrtbc/mv-premium/compare/v1.5.1...v1.5.2) (2026-02-25)
 
 
