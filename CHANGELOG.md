@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.7.0](https://github.com/albrtbc/mv-premium/compare/v1.6.0...v1.7.0) (2026-03-24)
+
+
+### Features
+
+* add configurable post font size (80%-150%) ([f5d0c8e](https://github.com/albrtbc/mv-premium/commit/f5d0c8e2abaf1222ccbb9cf01c615c00dbf37b86))
+* add hide header toggle with keyboard shortcut and early injection ([93895e7](https://github.com/albrtbc/mv-premium/commit/93895e77781af382b5fa48e247b514242c03d5b4))
+* add work mode for discreet forum browsing ([611213f](https://github.com/albrtbc/mv-premium/commit/611213fcf728c205d28fae94a96f624501d18e96))
+* bump version to 1.5.1 and add changelog entry ([3b7e92b](https://github.com/albrtbc/mv-premium/commit/3b7e92b1f896be908d74b981f50f1c3debcc9e7f))
+* **editor:** add profile info toolbar support ([48a8378](https://github.com/albrtbc/mv-premium/commit/48a8378560f3cbc27fe6b2202c9349db61e220ab))
+* increase max post font size from 150% to 200% for accessibility ([8d06b68](https://github.com/albrtbc/mv-premium/commit/8d06b686c18bee023a683d1e34dddc1c163a3cd1))
+
+
+### Bug Fixes
+
+* always enable tab title confirm button in work mode settings ([7e91f86](https://github.com/albrtbc/mv-premium/commit/7e91f86200a03e9ef15f80479f1c07b4367fb6b8))
+* change Firefox gecko ID to prevent store overwrites ([02c675c](https://github.com/albrtbc/mv-premium/commit/02c675c87dfb7c460b2275b030d3bb47542f2860))
+* **edge:** boost tipsy tooltip z-index to render above user hover card ([6f61ad2](https://github.com/albrtbc/mv-premium/commit/6f61ad2e3813ff35af5607765a401d4d086ce835))
+* hide native Steam store embeds in work mode ([e0bcb9d](https://github.com/albrtbc/mv-premium/commit/e0bcb9d7f5c5a0fd41ec0f2ada1ba50df1e08a5e))
+* prevent ignored user replies from hiding parent post in reply threads ([1761bed](https://github.com/albrtbc/mv-premium/commit/1761bed5e8936dfdfc7dba57a47986636bcc59b1))
+* work mode tab icon colors and title restoration on disable ([56a54c1](https://github.com/albrtbc/mv-premium/commit/56a54c14f8cbc535aba5eff3bd436290cdf03f4b))
+
 ## [1.6.0](https://github.com/albrtbc/mv-premium/compare/v1.5.2...v1.6.0) (2026-03-02)
 
 
