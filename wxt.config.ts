@@ -27,7 +27,7 @@ export default defineConfig({
 			'La experiencia definitiva para Mediavida. Potencia el foro con herramientas modernas, navegación fluida y personalización total.',
 		browser_specific_settings: {
 			gecko: {
-				id: 'mv-premium@adan-dev',
+				id: 'mv-premium@albrtbc',
 				// @ts-ignore: Esta propiedad es nueva en Firefox y WXT aún no la tiene tipada
 				data_collection_permissions: {
 					required: ['none'],
