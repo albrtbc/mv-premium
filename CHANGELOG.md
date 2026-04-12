@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.0](https://github.com/albrtbc/mv-premium/compare/v1.7.0...v1.8.0) (2026-04-12)
+
+
+### Features
+
+* merge upstream/main (v1.6.1) with AI subforum metadata and categories ([c041eda](https://github.com/albrtbc/mv-premium/commit/c041eda25561209d33b6b470e1dd24a0fc7c8fd6))
+* **subforums:** add AI subforum metadata and categories ([15943f8](https://github.com/albrtbc/mv-premium/commit/15943f8b9589ea82eacb11d293670b14450821c5))
+
 ## [1.7.0](https://github.com/albrtbc/mv-premium/compare/v1.6.0...v1.7.0) (2026-03-24)
 
 
