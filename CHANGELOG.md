@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.9.0](https://github.com/albrtbc/mv-premium/compare/v1.8.0...v1.9.0) (2026-05-29)
+
+
+### Features
+
+* add game releases calendar and controls ([0c8c006](https://github.com/albrtbc/mv-premium/commit/0c8c006605c2ee96d81c1e3d4debf6a6e57d5a5a))
+* **cine:** add Spanish movie release calendar ([0d5e836](https://github.com/albrtbc/mv-premium/commit/0d5e836cf225acf955e906afd704f9590b15ffe2))
+* **editor:** add Steam media insert action for games ([837a733](https://github.com/albrtbc/mv-premium/commit/837a733ea0a44301d06f6fef0ddaf92abb3f3089))
+* **itad:** add configurable game deals search ([d32b8a6](https://github.com/albrtbc/mv-premium/commit/d32b8a606d5217a298a4268f536ffb9961fabc9b))
+* **itad:** allow selecting price region for game deals ([ad33cc0](https://github.com/albrtbc/mv-premium/commit/ad33cc000aede7770fb9b9c0c24d8182de00564a))
+* **itad:** polish game deal modal layout ([d637cc4](https://github.com/albrtbc/mv-premium/commit/d637cc4c1dbe546353db719ad48f2da9f9cdb646))
+* **itad:** polish subforum search header ([da5c16d](https://github.com/albrtbc/mv-premium/commit/da5c16da2a36afb415f940bcbbac386c68108302))
+* **itad:** refine game search typeahead UX ([b7fdf44](https://github.com/albrtbc/mv-premium/commit/b7fdf442d3af27cabeb8d73a8e714368852c8ab6))
+* **options:** improve settings dashboard filtering UX ([26b843d](https://github.com/albrtbc/mv-premium/commit/26b843d9e8c9fb865544dc3da261e79a59fd890b))
+* **release-calendar:** show thread creation action in minimal layout ([d63757e](https://github.com/albrtbc/mv-premium/commit/d63757e4d4b2ee84cd776a087be377328fb65991))
+* **settings:** reorganize settings and move collapse control ([611cbd6](https://github.com/albrtbc/mv-premium/commit/611cbd696b5f4815e67d4752da6fbf539f5b6965))
+* **shortcuts:** add Cine release calendar toggle ([d774b70](https://github.com/albrtbc/mv-premium/commit/d774b709c6527b96ddc73d3f343f26cafe484a40))
+* **subforums:** add hidden subforums with global filtering and access blocking ([1b8871c](https://github.com/albrtbc/mv-premium/commit/1b8871c4c8122e94aeeeec80ffe53235305bf761))
+* **subforums:** hide threads started by ignored users ([25fe672](https://github.com/albrtbc/mv-premium/commit/25fe6729cd2ddaac606bc034336e13543f47d929))
+* **thread-clipper:** add quick thread creation from external pages with configurable target subforums, visual tray editing, BBCode generation, supported media embeds, history storage, and Mediavida editor prefill ([bd1eea8](https://github.com/albrtbc/mv-premium/commit/bd1eea87d4c7b50b1360c008e001109237a8724d))
+* **thread-preview:** add first-post previews ([7b897b2](https://github.com/albrtbc/mv-premium/commit/7b897b2eb6968a710a0ffe6ec7cbe9506bceac86))
+
+
+### Bug Fixes
+
+* **bookmarks:** improve checkbox contrast ([08fc1de](https://github.com/albrtbc/mv-premium/commit/08fc1de0bb0cc59f05c9ab991a2fb168fd011c4f))
+* handle Firefox production clicks in ITAD search ([19db6c1](https://github.com/albrtbc/mv-premium/commit/19db6c1cd22b3eb9ec044c5e486b200c4e5d65e3))
+* hide hidden subforums in spy ([7056c97](https://github.com/albrtbc/mv-premium/commit/7056c974e38fd9dfede30bc2ad4919c44efcea38))
+* **options:** improve selected setting result outline ([d064ca0](https://github.com/albrtbc/mv-premium/commit/d064ca04f30018c06a2ab66bfdc6e7039d594b52))
+* **search:** improve custom search UX ([7794585](https://github.com/albrtbc/mv-premium/commit/7794585bd3bf4dfb65a16a9b6ae93bc93c699b44))
+* **subforums:** keep forum dropdown columns aligned when hiding subforums ([e1b3c05](https://github.com/albrtbc/mv-premium/commit/e1b3c058988954b0b5f48034de96916a52f8cfc2))
+* **thread-preview:** avoid clipping like counts in short previews ([51bec43](https://github.com/albrtbc/mv-premium/commit/51bec43adeeb2a88d86f2170affaddb666bd612c))
+
 ## [1.8.0](https://github.com/albrtbc/mv-premium/compare/v1.7.0...v1.8.0) (2026-04-12)
 
 
