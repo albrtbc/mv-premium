@@ -148,6 +148,41 @@ class IntersectionObserverMock {
 }
 vi.stubGlobal('IntersectionObserver', IntersectionObserverMock)
 
+// Mock Web Storage.
+// jsdom normally provides localStorage, but Node 22+ ships an experimental
+// global `localStorage` that shadows it and resolves to `undefined` unless
+// `--localstorage-file` is passed. Provide a deterministic in-memory mock so
+// tests behave the same across Node versions (CI on Node 20, local on Node 26+).
+class StorageMock implements Storage {
+	private store = new Map<string, string>()
+
+	get length(): number {
+		return this.store.size
+	}
+	clear(): void {
+		this.store.clear()
+	}
+	getItem(key: string): string | null {
+		return this.store.has(key) ? (this.store.get(key) as string) : null
+	}
+	key(index: number): string | null {
+		return Array.from(this.store.keys())[index] ?? null
+	}
+	removeItem(key: string): void {
+		this.store.delete(key)
+	}
+	setItem(key: string, value: string): void {
+		this.store.set(key, String(value))
+	}
+}
+
+const localStorageMock = new StorageMock()
+const sessionStorageMock = new StorageMock()
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: localStorageMock })
+Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: sessionStorageMock })
+Object.defineProperty(window, 'localStorage', { configurable: true, value: localStorageMock })
+Object.defineProperty(window, 'sessionStorage', { configurable: true, value: sessionStorageMock })
+
 // Mock scrollTo
 window.scrollTo = vi.fn()
 
@@ -181,9 +216,19 @@ beforeEach(() => {
 	// Clear all mocks before each test
 	vi.clearAllMocks()
 
+	// Re-apply observer mocks on every test. Some suites call
+	// vi.unstubAllGlobals() in their own afterEach, which would otherwise remove
+	// these globals for the rest of the file. jsdom has no native ResizeObserver,
+	// so without the mock code can fall back to self-triggering MutationObservers
+	// that spin forever (e.g. thread-preview clamp logic).
+	vi.stubGlobal('ResizeObserver', ResizeObserverMock)
+	vi.stubGlobal('IntersectionObserver', IntersectionObserverMock)
+
 	// Reset storage mocks
 	mockBrowser.storage.local._setStore({})
 	mockBrowser.storage.sync._setStore({})
+	localStorageMock.clear()
+	sessionStorageMock.clear()
 })
 
 afterEach(() => {
