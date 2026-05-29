@@ -110,6 +110,36 @@ function executeAction(actionId: string) {
 				toggleWorkMode().catch(err => logger.error('Work mode toggle error:', err))
 			}).catch(err => logger.error('Work mode import error:', err))
 			break
+
+		case 'itad-search-toggle':
+			import('@/features/itad-search').then(({ toggleItadSubforumSearch }) => {
+				toggleItadSubforumSearch().catch(err => logger.error('ITAD search toggle error:', err))
+			}).catch(err => logger.error('ITAD search import error:', err))
+			break
+
+		case 'itad-search-juegos-toggle':
+			import('@/features/itad-search').then(({ toggleItadSubforumSearch }) => {
+				toggleItadSubforumSearch('juegos').catch(err => logger.error('ITAD Juegos search toggle error:', err))
+			}).catch(err => logger.error('ITAD Juegos search import error:', err))
+			break
+
+		case 'itad-search-hucha-toggle':
+			import('@/features/itad-search').then(({ toggleItadSubforumSearch }) => {
+				toggleItadSubforumSearch('club-hucha').catch(err => logger.error('ITAD Hucha search toggle error:', err))
+			}).catch(err => logger.error('ITAD Hucha search import error:', err))
+			break
+
+		case 'release-calendar-juegos-toggle':
+			import('@/features/release-calendar').then(({ toggleReleaseCalendarJuegos }) => {
+				toggleReleaseCalendarJuegos().catch(err => logger.error('Release calendar toggle error:', err))
+			}).catch(err => logger.error('Release calendar import error:', err))
+			break
+
+		case 'release-calendar-cine-toggle':
+			import('@/features/movie-release-calendar').then(({ toggleMovieReleaseCalendarCine }) => {
+				toggleMovieReleaseCalendarCine().catch(err => logger.error('Movie release calendar toggle error:', err))
+			}).catch(err => logger.error('Movie release calendar import error:', err))
+			break
 	}
 }
 

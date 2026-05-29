@@ -42,6 +42,8 @@ export const aiModelSchema = z.enum([
 export const ultrawideSchema = z.enum(['off', 'wide', 'extra-wide', 'full'])
 export type UltrawideMode = z.infer<typeof ultrawideSchema>
 export const centeredControlsPositionSchema = z.enum(['top', 'side'])
+export const gameReleaseCalendarLayoutSchema = z.enum(['showcase', 'minimal', 'bottom'])
+export const itadCountrySchema = z.enum(['ES', 'GB', 'US'])
 
 // =============================================================================
 // SETTINGS SCHEMA
@@ -77,7 +79,19 @@ export const settingsSchema = z.object({
 	improvedUpvotesEnabled: z.boolean().default(true),
 	mediaHoverCardsEnabled: z.boolean().default(true),
 	steamBundleInlineCardsEnabled: z.boolean().default(true),
+	itadSubforumSearchEnabled: z.boolean().default(true),
+	itadSubforumSearchJuegosEnabled: z.boolean().default(true),
+	itadSubforumSearchHuchaEnabled: z.boolean().default(true),
+	itadCountry: itadCountrySchema.default('ES'),
+	gameReleaseCalendarEnabled: z.boolean().default(true),
+	gameReleaseCalendarJuegosEnabled: z.boolean().default(true),
+	gameReleaseCalendarLayout: gameReleaseCalendarLayoutSchema.default('minimal'),
+	movieReleaseCalendarCineEnabled: z.boolean().default(true),
+	movieReleaseCalendarLayout: gameReleaseCalendarLayoutSchema.default('minimal'),
+	threadClipperSubforums: z.array(z.string()).default(['juegos']),
 	twitterLiteEmbedsEnabled: z.boolean().default(false),
+	threadPreviewEnabled: z.boolean().default(true),
+	hideIgnoredUserThreadsEnabled: z.boolean().default(true),
 
 	// Feature Toggles - Users
 	mutedWordsEnabled: z.boolean().default(false),

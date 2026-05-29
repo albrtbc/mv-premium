@@ -72,6 +72,31 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().liveThreadDelayEnabled).toBe(true)
 		})
 
+		it('has ignored user thread filtering enabled by default', () => {
+			expect(useSettingsStore.getState().hideIgnoredUserThreadsEnabled).toBe(true)
+		})
+
+		it('has ITAD subforum search enabled by default', () => {
+			expect(useSettingsStore.getState().itadSubforumSearchEnabled).toBe(true)
+			expect(useSettingsStore.getState().itadSubforumSearchJuegosEnabled).toBe(true)
+			expect(useSettingsStore.getState().itadSubforumSearchHuchaEnabled).toBe(true)
+			expect(useSettingsStore.getState().itadCountry).toBe('ES')
+		})
+
+		it('has game release calendar enabled by default', () => {
+			expect(useSettingsStore.getState().gameReleaseCalendarEnabled).toBe(true)
+			expect(useSettingsStore.getState().gameReleaseCalendarJuegosEnabled).toBe(true)
+		})
+
+		it('has movie release calendar enabled by default', () => {
+			expect(useSettingsStore.getState().movieReleaseCalendarCineEnabled).toBe(true)
+			expect(useSettingsStore.getState().movieReleaseCalendarLayout).toBe('minimal')
+		})
+
+		it('has minimal release calendar layout by default', () => {
+			expect(useSettingsStore.getState().gameReleaseCalendarLayout).toBe('minimal')
+		})
+
 		it('has centered controls position set to top by default', () => {
 			expect(useSettingsStore.getState().centeredControlsPosition).toBe('top')
 		})
@@ -160,11 +185,53 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().liveThreadEnabled).toBe(true)
 		})
 
+		it('setSetting supports ignored user thread filtering toggle', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('hideIgnoredUserThreadsEnabled', false)
+			})
+			expect(useSettingsStore.getState().hideIgnoredUserThreadsEnabled).toBe(false)
+		})
+
 		it('setSetting supports centered controls position', () => {
 			act(() => {
 				useSettingsStore.getState().setSetting('centeredControlsPosition', 'side')
 			})
 			expect(useSettingsStore.getState().centeredControlsPosition).toBe('side')
+		})
+
+		it('setSetting supports game release calendar toggle', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('gameReleaseCalendarEnabled', false)
+			})
+			expect(useSettingsStore.getState().gameReleaseCalendarEnabled).toBe(false)
+		})
+
+		it('setSetting supports game release calendar layout', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('gameReleaseCalendarLayout', 'bottom')
+			})
+			expect(useSettingsStore.getState().gameReleaseCalendarLayout).toBe('bottom')
+		})
+
+		it('setSetting supports movie release calendar toggle', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('movieReleaseCalendarCineEnabled', false)
+			})
+			expect(useSettingsStore.getState().movieReleaseCalendarCineEnabled).toBe(false)
+		})
+
+		it('setSetting supports movie release calendar layout', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('movieReleaseCalendarLayout', 'showcase')
+			})
+			expect(useSettingsStore.getState().movieReleaseCalendarLayout).toBe('showcase')
+		})
+
+		it('setSetting supports ITAD country', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('itadCountry', 'GB')
+			})
+			expect(useSettingsStore.getState().itadCountry).toBe('GB')
 		})
 	})
 

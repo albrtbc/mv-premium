@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
 	// Features
 	MUTED_WORDS: 'mvp-muted-words',
 	HIDDEN_THREADS: 'mvp-hidden-threads',
+	HIDDEN_SUBFORUMS: 'mvp-hidden-subforums',
 	SAVED_THREADS: 'mvp-saved-threads',
 	USER_CUSTOMIZATIONS: 'mvp-user-customizations',
 	FAVORITE_SUBFORUMS: 'mvp-favorite-subforums',
@@ -37,6 +38,10 @@ export const STORAGE_KEYS = {
 	ACTIVITY: 'mvp-activity',
 	TIME_STATS: 'mvp-time-stats',
 	PENDING_THREAD_CREATION: 'mvp-pending-thread-creation',
+	PENDING_RELEASE_THREAD_PREFILL: 'mvp-pending-release-thread-prefill',
+	PENDING_CLIPPED_THREAD_PREFILL: 'mvp-pending-clipped-thread-prefill',
+	THREAD_CLIPPER_BASKET: 'mvp-thread-clipper-basket',
+	THREAD_CLIPPER_HISTORY: 'mvp-thread-clipper-history',
 	PENDING_POST_EDIT: 'mvp-pending-post-edit',
 	PENDING_REPLY: 'mvp-pending-reply',
 	LAST_SEEN_VERSION: 'mvp-last-seen-version',

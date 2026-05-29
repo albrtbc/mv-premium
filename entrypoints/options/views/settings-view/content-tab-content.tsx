@@ -29,6 +29,7 @@ import { SettingRow, ColorPickerWithConfirm } from '../../components/settings'
 import { useSettingsStore } from '@/store/settings-store'
 import type { DashboardIcon, WorkModeOptions } from '@/store/settings-types'
 import { browser } from 'wxt/browser'
+import { isHighlightedSetting, shouldShowSetting, type SettingsContentFilter } from './constants'
 
 const logoUrl = browser.runtime.getURL('/icon/48.png')
 
@@ -40,7 +41,16 @@ const DASHBOARD_ICON_OPTIONS: { value: DashboardIcon; label: string; icon: React
 	{ value: 'gears', label: 'Engranajes', icon: <Cog className="h-4 w-4" /> },
 ]
 
-export function ContentTabContent() {
+const CONTENT_SETTING_IDS = [
+	'bold-color',
+	'twitter-lite',
+	'dashboard-icon',
+	'hide-header',
+	'work-mode',
+	'ultrawide-mode',
+]
+
+export function ContentTabContent({ settingFilter }: { settingFilter?: SettingsContentFilter }) {
 	const {
 		boldColor,
 		boldColorEnabled,
@@ -60,10 +70,19 @@ export function ContentTabContent() {
 		setSetting('workModeOptions', { ...workModeOptions, [key]: value })
 	}
 
+	const rowState = (settingId: string) => ({
+		settingId,
+		hidden: !shouldShowSetting(settingFilter, settingId),
+		highlighted: isHighlightedSetting(settingFilter, settingId),
+	})
+	const visibleRows = CONTENT_SETTING_IDS.filter(settingId => shouldShowSetting(settingFilter, settingId))
+	const showSeparatorBefore = (settingId: string) => visibleRows.indexOf(settingId) > 0
+
 	return (
 		<SettingsSection title="Contenido" description="Funciones para visualizar y organizar contenido en hilos.">
 			{/* Text Styling */}
 			<SettingRow
+				{...rowState('bold-color')}
 				icon={<Sparkles className="h-4 w-4" />}
 				label="Personalizar color de negrita"
 				description="Usa un color personalizado para el texto en negrita. Desactivado = color nativo de Mediavida."
@@ -82,9 +101,10 @@ export function ContentTabContent() {
 				</div>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('twitter-lite') && <Separator />}
 
 			<SettingRow
+				{...rowState('twitter-lite')}
 				icon={<MessageSquare className="h-4 w-4" />}
 				label="Tweets Lite"
 				description="Reemplaza los iframes de X/Twitter por tarjetas ligeras con avatar, texto, imágenes, tweets citados e hilos. Carga más rápido y se ve siempre."
@@ -98,10 +118,11 @@ export function ContentTabContent() {
 				/>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('dashboard-icon') && <Separator />}
 
 			{/* Dashboard Icon Selection */}
 			<SettingRow
+				{...rowState('dashboard-icon')}
 				icon={<LayoutDashboard className="h-4 w-4" />}
 				label="Icono del Dashboard"
 				description="Elige el icono que aparece en el navbar de Mediavida para acceder al panel."
@@ -129,10 +150,11 @@ export function ContentTabContent() {
 				</Select>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('hide-header') && <Separator />}
 
 			{/* Hide Header */}
 			<SettingRow
+				{...rowState('hide-header')}
 				icon={<PanelTopClose className="h-4 w-4" />}
 				label="Ocultar cabecera"
 				description="Oculta el header/navbar superior de Mediavida para ganar espacio vertical. También disponible como atajo de teclado."
@@ -146,10 +168,11 @@ export function ContentTabContent() {
 				/>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('work-mode') && <Separator />}
 
 			{/* Work Mode */}
 			<SettingRow
+				{...rowState('work-mode')}
 				icon={<Briefcase className="h-4 w-4" />}
 				label="Modo trabajo"
 				description="Oculta contenido visual del foro para navegar discretamente. También disponible como atajo de teclado."
@@ -163,7 +186,7 @@ export function ContentTabContent() {
 				/>
 			</SettingRow>
 
-			{workModeEnabled && (
+			{workModeEnabled && shouldShowSetting(settingFilter, 'work-mode') && (
 				<div className="ml-6 space-y-1 border-l-2 border-muted pl-4 pb-1">
 					<p className="text-xs text-muted-foreground mb-3">Elige qué contenido ocultar:</p>
 
@@ -250,19 +273,22 @@ export function ContentTabContent() {
 				</div>
 			)}
 
-			<Separator />
+			{showSeparatorBefore('ultrawide-mode') && <Separator />}
 
 			{/* Page Width - Layout */}
-			<PageWidthSettings />
+			<PageWidthSettings settingFilter={settingFilter} />
 		</SettingsSection>
 	)
 }
 
-function PageWidthSettings() {
+function PageWidthSettings({ settingFilter }: { settingFilter?: SettingsContentFilter }) {
 	const { ultrawideMode, setUltrawideMode } = useSettingsStore()
 
 	return (
 		<SettingRow
+			settingId="ultrawide-mode"
+			hidden={!shouldShowSetting(settingFilter, 'ultrawide-mode')}
+			highlighted={isHighlightedSetting(settingFilter, 'ultrawide-mode')}
 			icon={<Settings2 className="h-4 w-4" />}
 			label="Modo Ultrawide"
 			description="Ajusta el ancho del contenido. Ideal para monitores grandes."

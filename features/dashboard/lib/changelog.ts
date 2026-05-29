@@ -21,6 +21,167 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
 	{
+		version: '1.9.0',
+		date: '2026-05-29',
+		title: 'Estrenos de cine, previews de hilos y ajustes más cómodos',
+		summary:
+			'Nuevo calendario de estrenos para Cine, previews del primer post en listados, mejoras importantes en ajustes y nuevas opciones para juegos, Steam e IsThereAnyDeal.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Calendario de estrenos de Cine: Añadido un carrusel de próximos estrenos de películas en España con datos de TMDB, filtros por rango, vistas configurables y creación rápida de hilos con plantilla.',
+				category: 'Cine',
+			},
+			{
+				type: 'feature',
+				description:
+					'Previews de hilos: Los threads en subforos y Spy muestran una vista previa del primer post con texto, enlaces, embeds y controles para expandir o compartir el contenido.',
+				category: 'Comunidad',
+			},
+			{
+				type: 'feature',
+				description:
+					'Editor de juegos: Las fichas de juegos pueden insertar enlaces de Steam cuando están disponibles, usando datos enriquecidos de IGDB y Steam.',
+				category: 'Editor',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Buscador de ofertas: Añadida selección de región para precios de IsThereAnyDeal, permitiendo ajustar las ofertas de juegos al mercado preferido.',
+				category: 'Juegos',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Dashboard de ajustes: Reorganizada la navegación, mejorados los filtros y resultados de búsqueda, y refinado el resaltado de ajustes seleccionados.',
+				category: 'Ajustes',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Calendarios de lanzamientos: Compartidos los controles de diseño entre juegos y cine, con mejoras visuales en tarjetas, carruseles y creación de hilos.',
+				category: 'Diseño',
+			},
+			{
+				type: 'fix',
+				description:
+					'Corregidos detalles de estado y tipado en las previews de hilos para mantener estable el comportamiento de contenido oculto y spoilers.',
+				category: 'Comunidad',
+			},
+		],
+	},
+	{
+		version: '1.8.0',
+		date: '2026-05-24',
+		title: 'Calendario de lanzamientos y creador rápido de hilos',
+		summary:
+			'Nuevo calendario de lanzamientos de juegos, creación rápida de hilos desde páginas externas y mejoras en ofertas, búsqueda, marcadores y subforos ocultos.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Calendario de lanzamientos: Añadido un calendario de próximos juegos con filtros por plataforma, controles de vista, datos de IGDB y acceso desde el subforo Juegos.',
+				category: 'Juegos',
+			},
+			{
+				type: 'feature',
+				description:
+					'Crear hilo desde lanzamientos: Los juegos del calendario permiten preparar un hilo con plantilla y rellenar el editor de Mediavida automáticamente, también en la vista mínima.',
+				category: 'Juegos',
+			},
+			{
+				type: 'feature',
+				description:
+					'Creador rápido de hilos: Nueva herramienta para iniciar hilos desde páginas externas con subforos configurables, bandeja visual de edición, generación de BBCode y soporte para textos, enlaces y embeds multimedia.',
+				category: 'Editor',
+			},
+			{
+				type: 'improvement',
+				description:
+					'El buscador personalizado de Mediavida se adapta mejor al tema oscuro, con campo de búsqueda más cómodo, resultados más claros y una zona de clic del icono más precisa.',
+				category: 'Búsqueda',
+			},
+			{
+				type: 'improvement',
+				description:
+					'El buscador de ofertas de videojuegos también está disponible en Club de la hucha, con controles independientes para Juegos y Hucha desde ajustes y nuevos atajos para activar cada subforo por separado.',
+				category: 'Juegos',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Mejorado el contraste de los checkboxes en el gestor de marcadores para que sean más legibles en distintos temas.',
+				category: 'Accesibilidad',
+			},
+			{
+				type: 'fix',
+				description:
+					'Los subforos ocultos también se respetan en la página de Spy, evitando que vuelvan a aparecer en esa vista.',
+				category: 'Comunidad',
+			},
+		],
+	},
+	{
+		version: '1.7.1',
+		date: '2026-05-11',
+		title: 'Buscador de ofertas más pulido',
+		summary: 'Corrección de apertura del modal de juegos y pequeñas mejoras de interfaz en el buscador de ofertas.',
+		changes: [
+			{
+				type: 'fix',
+				description:
+					'Corregido un problema en producción donde seleccionar un juego podía cerrar el desplegable en lugar de abrir el modal de detalle.',
+				category: 'Juegos',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Mejorada la experiencia del buscador de ofertas con un modal más claro, botón para limpiar la búsqueda y estados de carga más estables.',
+				category: 'Diseño',
+			},
+		],
+	},
+	{
+		version: '1.7.0',
+		date: '2026-05-09',
+		title: 'Subforos ocultos y ofertas de juegos',
+		summary:
+			'Nueva gestión para ocultar subforos completos y un buscador premium de ofertas en el subforo Juegos con precios de IsThereAnyDeal.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Ocultar subforos: Nuevo sistema para ocultar subforos desde la interfaz de Mediavida y gestionarlos cómodamente desde el dashboard.',
+				category: 'Comunidad',
+			},
+			{
+				type: 'feature',
+				description:
+					'Hilos de usuarios ignorados: Los hilos creados por usuarios que tienes ignorados de forma total dejan de mostrarse automáticamente en los listados de subforos donde Mediavida permite conocer el autor del hilo.',
+				category: 'Comunidad',
+			},
+			{
+				type: 'feature',
+				description:
+					'Buscador de ofertas en Juegos: Añadido un buscador en el subforo Juegos con resultados de IsThereAnyDeal, precios actuales, mínimos históricos, tiendas, descuentos y detalle por plataforma.',
+				category: 'Juegos',
+			},
+			{
+				type: 'improvement',
+				description:
+					'El buscador de ofertas puede activarse o desactivarse desde el dashboard y también mediante un atajo de teclado configurable.',
+				category: 'Ajustes',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Mejorado el diseño de los resultados y del modal de detalle de juegos para mostrar la información de precios con más claridad.',
+				category: 'Diseño',
+			},
+		],
+	},
+	{
 		version: '1.6.1',
 		date: '2026-04-12',
 		title: 'Subforo de IA y Gemini',

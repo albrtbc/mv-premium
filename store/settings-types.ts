@@ -31,6 +31,12 @@ export type DashboardIcon = 'logo' | 'user-shield' | 'dashboard' | 'rocket' | 'g
 /** Centered posts control bar position */
 export type CenteredControlsPosition = 'top' | 'side'
 
+/** Game release calendar display mode */
+export type GameReleaseCalendarLayout = 'showcase' | 'minimal' | 'bottom'
+
+/** Country used by IsThereAnyDeal to localize shops and currency */
+export type ItadCountry = 'ES' | 'GB' | 'US'
+
 /** Work mode sub-options */
 export interface WorkModeOptions {
 	hideAvatars: boolean
@@ -84,12 +90,24 @@ export interface Settings {
 	improvedUpvotesEnabled: boolean
 	mediaHoverCardsEnabled: boolean
 	steamBundleInlineCardsEnabled: boolean
+	itadSubforumSearchEnabled: boolean
+	itadSubforumSearchJuegosEnabled: boolean
+	itadSubforumSearchHuchaEnabled: boolean
+	itadCountry: ItadCountry
+	gameReleaseCalendarEnabled: boolean
+	gameReleaseCalendarJuegosEnabled: boolean
+	gameReleaseCalendarLayout: GameReleaseCalendarLayout
+	movieReleaseCalendarCineEnabled: boolean
+	movieReleaseCalendarLayout: GameReleaseCalendarLayout
+	threadClipperSubforums: string[]
 	twitterLiteEmbedsEnabled: boolean
 	pinnedPostsEnabled: boolean
+	threadPreviewEnabled: boolean
 	threadSummarizerEnabled: boolean
 	postSummaryEnabled: boolean
 	saveThreadEnabled: boolean
 	hideThreadEnabled: boolean
+	hideIgnoredUserThreadsEnabled: boolean
 
 	// Feature Toggles - Users
 	mutedWordsEnabled: boolean

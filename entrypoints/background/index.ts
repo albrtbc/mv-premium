@@ -18,11 +18,17 @@
 import { defineBackground, storage } from '#imports'
 import { browser } from 'wxt/browser'
 import { onMessage } from '@/lib/messaging'
-import { createContextMenus, setupContextMenuListener } from './context-menus'
+import {
+	createContextMenus,
+	setupContextMenuListener,
+	setupContextMenuRefreshHandler,
+	setupThreadClipperTrayListener,
+} from './context-menus'
 import { setupUploadHandlers } from './upload-handlers'
 import { setupApiHandlers } from './api-handlers'
 import { setupAiHandlers } from './ai-handlers'
 import { setupIgdbHandlers } from './igdb-handlers'
+import { setupItadHandlers } from './itad-handlers'
 import { highlightCode } from './prism-highlighter'
 import { setupTwitterLiteNetworkGuard } from './twitter-lite-network-guard'
 import { clearCache } from '@/services/media/cache'
@@ -73,6 +79,8 @@ export default defineBackground(() => {
 		// Ignore startup menu creation errors; onInstalled will retry on updates.
 	})
 	setupContextMenuListener()
+	setupContextMenuRefreshHandler()
+	setupThreadClipperTrayListener()
 
 	// Upload handlers (ImgBB, Freeimage)
 	setupUploadHandlers()
@@ -85,6 +93,9 @@ export default defineBackground(() => {
 
 	// IGDB handlers (game database)
 	setupIgdbHandlers()
+
+	// IsThereAnyDeal handlers (game prices)
+	setupItadHandlers()
 
 	// Strict Twitter Lite network guard (blocks native Twitter embeds until explicit user action)
 	setupTwitterLiteNetworkGuard()

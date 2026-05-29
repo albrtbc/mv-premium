@@ -15,7 +15,9 @@ const mockState = {
 	// Premium features default to true to match test expectations
 	mediaHoverCardsEnabled: true,
 	steamBundleInlineCardsEnabled: true,
+	itadSubforumSearchEnabled: true,
 	pinnedPostsEnabled: true,
+	threadPreviewEnabled: true,
 	saveThreadEnabled: true,
 	galleryButtonEnabled: true,
 	postSummaryEnabled: true,
@@ -48,7 +50,9 @@ describe('feature-flags', () => {
 		// Reset premium defaults
 		mockState.mediaHoverCardsEnabled = true
 		mockState.steamBundleInlineCardsEnabled = true
+		mockState.itadSubforumSearchEnabled = true
 		mockState.pinnedPostsEnabled = true
+		mockState.threadPreviewEnabled = true
 		mockState.saveThreadEnabled = true
 		mockState.galleryButtonEnabled = true
 		mockState.postSummaryEnabled = true
@@ -81,6 +85,15 @@ describe('feature-flags', () => {
 				expect(isFeatureEnabled(FeatureFlag.PinnedPosts)).toBe(false)
 			})
 
+			it('returns true for ThreadPreview feature when enabled', () => {
+				expect(isFeatureEnabled(FeatureFlag.ThreadPreview)).toBe(true)
+			})
+
+			it('returns false for ThreadPreview feature when disabled', () => {
+				mockState.threadPreviewEnabled = false
+				expect(isFeatureEnabled(FeatureFlag.ThreadPreview)).toBe(false)
+			})
+
 			it('returns true for SavedThreads feature when enabled', () => {
 				expect(isFeatureEnabled(FeatureFlag.SavedThreads)).toBe(true)
 			})
@@ -91,6 +104,11 @@ describe('feature-flags', () => {
 
 			it('returns true for SteamBundleInlineCards feature when enabled', () => {
 				expect(isFeatureEnabled(FeatureFlag.SteamBundleInlineCards)).toBe(true)
+			})
+
+			it('returns false for ItadSubforumSearch feature when disabled', () => {
+				mockState.itadSubforumSearchEnabled = false
+				expect(isFeatureEnabled(FeatureFlag.ItadSubforumSearch)).toBe(false)
 			})
 		})
 

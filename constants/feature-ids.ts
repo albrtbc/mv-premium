@@ -26,6 +26,10 @@ export const FEATURE_IDS = {
 	INFINITE_SCROLL_BUTTON: 'mvp-infinite-scroll-button',
 	MEDIA_HOVER_CARD: 'mvp-media-hover-card',
 	NATIVE_LIVE_DELAY_CONTROL: 'mvp-native-live-delay-control',
+	HIDDEN_SUBFORUM_BLOCKER: 'mvp-hidden-subforum-blocker',
+	ITAD_SUBFORUM_SEARCH: 'mvp-itad-subforum-search',
+	GAME_RELEASE_CALENDAR: 'mvp-game-release-calendar',
+	MOVIE_RELEASE_CALENDAR: 'mvp-movie-release-calendar',
 
 	// Improved Upvotes
 	IMPROVED_UPVOTES_PREFIX: 'mvp-improved-upvotes-',

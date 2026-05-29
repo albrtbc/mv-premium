@@ -46,7 +46,10 @@ export const FeatureFlag = {
 	CinemaCards: 'cinema-cards',
 	MediaHoverCards: 'media-hover-cards',
 	SteamBundleInlineCards: 'steam-bundle-inline-cards',
+	ItadSubforumSearch: 'itad-subforum-search',
+	GameReleaseCalendar: 'game-release-calendar',
 	PinnedPosts: 'pinned-posts',
+	ThreadPreview: 'thread-preview',
 	SavedThreads: 'saved-threads',
 
 	// Experimental Features (may require debug mode)
@@ -106,7 +109,10 @@ const FEATURE_CONFIG: Record<FeatureFlagKey, FeatureConfig> = {
 	[FeatureFlag.CinemaCards]: { settingsKey: 'cinemaButtonEnabled', requiresApiKey: 'tmdbApiKey' },
 	[FeatureFlag.MediaHoverCards]: { settingsKey: 'mediaHoverCardsEnabled' },
 	[FeatureFlag.SteamBundleInlineCards]: { settingsKey: 'steamBundleInlineCardsEnabled' },
+	[FeatureFlag.ItadSubforumSearch]: { settingsKey: 'itadSubforumSearchEnabled' },
+	[FeatureFlag.GameReleaseCalendar]: { settingsKey: 'gameReleaseCalendarEnabled' },
 	[FeatureFlag.PinnedPosts]: { settingsKey: 'pinnedPostsEnabled' },
+	[FeatureFlag.ThreadPreview]: { settingsKey: 'threadPreviewEnabled' },
 	[FeatureFlag.SavedThreads]: { settingsKey: 'saveThreadEnabled' },
 
 	// Experimental Features

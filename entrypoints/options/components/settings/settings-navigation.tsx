@@ -20,8 +20,26 @@ import { SettingRow } from './setting-row'
 import { browser } from 'wxt/browser'
 import { toast } from 'sonner'
 import type { CenteredControlsPosition } from '@/store/settings-types'
+import {
+	isHighlightedSetting,
+	shouldShowSetting,
+	type SettingsContentFilter,
+} from '../../views/settings-view/constants'
 
-export function SettingsNavigation() {
+const NAVIGATION_SETTING_IDS = [
+	'infinite-scroll',
+	'auto-infinite-scroll',
+	'live-thread',
+	'gallery-button',
+	'live-thread-delay',
+	'native-live-delay',
+	'centered-posts',
+	'centered-controls-position',
+	'centered-controls-sticky',
+	'centered-controls-compact',
+]
+
+export function SettingsNavigation({ settingFilter }: { settingFilter?: SettingsContentFilter }) {
 	const {
 		infiniteScrollEnabled,
 		setInfiniteScrollEnabled,
@@ -47,6 +65,16 @@ export function SettingsNavigation() {
 		})
 	}
 
+	const rowState = (settingId: string) => ({
+		settingId,
+		hidden: !shouldShowSetting(settingFilter, settingId),
+		highlighted: isHighlightedSetting(settingFilter, settingId),
+	})
+	const shouldForceRender = (settingId: string) =>
+		settingFilter?.highlightedSettingId === settingId || settingFilter?.visibleSettingIds?.has(settingId) === true
+	const visibleRows = NAVIGATION_SETTING_IDS.filter(settingId => shouldShowSetting(settingFilter, settingId))
+	const showSeparatorBefore = (settingId: string) => visibleRows.indexOf(settingId) > 0
+
 	return (
 		<SettingsSection title="Navegación" description="Opciones relacionadas con la navegación y carga de contenido.">
 			<Card className="mb-6 border-primary/50 bg-primary/15 border-l-[6px] border-l-primary shadow-md overflow-hidden transition-all hover:bg-primary/20">
@@ -66,6 +94,7 @@ export function SettingsNavigation() {
 			</Card>
 
 			<SettingRow
+				{...rowState('infinite-scroll')}
 				icon={<InfinityIcon className="h-4 w-4" />}
 				label="Scroll infinito"
 				description="Carga automáticamente más posts al llegar al final de la página."
@@ -84,8 +113,9 @@ export function SettingsNavigation() {
 				/>
 			</SettingRow>
 
-			{infiniteScrollEnabled && (
+			{(infiniteScrollEnabled || shouldForceRender('auto-infinite-scroll')) && (
 				<SettingRow
+					{...rowState('auto-infinite-scroll')}
 					icon={<Zap className="h-4 w-4" />}
 					label="Activar automáticamente"
 					description="El scroll infinito se activa automáticamente al entrar en un hilo (excepto en hilos LIVE)."
@@ -102,9 +132,10 @@ export function SettingsNavigation() {
 				</SettingRow>
 			)}
 
-			<Separator />
+			{showSeparatorBefore('live-thread') && <Separator />}
 
 			<SettingRow
+				{...rowState('live-thread')}
 				icon={<Radio className="h-4 w-4" />}
 				label="Modo Live"
 				description="Muestra nuevos posts en tiempo real sin recargar la página."
@@ -119,9 +150,10 @@ export function SettingsNavigation() {
 				/>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('gallery-button') && <Separator />}
 
 			<SettingRow
+				{...rowState('gallery-button')}
 				icon={<Images className="h-4 w-4" />}
 				label="Botón de galería"
 				description="Muestra el botón para ver todas las imágenes de cada página del hilo en una galería."
@@ -136,9 +168,10 @@ export function SettingsNavigation() {
 				/>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('live-thread-delay') && <Separator />}
 
 			<SettingRow
+				{...rowState('live-thread-delay')}
 				icon={<Clock className="h-4 w-4" />}
 				label="Delay en Live de MV Premium"
 				description="Añade un control de delay en el live propio de MV Premium para evitar spoilers."
@@ -153,9 +186,10 @@ export function SettingsNavigation() {
 				/>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('native-live-delay') && <Separator />}
 
 			<SettingRow
+				{...rowState('native-live-delay')}
 				icon={<Clock className="h-4 w-4" />}
 				label="Delay en Live nativo de Mediavida"
 				description="Añade un control de delay en los hilos live nativos de Mediavida para evitar spoilers."
@@ -170,9 +204,10 @@ export function SettingsNavigation() {
 				/>
 			</SettingRow>
 
-			<Separator />
+			{showSeparatorBefore('centered-posts') && <Separator />}
 
 			<SettingRow
+				{...rowState('centered-posts')}
 				icon={<Maximize className="h-4 w-4" />}
 				label="Posts e hilos centrados"
 				description="Oculta el sidebar y expande el contenido en hilos, Spy y subforos."
@@ -201,8 +236,9 @@ export function SettingsNavigation() {
 				/>
 			</SettingRow>
 
-			{centeredPostsEnabled && (
+			{(centeredPostsEnabled || shouldForceRender('centered-controls-position')) && (
 				<SettingRow
+					{...rowState('centered-controls-position')}
 					icon={<Maximize className="h-4 w-4" />}
 					label="Posición de controles"
 					description="Solo en hilos: arriba (barra horizontal) o lateral flotante sin ocupar ancho del hilo. En pantallas estrechas se usa arriba automáticamente."
@@ -231,9 +267,12 @@ export function SettingsNavigation() {
 				</SettingRow>
 			)}
 
-			{centeredPostsEnabled && centeredControlsPosition === 'top' && (
+			{(centeredPostsEnabled && centeredControlsPosition === 'top') ||
+			shouldForceRender('centered-controls-sticky') ||
+			shouldForceRender('centered-controls-compact') ? (
 				<>
 					<SettingRow
+						{...rowState('centered-controls-sticky')}
 						icon={<Pin className="h-4 w-4" />}
 						label="Barra de controles fija"
 						description="La barra de controles permanece visible al hacer scroll."
@@ -254,6 +293,7 @@ export function SettingsNavigation() {
 					</SettingRow>
 
 					<SettingRow
+						{...rowState('centered-controls-compact')}
 						icon={<Minimize2 className="h-4 w-4" />}
 						label="Barra compacta"
 						description="Reduce el tamaño de la barra de controles a una sola línea."
@@ -268,16 +308,12 @@ export function SettingsNavigation() {
 									reloadMediavidaTabs()
 								}, 100)
 
-								toast.success(
-									checked
-										? 'Barra compacta activada'
-										: 'Configuración guardada'
-								)
+								toast.success(checked ? 'Barra compacta activada' : 'Configuración guardada')
 							}}
 						/>
 					</SettingRow>
 				</>
-			)}
+			) : null}
 		</SettingsSection>
 	)
 }

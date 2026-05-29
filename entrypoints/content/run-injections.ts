@@ -179,6 +179,18 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		}
 	}
 
+	const isAnyUserProfilePage = /^\/id\/[^/]+(?:\/.*)?$/.test(window.location.pathname)
+	const shouldInitHiddenSubforums =
+		pageContext?.isForumRelated || pageContext?.isProfileSubpage || pageContext?.isBookmarks || isAnyUserProfilePage
+	if (shouldInitHiddenSubforums) {
+		const { initHiddenSubforums } = await import('@/features/hidden-subforums')
+		const { isPageBlocked } = await initHiddenSubforums()
+
+		if (isPageBlocked) {
+			return
+		}
+	}
+
 	// =========================================================================
 	// HOMEPAGE
 	// =========================================================================
@@ -214,6 +226,15 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		import('@/features/editor/logic/editor-content-preserve').then(({ injectEditorContentPreservation }) => {
 			injectEditorContentPreservation()
 		})
+
+		if (window.location.pathname.includes('/nuevo-hilo')) {
+			import('@/features/release-calendar').then(({ applyReleaseThreadPrefill }) => {
+				applyReleaseThreadPrefill()
+			})
+			import('@/features/thread-clipper').then(({ applyClippedThreadPrefill }) => {
+				void applyClippedThreadPrefill()
+			})
+		}
 
 		// Draft save button - Only where editor exists
 		import('@/features/drafts').then(({ injectSaveDraftButton }) => {
@@ -262,6 +283,38 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 			'@/features/favorite-subforums/logic/favorite-subforum-inject'
 		)
 		injectFavoriteSubforumButtons()
+	}
+
+	if (
+		(pageContext?.isSubforum || isPaginatedSubforum || pageContext?.isForumGlobalView || pageContext?.isFavorites) &&
+		isFeatureEnabled(FeatureFlag.ThreadPreview)
+	) {
+		const { injectThreadPreviewButtons } = await import('@/features/thread-preview')
+		injectThreadPreviewButtons()
+	}
+
+	if (
+		pageContext?.isSubforum &&
+		/^\/foro\/(?:juegos|club-hucha)\/?$/.test(window.location.pathname)
+	) {
+		const { injectItadSubforumSearch } = await import('@/features/itad-search')
+		injectItadSubforumSearch()
+	}
+
+	if (
+		pageContext?.isSubforum &&
+		/^\/foro\/juegos\/?$/.test(window.location.pathname)
+	) {
+		const { injectReleaseCalendar } = await import('@/features/release-calendar')
+		injectReleaseCalendar()
+	}
+
+	if (
+		pageContext?.isSubforum &&
+		/^\/foro\/cine\/?$/.test(window.location.pathname)
+	) {
+		const { injectMovieReleaseCalendar } = await import('@/features/movie-release-calendar')
+		injectMovieReleaseCalendar()
 	}
 
 	// Sidebar on subforum pages, global view pages (spy, new, unread, top, featured), and thread pages
