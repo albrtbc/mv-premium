@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/albrtbc/mv-premium/compare/v1.9.0...v1.9.1) (2026-05-29)
+
+
+### Bug Fixes
+
+* **ci:** resolve test runner hang and localStorage failures after upstream merge ([c1b08f5](https://github.com/albrtbc/mv-premium/commit/c1b08f5ff12285f10cda67e86f0f8f9272bfd37e))
+
 ## [1.9.0](https://github.com/albrtbc/mv-premium/compare/v1.8.0...v1.9.0) (2026-05-29)
 
 
