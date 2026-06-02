@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0](https://github.com/albrtbc/mv-premium/compare/v1.9.1...v2.0.0) (2026-06-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* se adopta la major v2.0.0, que introduce nuevas estructuras de datos (content-rules, plantillas multimedia) y cambios de configuración respecto a la 1.x del fork.
+
+### Features
+
+* add anime and manga media templates via AniList ([3657fff](https://github.com/albrtbc/mv-premium/commit/3657fff9f60406ea0add91a3824d0cfa0b287701))
+* alinea el versionado del fork con upstream v2.0.0 ([74826b9](https://github.com/albrtbc/mv-premium/commit/74826b9e71a612ad40d4b09bf550f98532fa8616))
+* **drafts:** add clear editor action ([ae17f96](https://github.com/albrtbc/mv-premium/commit/ae17f96491c99e088cc604ee5942d46fa27451f7))
+* **drafts:** show copied state after copying editor content ([f197e0a](https://github.com/albrtbc/mv-premium/commit/f197e0a8bde1b09bf0f85687c8e9c89dff6507cc))
+* **filters:** redesign thread rules and filters navigation ([a8ae127](https://github.com/albrtbc/mv-premium/commit/a8ae12777fe7e6e2bed3c576be10c94bb7557009))
+* **release-calendar:** cover platform badge overflow ([0f0ec71](https://github.com/albrtbc/mv-premium/commit/0f0ec71fd24c0819ac179333e116a5125825a7ae))
+
 ## [1.9.1](https://github.com/albrtbc/mv-premium/compare/v1.9.0...v1.9.1) (2026-05-29)
 
 
