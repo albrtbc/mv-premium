@@ -103,6 +103,8 @@ export interface Settings {
 	twitterLiteEmbedsEnabled: boolean
 	pinnedPostsEnabled: boolean
 	threadPreviewEnabled: boolean
+	contentRulesEnabled: boolean
+	classicThreadActionsEnabled: boolean
 	threadSummarizerEnabled: boolean
 	postSummaryEnabled: boolean
 	saveThreadEnabled: boolean
