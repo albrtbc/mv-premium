@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.1](https://github.com/albrtbc/mv-premium/compare/v4.0.0...v4.0.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **release:** rebuild artifacts with API credentials ([d8d690b](https://github.com/albrtbc/mv-premium/commit/d8d690be52e4c733a4be2b841384dd0ac6895cf2))
+
 ## [4.0.0](https://github.com/albrtbc/mv-premium/compare/v3.5.0...v4.0.0) (2026-08-12)
 
 
