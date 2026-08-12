@@ -44,6 +44,7 @@ export type UltrawideMode = z.infer<typeof ultrawideSchema>
 export const centeredControlsPositionSchema = z.enum(['top', 'side'])
 export const gameReleaseCalendarLayoutSchema = z.enum(['showcase', 'minimal', 'bottom'])
 export const itadCountrySchema = z.enum(['ES', 'GB', 'US'])
+export const relatedThreadsDisplaySchema = z.enum(['hidden', 'collapsible', 'original'])
 
 // =============================================================================
 // SETTINGS SCHEMA
@@ -69,8 +70,12 @@ export const settingsSchema = z.object({
 	syncEnabled: z.boolean().default(false),
 
 	// Feature Toggles - Navigation
+	mobileLiteEnabled: z.boolean().default(true),
+	mobileLitePostGesturesEnabled: z.boolean().default(true),
 	infiniteScrollEnabled: z.boolean().default(false),
+	autoInfiniteScrollEnabled: z.boolean().default(false),
 	liveThreadEnabled: z.boolean().default(false),
+	autoLiveThreadEnabled: z.boolean().default(false),
 	newHomepageEnabled: z.boolean().default(false),
 	nativeLiveDelayEnabled: z.boolean().default(true),
 	liveThreadDelayEnabled: z.boolean().default(true),
@@ -79,12 +84,14 @@ export const settingsSchema = z.object({
 	improvedUpvotesEnabled: z.boolean().default(true),
 	mediaHoverCardsEnabled: z.boolean().default(true),
 	steamBundleInlineCardsEnabled: z.boolean().default(true),
+	fragranticaEmbedsEnabled: z.boolean().default(true),
 	itadSubforumSearchEnabled: z.boolean().default(true),
 	itadSubforumSearchJuegosEnabled: z.boolean().default(true),
 	itadSubforumSearchHuchaEnabled: z.boolean().default(true),
 	itadCountry: itadCountrySchema.default('ES'),
 	gameReleaseCalendarEnabled: z.boolean().default(true),
 	gameReleaseCalendarJuegosEnabled: z.boolean().default(true),
+	gameReleaseCalendarJuegosMovilEnabled: z.boolean().default(true),
 	gameReleaseCalendarLayout: gameReleaseCalendarLayoutSchema.default('minimal'),
 	movieReleaseCalendarCineEnabled: z.boolean().default(true),
 	movieReleaseCalendarLayout: gameReleaseCalendarLayoutSchema.default('minimal'),
@@ -94,13 +101,16 @@ export const settingsSchema = z.object({
 	contentRulesEnabled: z.boolean().default(true),
 	classicThreadActionsEnabled: z.boolean().default(false),
 	hideIgnoredUserThreadsEnabled: z.boolean().default(true),
+	relatedThreadsDisplay: relatedThreadsDisplaySchema.default('hidden'),
+	relatedThreadsMaxAgeMonths: z.number().int().min(0).max(300).catch(0).default(0),
 
 	// Feature Toggles - Users
 	mutedWordsEnabled: z.boolean().default(false),
 	mutedWords: z.array(z.string()).default([]),
 
 	// Privacy & Storage
-	enableActivityTracking: z.boolean().default(true),
+	enableActivityTracking: z.boolean().default(false),
+	enableRhythmTracking: z.boolean().default(true),
 
 	// UI State
 	settingsActiveTab: z.string().default('integrations'),
@@ -108,6 +118,9 @@ export const settingsSchema = z.object({
 
 	// Layout
 	hideHeaderEnabled: z.boolean().default(false),
+
+	// Feature Toggles - Editor
+	autoTagsEnabled: z.boolean().default(true),
 	ultrawideMode: ultrawideSchema.default('off'),
 	centeredPostsEnabled: z.boolean().default(false),
 	centeredControlsSticky: z.boolean().default(false),

@@ -1,7 +1,7 @@
 /**
  * Work Mode Feature
  *
- * Hides visual/media content (avatars, images, videos, social embeds, Steam cards)
+ * Hides visual/media content (avatars, images, videos, social embeds, game-store cards)
  * so users can browse the forum discreetly in work environments.
  *
  * Each content type can be toggled independently via workModeOptions.
@@ -95,6 +95,17 @@ export function buildWorkModeCSS(options: WorkModeOptions): string {
 		`)
 	}
 
+	// Default ON when the key is missing: persisted workModeOptions from before
+	// this option existed don't include it (the store merge is shallow).
+	if (options.hideUsername !== false) {
+		rules.push(`
+			/* Work Mode: Hide own nick in the header (hover over it to reveal) */
+			#usermenu li.avw a.av:not(:hover) {
+				color: transparent !important;
+			}
+		`)
+	}
+
 	if (options.hideImages) {
 		rules.push(`
 			/* Work Mode: Hide images in posts */
@@ -156,8 +167,9 @@ export function buildWorkModeCSS(options: WorkModeOptions): string {
 
 	if (options.hideSteamCards) {
 		rules.push(`
-			/* Work Mode: Hide Steam cards (native embeds + extension bundle cards) */
+			/* Work Mode: Hide game-store cards (native embeds + extension bundle cards) */
 			[data-s9e-mediaembed="steamstore"],
+			[data-s9e-mediaembed="gog"],
 			[data-mvp-steam-bundle-card],
 			.steam-embed-placeholder {
 				display: none !important;

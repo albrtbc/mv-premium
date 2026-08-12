@@ -29,6 +29,7 @@ export const FEATURE_IDS = {
 	HIDDEN_SUBFORUM_BLOCKER: 'mvp-hidden-subforum-blocker',
 	ITAD_SUBFORUM_SEARCH: 'mvp-itad-subforum-search',
 	GAME_RELEASE_CALENDAR: 'mvp-game-release-calendar',
+	GAME_RELEASE_CALENDAR_MOVIL: 'mvp-game-release-calendar-movil',
 	MOVIE_RELEASE_CALENDAR: 'mvp-movie-release-calendar',
 
 	// Improved Upvotes
@@ -43,4 +44,5 @@ export const FEATURE_IDS = {
 	DRAFT_MANAGER_PREFIX: 'mvp-draft-manager-',
 	INFINITE_SCROLL_DIVIDER_PREFIX: 'mvp-infinite-scroll-divider-',
 	STEAM_BUNDLE_INLINE_CARD_PREFIX: 'mvp-steam-bundle-inline-card-',
+	FRAGRANTICA_INLINE_CARD_PREFIX: 'mvp-fragrantica-inline-card-',
 } as const

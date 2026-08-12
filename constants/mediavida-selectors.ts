@@ -90,6 +90,10 @@ export const MV_SELECTORS = {
 	// THREAD PAGE (Hilos)
 	// ============================================================================
 	THREAD: {
+		/** Related threads block shown at the end of the last page */
+		RELATED_THREADS: '.hilos-relacionados',
+		RELATED_THREADS_HEADING: '.rel-head',
+		RELATED_THREADS_CONTENT: '.wpx',
 		/** Container for all posts */
 		POSTS_CONTAINER: '#posts-wrap',
 		/** Container ID (for getElementById) */
@@ -173,6 +177,10 @@ export const MV_SELECTORS = {
 		QUICK_REPLY_ALL: '.quickreply, #topic-reply',
 		/** Bottom progress indicator */
 		BOTTOM_PROGRESS: '.bottom-progress',
+		/** Mobile fixed bottom navigation bar */
+		BOTTOM_NAV_ID: 'bottom-nav',
+		/** Mobile pagination dropdown inside #bottom-nav */
+		PAGE_PILLS: '.page-pills',
 		/** Main wrapper */
 		MAIN_WRAPPER: '#main.wrp',
 		/** Generic wrapper */

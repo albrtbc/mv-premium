@@ -27,26 +27,42 @@ import {
 import { setupUploadHandlers } from './upload-handlers'
 import { setupApiHandlers } from './api-handlers'
 import { setupAiHandlers } from './ai-handlers'
+import { setupStatsHandlers } from './stats-handlers'
 import { setupIgdbHandlers } from './igdb-handlers'
 import { setupItadHandlers } from './itad-handlers'
 import { highlightCode } from './prism-highlighter'
 import { setupTwitterLiteNetworkGuard } from './twitter-lite-network-guard'
-import { clearCache } from '@/services/media/cache'
+import { resetMobileLiteWhatsNew } from '@/features/mobile-lite/logic/whats-new'
+
+/**
+ * Every API cache prefix is memory-only now, so any persisted entry under
+ * these prefixes is stale garbage from older versions. The worst offender was
+ * IGDB upcoming-releases (~500KB per time-window key), which could exhaust
+ * Firefox's 5MB storage quota on its own.
+ */
+const LEGACY_API_CACHE_KEY_PREFIXES = [
+	'mv-cache:',
+	'mv-resolver:',
+	'mv-tmdb-v2:',
+	'mv-igdb-v1:',
+	'mv-anilist-v1:',
+	'mv-anilist-image-v1:',
+	// Steam cache used the format "steam-game-{id}" directly, without prefix:key
+	'steam-game-',
+]
 
 /**
  * Clean up legacy API cache entries that should not persist to storage.
- * APIs like TMDB, IMDB, Steam now use memory-only cache.
+ * Single snapshot pass over all known cache prefixes.
  */
 async function cleanupLegacyApiCache(): Promise<void> {
-	// Clean caches that use the format "prefix:key"
-	await Promise.all([clearCache({ prefix: 'mv-resolver' }), clearCache({ prefix: 'mv-tmdb-v2' })])
-
-	// Clean Steam cache which uses format "steam-game-{id}" directly
 	try {
 		const snapshot = await storage.snapshot('local')
-		const steamKeys = Object.keys(snapshot).filter(key => key.startsWith('steam-game-'))
-		if (steamKeys.length > 0) {
-			await Promise.all(steamKeys.map(k => storage.removeItem(`local:${k}` as `local:${string}`)))
+		const staleKeys = Object.keys(snapshot).filter(key =>
+			LEGACY_API_CACHE_KEY_PREFIXES.some(prefix => key.startsWith(prefix))
+		)
+		if (staleKeys.length > 0) {
+			await Promise.all(staleKeys.map(k => storage.removeItem(`local:${k}` as `local:${string}`)))
 		}
 	} catch {
 		// Ignore errors
@@ -57,58 +73,74 @@ async function cleanupLegacyApiCache(): Promise<void> {
 // Background Entry Point
 // =============================================================================
 
-export default defineBackground(() => {
-	// ==========================================================================
-	// Extension Install/Update Handler
-	// ==========================================================================
+export default defineBackground({
+	persistent: {
+		firefox: false,
+	},
+	main() {
+		// ==========================================================================
+		// Extension Install/Update Handler
+		// ==========================================================================
 
-	browser.runtime.onInstalled.addListener(async () => {
-		// Create context menus on install/update
-		await createContextMenus()
+		browser.runtime.onInstalled.addListener(async details => {
+			// Create context menus on install/update
+			await createContextMenus()
 
-		// Clean up legacy API cache entries (now uses memory-only cache)
-		await cleanupLegacyApiCache()
-	})
+			if (details.reason === 'install' || details.reason === 'update') {
+				await resetMobileLiteWhatsNew()
+			}
 
-	// ==========================================================================
-	// Setup All Handlers
-	// ==========================================================================
+			// Clean up legacy API cache entries (now uses memory-only cache)
+			await cleanupLegacyApiCache()
+		})
 
-	// Context menus (save thread, hide thread, mute word)
-	createContextMenus().catch(() => {
-		// Ignore startup menu creation errors; onInstalled will retry on updates.
-	})
-	setupContextMenuListener()
-	setupContextMenuRefreshHandler()
-	setupThreadClipperTrayListener()
+		// ==========================================================================
+		// Setup All Handlers
+		// ==========================================================================
 
-	// Upload handlers (ImgBB, Freeimage)
-	setupUploadHandlers()
+		// Upload handlers (ImgBB, Freeimage)
+		setupUploadHandlers()
 
-	// API handlers (Steam, TMDB, GIPHY, options page)
-	setupApiHandlers()
+		// Context menus (save thread, hide thread, mute word)
+		try {
+			createContextMenus().catch(() => {
+				// Ignore startup menu creation errors; onInstalled will retry on updates.
+			})
+			setupContextMenuListener()
+			setupContextMenuRefreshHandler()
+			setupThreadClipperTrayListener()
+		} catch {
+			// Firefox Android can lack full contextMenus support. Keep non-menu handlers alive.
+		}
 
-	// AI handlers (Gemini)
-	setupAiHandlers()
+		// API handlers (Steam, TMDB, GIPHY, options page)
+		setupApiHandlers()
 
-	// IGDB handlers (game database)
-	setupIgdbHandlers()
+		// Stats persistence handlers
+		setupStatsHandlers()
 
-	// IsThereAnyDeal handlers (game prices)
-	setupItadHandlers()
+		// AI handlers (Gemini)
+		setupAiHandlers()
 
-	// Strict Twitter Lite network guard (blocks native Twitter embeds until explicit user action)
-	setupTwitterLiteNetworkGuard()
+		// IGDB handlers (game database)
+		setupIgdbHandlers()
 
-	// ==========================================================================
-	// Code Highlighting Handler
-	// ==========================================================================
+		// IsThereAnyDeal handlers (game prices)
+		setupItadHandlers()
 
-	/**
-	 * Syntax highlight code using PrismJS
-	 * Keeps the heavy Prism library out of the content script bundle
-	 */
-	onMessage('highlightCode', async ({ data }) => {
-		return await highlightCode(data.code, data.language)
-	})
+		// Strict Twitter Lite network guard (blocks native Twitter embeds until explicit user action)
+		setupTwitterLiteNetworkGuard()
+
+		// ==========================================================================
+		// Code Highlighting Handler
+		// ==========================================================================
+
+		/**
+		 * Syntax highlight code using PrismJS
+		 * Keeps the heavy Prism library out of the content script bundle
+		 */
+		onMessage('highlightCode', async ({ data }) => {
+			return await highlightCode(data.code, data.language)
+		})
+	},
 })

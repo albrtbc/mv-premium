@@ -41,7 +41,7 @@ export function IntegrationsContent({ settingFilter }: { settingFilter?: Setting
 		if (!geminiApiKey) return
 		setTestingGemini(true)
 		try {
-			const result = await testGeminiConnection(geminiApiKey)
+			const result = await testGeminiConnection()
 
 			if (result.success) {
 				toast.success('Conexión exitosa', { description: result.message })
@@ -113,7 +113,7 @@ export function IntegrationsContent({ settingFilter }: { settingFilter?: Setting
 							<p className="text-sm text-muted-foreground mt-1.5 max-w-[350px]">
 								{imgbbApiKey ? (
 									<>
-										Personalizado con <strong>ImgBB</strong> (hasta 32MB)
+										Subidas con <strong>ImgBB</strong> (hasta 32MB)
 									</>
 								) : (
 									<>
@@ -149,6 +149,7 @@ export function IntegrationsContent({ settingFilter }: { settingFilter?: Setting
 							onChange={setImgbbApiKey}
 							placeholder="Dejar vacío para usar freeimage.host"
 							label="ImgBB"
+							allowCopy
 						/>
 					</div>
 				</div>
@@ -169,7 +170,10 @@ export function IntegrationsContent({ settingFilter }: { settingFilter?: Setting
 							de forma automática. Almacenamiento permanente y gratuito.
 						</p>
 						<p>
-							<strong>Si prefieres ImgBB:</strong>
+							Si configuras una API key de ImgBB, MVPremium subirá las imágenes usando ImgBB en lugar de freeimage.host.
+						</p>
+						<p>
+							<strong>Para configurar ImgBB:</strong>
 						</p>
 						<ol className="list-decimal list-inside space-y-1.5">
 							<li>
@@ -206,7 +210,7 @@ export function IntegrationsContent({ settingFilter }: { settingFilter?: Setting
 			<div className="flex flex-col gap-4 py-4">
 				<div className="flex items-start justify-between gap-4">
 					<div className="flex gap-3">
-						<Sparkles className="h-5 w-5 mt-0.5 text-purple-500" />
+						<Sparkles className="h-5 w-5 mt-0.5 text-primary" />
 						<div>
 							<h4 className="text-sm font-medium leading-none flex items-center gap-2">
 								Google Gemini API
@@ -230,7 +234,7 @@ export function IntegrationsContent({ settingFilter }: { settingFilter?: Setting
 									<button
 										onClick={handleTestGemini}
 										disabled={testingGemini}
-										className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-purple-500 transition-colors disabled:opacity-50"
+										className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
 									>
 										{testingGemini ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
 										Probar conexión
@@ -242,7 +246,13 @@ export function IntegrationsContent({ settingFilter }: { settingFilter?: Setting
 
 					{/* API Key Input */}
 					<div className="flex-shrink-0">
-						<ApiKeyInput value={geminiApiKey} onChange={setGeminiApiKey} placeholder="AIza..." label="Gemini" />
+						<ApiKeyInput
+							value={geminiApiKey}
+							onChange={setGeminiApiKey}
+							placeholder="AIza..."
+							label="Gemini"
+							allowCopy
+						/>
 					</div>
 				</div>
 

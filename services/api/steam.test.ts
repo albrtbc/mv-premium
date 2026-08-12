@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { extractSteamAppId, extractSteamBundleId, isSteamBundleUrl, isSteamUrl, searchSteamApps } from './steam'
+import {
+	extractSteamAppId,
+	extractSteamBundleId,
+	fetchSteamGameDetails,
+	isSteamBundleUrl,
+	isSteamUrl,
+	searchSteamApps,
+} from './steam'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -75,3 +82,115 @@ describe('steam app search', () => {
 	})
 })
 
+describe('steam game details language fallback', () => {
+	function makeAppDetailsResponse(appId: number, name: string, aboutTheGame: string): Response {
+		return new Response(
+			JSON.stringify({
+				[String(appId)]: {
+					success: true,
+					data: {
+						type: 'game',
+						name,
+						steam_appid: appId,
+						required_age: 0,
+						is_free: false,
+						short_description: '',
+						about_the_game: aboutTheGame,
+						header_image: 'https://example.com/header.jpg',
+						website: null,
+					},
+				},
+			})
+		)
+	}
+
+	it('maps every supported platform from Steam app details', async () => {
+		const appId = 910004
+		vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+			new Response(
+				JSON.stringify({
+					[String(appId)]: {
+						success: true,
+						data: {
+							type: 'game',
+							name: 'Multiplatform game',
+							steam_appid: appId,
+							required_age: 0,
+							is_free: false,
+							short_description: 'Available on every desktop platform.',
+							header_image: 'https://example.com/header.jpg',
+							website: null,
+							platforms: { windows: true, mac: true, linux: true },
+						},
+					},
+				})
+			)
+		)
+
+		const result = await fetchSteamGameDetails(appId)
+
+		expect(result?.operatingSystems).toEqual(['windows', 'macos', 'linux'])
+	})
+
+	it('refetches in English when Steam returns a non-Latin default language', async () => {
+		// Steam serves the app's default language (e.g. Japanese) instead of
+		// falling back to English when the requested Spanish locale is missing.
+		vi.spyOn(globalThis, 'fetch')
+			.mockResolvedValueOnce(
+				makeAppDetailsResponse(
+					910001,
+					'何度目かの式',
+					'<p>結婚式を舞台にした新たな推理ゲームをお届けします。殺された主人公が神の力で生き返って自分の死の原因を突き止めます。</p>'
+				)
+			)
+			.mockResolvedValueOnce(
+				makeAppDetailsResponse(
+					910001,
+					'Nandome ka no Shiki',
+					'<p>A brand new mystery game set at a wedding ceremony. The murdered protagonist comes back to life to solve their own death.</p>'
+				)
+			)
+
+		const result = await fetchSteamGameDetails(910001)
+
+		expect(fetch).toHaveBeenCalledTimes(2)
+		expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('l=spanish')
+		expect(String(vi.mocked(fetch).mock.calls[1][0])).toContain('l=english')
+		expect(result?.description).toContain('mystery game')
+		expect(result?.name).toBe('Nandome ka no Shiki')
+	})
+
+	it('keeps the Spanish response without a second request when text is Latin script', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+			makeAppDetailsResponse(
+				910002,
+				'Juego de Misterio',
+				'<p>Un nuevo juego de misterio ambientado en una boda. El protagonista asesinado vuelve a la vida para resolver su propia muerte.</p>'
+			)
+		)
+
+		const result = await fetchSteamGameDetails(910002)
+
+		expect(fetch).toHaveBeenCalledTimes(1)
+		expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('l=spanish')
+		expect(result?.description).toContain('juego de misterio')
+	})
+
+	it('keeps the default-language data when the English refetch fails', async () => {
+		vi.spyOn(globalThis, 'fetch')
+			.mockResolvedValueOnce(
+				makeAppDetailsResponse(
+					910003,
+					'日本語のゲーム',
+					'<p>これは日本語だけで書かれた説明文です。英語のフォールバックが失敗した場合でも元のデータを保持します。長い説明文がここに続きます。</p>'
+				)
+			)
+			// 404 is not retried by fetchWithRetry, so the fallback fails fast
+			.mockResolvedValueOnce(new Response('not found', { status: 404 }))
+
+		const result = await fetchSteamGameDetails(910003)
+
+		expect(result).not.toBeNull()
+		expect(result?.name).toBe('日本語のゲーム')
+	})
+})

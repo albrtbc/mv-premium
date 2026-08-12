@@ -71,6 +71,9 @@ interface SettingsActions {
 	setUltrawideMode: (mode: Settings['ultrawideMode']) => void
 	setCenteredPostsEnabled: (enabled: boolean) => void
 
+	// Editor
+	setAutoTagsEnabled: (enabled: boolean) => void
+
 	// Keyboard Shortcuts
 	setShortcut: (actionId: string, keyCombo: string | null) => void
 
@@ -198,7 +201,11 @@ export const useSettingsStore = create<SettingsState>()(
 			// Navigation
 			// Both can be enabled in settings - mutual exclusion happens at button level in threads
 			setInfiniteScrollEnabled: enabled => set({ infiniteScrollEnabled: enabled }),
-			setLiveThreadEnabled: enabled => set({ liveThreadEnabled: enabled }),
+			setLiveThreadEnabled: enabled =>
+				set({
+					liveThreadEnabled: enabled,
+					...(enabled ? {} : { autoLiveThreadEnabled: false }),
+				}),
 			setNativeLiveDelayEnabled: enabled => set({ nativeLiveDelayEnabled: enabled }),
 			setLiveThreadDelayEnabled: enabled => set({ liveThreadDelayEnabled: enabled }),
 
@@ -213,6 +220,9 @@ export const useSettingsStore = create<SettingsState>()(
 			// Layout
 			setUltrawideMode: mode => set({ ultrawideMode: mode }),
 			setCenteredPostsEnabled: enabled => set({ centeredPostsEnabled: enabled }),
+
+			// Editor
+			setAutoTagsEnabled: enabled => set({ autoTagsEnabled: enabled }),
 
 			// Keyboard Shortcuts
 			setShortcut: (actionId, keyCombo) =>

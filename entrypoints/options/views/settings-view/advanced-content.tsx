@@ -1,9 +1,11 @@
 /**
  * Advanced Content - Debug mode, activity tracking, data management
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { storage } from '#imports'
 import { logger } from '@/lib/logger'
 import Activity from 'lucide-react/dist/esm/icons/activity'
+import Clock from 'lucide-react/dist/esm/icons/clock'
 import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
 import Download from 'lucide-react/dist/esm/icons/download'
 import Upload from 'lucide-react/dist/esm/icons/upload'
@@ -13,10 +15,23 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import { SettingsSection } from '../../components/settings/settings-section'
 import { SettingRow } from '../../components/settings'
 import { useSettingsStore } from '@/store/settings-store'
-import { exportAllData, importAllData, resetAllData, downloadJSON } from '../../lib/export-import'
+import { resetAllData } from '../../lib/export-import'
+import { backupContainsPersonalApiKeys, createBackupData, downloadBackupJSON, importBackupData } from '../../lib/backup-service'
+import type { BackupData, BackupImportStats } from '../../lib/backup-service'
 import {
 	getSettingDomId,
 	isHighlightedSetting,
@@ -25,28 +40,179 @@ import {
 } from './constants'
 import { cn } from '@/lib/utils'
 
+const LAST_LOCAL_BACKUP_EXPORT_KEY = 'local:mvp-last-local-backup-export'
+
+interface BackupPreview {
+	drafts: number
+	templates: number
+	savedThreads: number
+	pinnedThreads: number
+	pinnedPosts: number
+	contentRules: number
+	savedThemes: number
+	settings: number
+	mutedWords: number
+	userCustomizations: number
+	favoriteSubforums: number
+	hiddenThreads: number
+	hiddenSubforums: number
+	delayPreferences: number
+	subforumStats: number
+	rhythmDays: number
+	appearanceItems: number
+	lastExportedAt: string | null
+}
+
+interface BackupPreviewItem {
+	label: string
+	value: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function countArray(value: unknown): number {
+	return Array.isArray(value) ? value.length : 0
+}
+
+function countObjectKeys(value: unknown): number {
+	return isRecord(value) ? Object.keys(value).length : 0
+}
+
+function countDraftsAndTemplates(value: unknown): Pick<BackupPreview, 'drafts' | 'templates'> {
+	if (!isRecord(value) || !Array.isArray(value.drafts)) return { drafts: 0, templates: 0 }
+
+	return value.drafts.reduce(
+		(acc, draft) => {
+			if (isRecord(draft) && draft.type === 'template') {
+				acc.templates += 1
+			} else {
+				acc.drafts += 1
+			}
+			return acc
+		},
+		{ drafts: 0, templates: 0 }
+	)
+}
+
+function countUserCustomizations(value: unknown): number {
+	if (isRecord(value) && isRecord(value.users)) return Object.keys(value.users).length
+	return countObjectKeys(value)
+}
+
+function countDefinedValues(values: unknown[]): number {
+	return values.filter(value => value !== undefined && value !== null).length
+}
+
+function countRhythmDays(value: unknown): number {
+	if (!isRecord(value)) return 0
+	if (isRecord(value.days)) return Object.keys(value.days).length
+	if (Array.isArray(value.hours)) return value.hours.filter(ms => Number(ms) > 0).length
+	return countObjectKeys(value)
+}
+
+function createBackupPreview(data: BackupData, lastExportedAt: string | null): BackupPreview {
+	const { drafts, templates } = countDraftsAndTemplates(data.data.content.drafts)
+	const uiTheme = data.data.themes.ui
+	const mvTheme = data.data.themes.mediavida
+
+	return {
+		drafts,
+		templates,
+		savedThreads: countArray(data.data.content.savedThreads),
+		pinnedThreads: data.data.content.pinnedPosts.length,
+		pinnedPosts: data.data.content.pinnedPosts.reduce((total, entry) => total + entry.posts.length, 0),
+		contentRules: countArray(data.data.content.contentRules),
+		savedThemes: countArray(uiTheme.savedPresets) + countArray(mvTheme.savedPresets),
+		settings: countObjectKeys(data.data.settings),
+		mutedWords: countArray(data.data.settings.mutedWords),
+		userCustomizations: countUserCustomizations(data.data.content.userCustomizations),
+		favoriteSubforums: countArray(data.data.content.favoriteSubforums),
+		hiddenThreads: countArray(data.data.content.hiddenThreads),
+		hiddenSubforums: countArray(data.data.content.hiddenSubforums),
+		delayPreferences: countDefinedValues([data.data.preferences.nativeLiveDelay, data.data.preferences.liveThreadDelay]),
+		subforumStats: countObjectKeys(data.data.stats.timeStats),
+		rhythmDays: countRhythmDays(data.data.stats.rhythmStats),
+		appearanceItems: countDefinedValues([
+			uiTheme.resolvedTheme,
+			uiTheme.rawTheme,
+			uiTheme.custom,
+			uiTheme.customFont,
+			uiTheme.applyFontGlobally,
+			uiTheme.postFontSize,
+			mvTheme.state,
+		]),
+		lastExportedAt,
+	}
+}
+
+function formatLastExportDate(value: string | null): string {
+	if (!value) return 'Nunca'
+
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return 'Fecha no disponible'
+
+	return new Intl.DateTimeFormat('es-ES', {
+		dateStyle: 'medium',
+		timeStyle: 'short',
+	}).format(date)
+}
+
+function formatCount(value: number, singular: string, plural: string): string {
+	return `${value} ${value === 1 ? singular : plural}`
+}
+
 export function AdvancedContent({
 	settingFilter,
-	hasActiveFinder,
 }: {
 	settingFilter?: SettingsContentFilter
 	hasActiveFinder?: boolean
 }) {
-	const { enableActivityTracking, updateSettings } = useSettingsStore()
+	const { enableActivityTracking, enableRhythmTracking, updateSettings } = useSettingsStore()
 	const [showResetDialog, setShowResetDialog] = useState(false)
-	const [showClearActivityDialog, setShowClearActivityDialog] = useState(false)
 	const [showImportReport, setShowImportReport] = useState(false)
-	const [importStats, setImportStats] = useState<any>(null)
+	const [importStats, setImportStats] = useState<BackupImportStats | null>(null)
+	const [backupPreview, setBackupPreview] = useState<BackupPreview | null>(null)
+	const [isBackupPreviewLoading, setIsBackupPreviewLoading] = useState(false)
+	const [backupPreviewError, setBackupPreviewError] = useState<string | null>(null)
+	const [showBackupDetailsDialog, setShowBackupDetailsDialog] = useState(false)
+	const [showExportOptionsDialog, setShowExportOptionsDialog] = useState(false)
+	const [includePersonalApiKeys, setIncludePersonalApiKeys] = useState(false)
+	const [showImportApiKeysDialog, setShowImportApiKeysDialog] = useState(false)
+	const [includeImportedPersonalApiKeys, setIncludeImportedPersonalApiKeys] = useState(false)
+	const [pendingImportData, setPendingImportData] = useState<unknown>(null)
 
-	const handleExport = async () => {
+	const performExport = async (includeKeys: boolean) => {
 		try {
-			const data = await exportAllData()
+			const data = await createBackupData({ includePersonalApiKeys: includeKeys })
 			const date = new Date().toISOString().split('T')[0]
-			downloadJSON(data, `mv-premium-backup-${date}.json`)
+			downloadBackupJSON(data, `mv-premium-backup-${date}.json`)
+			const exportedAt = new Date().toISOString()
+			await storage.setItem(LAST_LOCAL_BACKUP_EXPORT_KEY, exportedAt)
+			setBackupPreview(createBackupPreview(data, exportedAt))
+			setShowExportOptionsDialog(false)
 			toast.success('Datos exportados correctamente')
 		} catch (error) {
 			toast.error('Error al exportar datos')
 			logger.error('Export error:', error)
+		}
+	}
+
+	const handleExport = () => {
+		setIncludePersonalApiKeys(false)
+		setShowExportOptionsDialog(true)
+	}
+
+	const performImport = async (data: unknown, includeKeys: boolean) => {
+		const result = await importBackupData(data, { includePersonalApiKeys: includeKeys })
+
+		if (result.success && result.stats) {
+			setImportStats(result.stats)
+			setShowImportReport(true)
+			toast.success('Datos importados correctamente')
+		} else {
+			toast.error(result.error || 'El backup no es válido')
 		}
 	}
 
@@ -61,21 +227,30 @@ export function AdvancedContent({
 			try {
 				const text = await file.text()
 				const data = JSON.parse(text)
-				const result = await importAllData(data)
 
-				if (result.success && result.stats) {
-					setImportStats(result.stats)
-					setShowImportReport(true)
-					toast.success('Datos importados correctamente')
-				} else {
-					toast.error(result.error || 'Error desconocido')
+				if (backupContainsPersonalApiKeys(data)) {
+					setPendingImportData(data)
+					setIncludeImportedPersonalApiKeys(false)
+					setShowImportApiKeysDialog(true)
+					return
 				}
+
+				await performImport(data, false)
 			} catch (error) {
-				toast.error('Error al importar datos')
+				toast.error(error instanceof SyntaxError ? 'El archivo no contiene JSON válido' : 'Error al importar datos')
 				logger.error('Import error:', error)
 			}
 		}
 		input.click()
+	}
+
+	const handleImportApiKeysDecision = async () => {
+		if (pendingImportData === null) return
+
+		const data = pendingImportData
+		setPendingImportData(null)
+		setShowImportApiKeysDialog(false)
+		await performImport(data, includeImportedPersonalApiKeys)
 	}
 
 	const handleReset = async () => {
@@ -93,19 +268,12 @@ export function AdvancedContent({
 
 	const handleToggleActivityTracking = (enabled: boolean) => {
 		updateSettings({ enableActivityTracking: enabled })
-		toast.success(enabled ? 'Registro de actividad activado' : 'Registro de actividad desactivado')
+		toast.success(enabled ? 'Heatmap legacy activado' : 'Heatmap legacy pausado')
 	}
 
-	const handleClearActivityHistory = async () => {
-		try {
-			const { clearActivityData } = await import('@/features/stats/storage')
-			await clearActivityData()
-			setShowClearActivityDialog(false)
-			toast.success('Historial de actividad borrado')
-		} catch (error) {
-			toast.error('Error al borrar historial')
-			logger.error('Clear activity error:', error)
-		}
+	const handleToggleRhythmTracking = (enabled: boolean) => {
+		updateSettings({ enableRhythmTracking: enabled })
+		toast.success(enabled ? 'Tiempo en Mediavida activado' : 'Tiempo en Mediavida desactivado')
 	}
 
 	const rowState = (settingId: string) => ({
@@ -120,41 +288,128 @@ export function AdvancedContent({
 			isHighlightedSetting(settingFilter, settingId) && 'border-primary/50 bg-primary/10 shadow-sm ring-1 ring-primary/20'
 		)
 	const showActivityTracking = shouldShowSetting(settingFilter, 'activity-tracking')
+	const showRhythmTracking = shouldShowSetting(settingFilter, 'rhythm-tracking')
 	const showBackupData = shouldShowSetting(settingFilter, 'backup-data')
 	const showResetData = shouldShowSetting(settingFilter, 'reset-data')
 
+	useEffect(() => {
+		if (!showBackupData) return
+
+		let mounted = true
+
+		async function loadBackupPreview() {
+			setIsBackupPreviewLoading(true)
+			setBackupPreviewError(null)
+
+			try {
+				const [data, lastExportedAt] = await Promise.all([
+					createBackupData(),
+					storage.getItem<string | null>(LAST_LOCAL_BACKUP_EXPORT_KEY),
+				])
+				if (!mounted) return
+
+				setBackupPreview(createBackupPreview(data, lastExportedAt ?? null))
+			} catch (error) {
+				if (!mounted) return
+
+				setBackupPreviewError('No se ha podido calcular el resumen del backup.')
+				logger.error('Backup preview error:', error)
+			} finally {
+				if (mounted) setIsBackupPreviewLoading(false)
+			}
+		}
+
+		void loadBackupPreview()
+
+		return () => {
+			mounted = false
+		}
+	}, [showBackupData])
+
+	const backupPreviewGroups: BackupPreviewItem[] = backupPreview
+		? [
+				{
+					label: 'Borradores y plantillas',
+					value: `${formatCount(backupPreview.drafts, 'borrador', 'borradores')} · ${formatCount(backupPreview.templates, 'plantilla', 'plantillas')}`,
+				},
+				{
+					label: 'Hilos guardados',
+					value: `${formatCount(backupPreview.savedThreads, 'hilo', 'hilos')} · incluye la ruta del hilo`,
+				},
+				{
+					label: 'Posts anclados',
+					value: `${formatCount(backupPreview.pinnedPosts, 'post', 'posts')} · ${formatCount(backupPreview.pinnedThreads, 'hilo', 'hilos')} con anclajes`,
+				},
+				{
+					label: 'Filtros y contenido oculto',
+					value: [
+						formatCount(backupPreview.contentRules, 'regla', 'reglas'),
+						formatCount(backupPreview.mutedWords, 'palabra', 'palabras'),
+						formatCount(backupPreview.hiddenThreads + backupPreview.hiddenSubforums, 'oculto', 'ocultos'),
+					].join(' · '),
+				},
+				{
+					label: 'Apariencia y preferencias',
+					value: [
+						formatCount(backupPreview.savedThemes, 'tema guardado', 'temas guardados'),
+						formatCount(backupPreview.appearanceItems, 'valor visual', 'valores visuales'),
+						formatCount(backupPreview.delayPreferences, 'delay', 'delays'),
+					].join(' · '),
+				},
+				{
+					label: 'Datos personales de uso',
+					value: [
+						formatCount(backupPreview.userCustomizations, 'personalización', 'personalizaciones'),
+						formatCount(backupPreview.favoriteSubforums, 'foro favorito', 'foros favoritos'),
+						formatCount(backupPreview.subforumStats, 'subforo con tiempo', 'subforos con tiempo'),
+						formatCount(backupPreview.rhythmDays, 'día en Tiempo en Mediavida', 'días en Tiempo en Mediavida'),
+					].join(' · '),
+				},
+				{
+					label: 'Ajustes seguros',
+					value: `${formatCount(backupPreview.settings, 'opción', 'opciones')} · claves personales excluidas por defecto`,
+				},
+			]
+		: []
+	const backupPreviewSummary = backupPreview
+		? [
+				formatCount(backupPreview.drafts, 'borrador', 'borradores'),
+				formatCount(backupPreview.templates, 'plantilla', 'plantillas'),
+				formatCount(backupPreview.savedThreads, 'hilo guardado', 'hilos guardados'),
+				formatCount(backupPreview.pinnedPosts, 'post anclado', 'posts anclados'),
+				formatCount(backupPreview.contentRules, 'regla', 'reglas'),
+				formatCount(backupPreview.savedThemes, 'tema guardado', 'temas guardados'),
+			].join(' · ')
+		: 'Preparando resumen...'
+
 	return (
 		<>
-			{(showActivityTracking || showBackupData) && (
+			{(showActivityTracking || showRhythmTracking || showBackupData) && (
 				<SettingsSection title="Avanzado" description="Opciones para usuarios avanzados, depuración y gestión de datos.">
 					{/* Activity Tracking */}
 					{showActivityTracking && (
 						<SettingRow
 							{...rowState('activity-tracking')}
 							icon={<Activity className="h-4 w-4" />}
-							label="Registro de actividad (Heatmap)"
-							description="Registra posts creados y editados para el heatmap del dashboard."
+							label="Heatmap legacy de posts"
+							description="Registra títulos, URLs y contexto de posts/hilos para el calendario legacy. Puede no ser exacto y está desactivado por defecto."
 						>
 							<Switch checked={enableActivityTracking} onCheckedChange={handleToggleActivityTracking} />
 						</SettingRow>
 					)}
 
-					{showActivityTracking && !hasActiveFinder && (
-						<div className="flex items-center justify-between py-2 pl-8">
-							<span className="text-sm text-muted-foreground">Borrar todo el historial del heatmap</span>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setShowClearActivityDialog(true)}
-								className="text-destructive hover:text-destructive"
-							>
-								<Trash2 className="mr-2 h-4 w-4" />
-								Borrar historial
-							</Button>
-						</div>
+					{showRhythmTracking && (
+						<SettingRow
+							{...rowState('rhythm-tracking')}
+							icon={<Clock className="h-4 w-4" />}
+							label="Tiempo en Mediavida (Reloj)"
+							description="Registra tiempo de navegación por hora, día y subforo para el reloj y las tarjetas de ritmo."
+						>
+							<Switch checked={enableRhythmTracking} onCheckedChange={handleToggleRhythmTracking} />
+						</SettingRow>
 					)}
 
-					{showActivityTracking && showBackupData && <Separator />}
+					{(showActivityTracking || showRhythmTracking) && showBackupData && <Separator />}
 
 					{/* Data Management */}
 					<div
@@ -164,8 +419,43 @@ export function AdvancedContent({
 					>
 						<div className="space-y-4 p-2 pt-2">
 							<div>
-								<h3 className="text-base font-medium">Copia de Seguridad</h3>
-								<p className="text-sm text-muted-foreground mt-1">Exporta o importa tus datos y configuraciones.</p>
+								<h3 className="text-base font-medium">Copia de seguridad local</h3>
+								<p className="text-sm text-muted-foreground mt-1">
+									Exporta o importa un backup JSON de tus datos seguros de MV Premium.
+								</p>
+							</div>
+
+							<div className="rounded-md bg-muted/20 p-3">
+								{backupPreviewError ? (
+									<p className="text-sm text-destructive">{backupPreviewError}</p>
+								) : backupPreview ? (
+									<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+										<div className="min-w-0 space-y-1">
+											<p className="text-sm font-medium">Backup local listo</p>
+											<p className="text-xs text-muted-foreground">{backupPreviewSummary}</p>
+											<p className="text-xs text-muted-foreground">
+												Sin claves personales por defecto, tokens, cachés ni historial granular. Incluye rutas de hilos/posts guardados para restaurarlos.
+											</p>
+										</div>
+										<div className="flex shrink-0 flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center lg:flex-col lg:items-end">
+											<span>
+												Última exportación: {formatLastExportDate(backupPreview.lastExportedAt)}
+												{isBackupPreviewLoading && ' · Actualizando...'}
+											</span>
+											<Button
+												type="button"
+												variant="link"
+												size="sm"
+												className="h-auto justify-start p-0 text-xs lg:justify-end"
+												onClick={() => setShowBackupDetailsDialog(true)}
+											>
+												Ver detalle del backup
+											</Button>
+										</div>
+									</div>
+								) : (
+									<p className="text-sm text-muted-foreground">Preparando resumen...</p>
+								)}
 							</div>
 
 							<div className="flex flex-wrap gap-3">
@@ -178,21 +468,118 @@ export function AdvancedContent({
 									Importar datos
 								</Button>
 							</div>
-							<p className="text-xs text-muted-foreground">
-								La exportación incluye: palabras silenciadas, posts anclados, borradores, plantillas, preferencias y
-								temas guardados (incluyendo tema MV personalizado y presets).
-							</p>
 						</div>
 					</div>
 				</SettingsSection>
 			)}
+
+			<AlertDialog open={showBackupDetailsDialog} onOpenChange={setShowBackupDetailsDialog}>
+				<AlertDialogContent className="max-w-xl">
+					<AlertDialogHeader>
+						<AlertDialogTitle>Detalle del backup</AlertDialogTitle>
+						<AlertDialogDescription asChild>
+							<div className="space-y-3 mt-2">
+								<p className="text-sm">
+									Se exportarán estos datos seguros para poder restaurarlos más adelante:
+								</p>
+								{backupPreview && (
+									<div className="grid grid-cols-1 gap-x-4 gap-y-2.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider sm:grid-cols-2">
+										{backupPreviewGroups.map(item => (
+											<div key={item.label} className="flex items-start gap-2">
+												<span className="mt-1 text-primary text-[8px]">●</span>
+												<span>
+													<span className="block text-foreground">{item.label}</span>
+													<span className="normal-case tracking-normal text-muted-foreground">{item.value}</span>
+												</span>
+											</div>
+										))}
+									</div>
+								)}
+								<p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">
+									Las rutas de hilos guardados y posts anclados se incluyen porque son necesarias para restaurarlos.
+									Las claves personales solo se exportan si lo activas al crear el backup. No se exportan tokens,
+									cachés, datos temporales, historial granular del heatmap ni URLs visitadas. Si existen, se
+									incluyen el tiempo por subforo y Tiempo en Mediavida como estadísticas agregadas.
+								</p>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogAction onClick={() => setShowBackupDetailsDialog(false)}>Cerrar</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog open={showExportOptionsDialog} onOpenChange={setShowExportOptionsDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Exportar backup local</AlertDialogTitle>
+						<AlertDialogDescription asChild>
+							<div className="space-y-4 mt-2">
+								<p className="text-sm">
+									El backup incluirá tus datos restaurables de MV Premium. Las claves personales no se incluyen salvo
+									que lo actives manualmente.
+								</p>
+								<label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3">
+									<Checkbox
+										checked={includePersonalApiKeys}
+										onCheckedChange={checked => setIncludePersonalApiKeys(checked === true)}
+									/>
+									<span className="space-y-1 text-sm">
+										<span className="block font-medium text-foreground">Incluir claves personales</span>
+										<span className="block text-xs text-muted-foreground">
+											Guarda también tus claves de ImgBB y Gemini en este archivo JSON.
+										</span>
+									</span>
+								</label>
+								<p className="text-xs text-muted-foreground">
+									Activa esta opción solo si vas a guardar el archivo en un sitio privado y de confianza.
+								</p>
+							</div>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancelar</AlertDialogCancel>
+						<AlertDialogAction onClick={() => void performExport(includePersonalApiKeys)}>Exportar</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<ConfirmDialog
+				open={showImportApiKeysDialog}
+				onOpenChange={setShowImportApiKeysDialog}
+				title="El backup contiene claves personales"
+				description={
+					<div className="space-y-4 mt-2">
+						<p className="text-sm text-muted-foreground">
+							Puedes importar el resto del backup y conservar tus claves actuales, o restaurar también las claves guardadas
+							en el archivo.
+						</p>
+						<label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3">
+							<Checkbox
+								checked={includeImportedPersonalApiKeys}
+								onCheckedChange={checked => setIncludeImportedPersonalApiKeys(checked === true)}
+							/>
+							<span className="space-y-1 text-sm">
+								<span className="block font-medium text-foreground">Restaurar claves personales</span>
+								<span className="block text-xs text-muted-foreground">
+									Sustituirá tus claves locales de ImgBB y Gemini por las del backup.
+								</span>
+							</span>
+						</label>
+					</div>
+				}
+				cancelText="Cancelar"
+				confirmText="Importar"
+				onConfirm={() => void handleImportApiKeysDecision()}
+			/>
 
 			{/* Danger Zone - Separate section for destructive actions */}
 			<div
 				id={getSettingDomId('reset-data')}
 				data-setting-id="reset-data"
 				className={cn(
-					(showActivityTracking || showBackupData) && 'mt-6 border-t border-destructive/30 pt-6',
+					(showActivityTracking || showRhythmTracking || showBackupData) && 'mt-6 border-t border-destructive/30 pt-6',
 					!showResetData && 'hidden',
 					isHighlightedSetting(settingFilter, 'reset-data') && 'rounded-lg border border-primary/50 bg-primary/10 p-2 shadow-sm ring-1 ring-primary/20'
 				)}
@@ -216,23 +603,6 @@ export function AdvancedContent({
 					</div>
 				</div>
 			</div>
-
-			{/* Clear Activity Confirmation Dialog */}
-			<ConfirmDialog
-				open={showClearActivityDialog}
-				onOpenChange={setShowClearActivityDialog}
-				title="¿Borrar historial de actividad?"
-				description={
-					<>
-						Esto eliminará todo el historial del heatmap de actividad. Los datos de posts creados y editados se perderán
-						permanentemente.
-						<span className="block mt-3 font-medium text-destructive">Esta acción no se puede deshacer.</span>
-					</>
-				}
-				confirmText="Sí, borrar historial"
-				variant="destructive"
-				onConfirm={handleClearActivityHistory}
-			/>
 
 			{/* Reset Confirmation Dialog */}
 			<ConfirmDialog
@@ -264,7 +634,6 @@ export function AdvancedContent({
 				title="Importación Completada"
 				description={
 					importStats &&
-					importStats &&
 					(() => {
 						const totalChanges =
 							importStats.pinnedPosts +
@@ -275,7 +644,11 @@ export function AdvancedContent({
 							importStats.userCustomizations +
 							importStats.favorites +
 							importStats.subforumStats +
-							importStats.activityDays +
+							importStats.contentRules +
+							importStats.hiddenThreads +
+							importStats.hiddenSubforums +
+							(importStats.rhythmStatsUpdated ? 1 : 0) +
+							(importStats.themesUpdated ? 1 : 0) +
 							(importStats.settingsUpdated ? 1 : 0)
 
 						if (totalChanges === 0) {
@@ -361,13 +734,43 @@ export function AdvancedContent({
 											</span>
 										</div>
 									)}
-									{importStats.activityDays > 0 && (
+									{importStats.rhythmStatsUpdated && (
+										<div className="flex items-center gap-2">
+											<span className="text-primary text-[8px]">●</span>
+											<span>Tiempo en Mediavida</span>
+										</div>
+									)}
+									{importStats.contentRules > 0 && (
 										<div className="flex items-center gap-2">
 											<span className="text-primary text-[8px]">●</span>
 											<span>
-												{importStats.activityDays}{' '}
-												{importStats.activityDays === 1 ? 'Día de Actividad' : 'Días de Actividad'}
+												{importStats.contentRules}{' '}
+												{importStats.contentRules === 1 ? 'Regla de contenido' : 'Reglas de contenido'}
 											</span>
+										</div>
+									)}
+									{importStats.hiddenThreads > 0 && (
+										<div className="flex items-center gap-2">
+											<span className="text-primary text-[8px]">●</span>
+											<span>
+												{importStats.hiddenThreads}{' '}
+												{importStats.hiddenThreads === 1 ? 'Hilo oculto' : 'Hilos ocultos'}
+											</span>
+										</div>
+									)}
+									{importStats.hiddenSubforums > 0 && (
+										<div className="flex items-center gap-2">
+											<span className="text-primary text-[8px]">●</span>
+											<span>
+												{importStats.hiddenSubforums}{' '}
+												{importStats.hiddenSubforums === 1 ? 'Subforo oculto' : 'Subforos ocultos'}
+											</span>
+										</div>
+									)}
+									{importStats.themesUpdated && (
+										<div className="flex items-center gap-2 col-span-2">
+											<span className="text-primary text-[8px]">●</span>
+											<span>Temas y apariencia</span>
 										</div>
 									)}
 									{importStats.settingsUpdated && (

@@ -22,8 +22,11 @@ import Package from 'lucide-react/dist/esm/icons/package'
 import ExternalLink from 'lucide-react/dist/esm/icons/external-link'
 import Store from 'lucide-react/dist/esm/icons/store'
 import CalendarDays from 'lucide-react/dist/esm/icons/calendar-days'
+import CalendarClock from 'lucide-react/dist/esm/icons/calendar-clock'
+import Check from 'lucide-react/dist/esm/icons/check'
 import MousePointerClick from 'lucide-react/dist/esm/icons/mouse-pointer-click'
 import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
+import Wand2 from 'lucide-react/dist/esm/icons/wand-2'
 import { browser } from 'wxt/browser'
 import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
@@ -39,7 +42,7 @@ import { SettingRow } from '../../components/settings'
 import { sendMessage } from '@/lib/messaging'
 import { ALL_SUBFORUMS, VALID_SUBFORUM_SLUGS } from '@/lib/subforums'
 import { useSettingsStore } from '@/store/settings-store'
-import type { ItadCountry } from '@/store/settings-types'
+import type { ItadCountry, RelatedThreadsDisplay } from '@/store/settings-types'
 import { isHighlightedSetting, shouldShowAnySetting, shouldShowSetting, type SettingsContentFilter } from './constants'
 
 const ITAD_COUNTRY_OPTIONS: Array<{ value: ItadCountry; label: string }> = [
@@ -48,8 +51,42 @@ const ITAD_COUNTRY_OPTIONS: Array<{ value: ItadCountry; label: string }> = [
 	{ value: 'US', label: 'Estados Unidos - USD' },
 ]
 
+const MAX_AGE_MONTHS_LIMIT = 300
+
+/** Digits only, capped at three characters, so the field cannot hold a number we would reject. */
+function sanitizeMaxAgeDraft(raw: string): string {
+	return raw.replace(/\D/g, '').slice(0, 3)
+}
+
+/** An empty field means "no limit", so 0 is never something the user has to type or decode. */
+function parseMaxAgeDraft(draft: string): number {
+	const months = Number.parseInt(draft, 10)
+	return Number.isFinite(months) && months > 0 ? months : 0
+}
+
+/** Exact, not approximate: 20 months is 1 año y 8 meses, and saying "unos 1,7 años" just hedges. */
+function formatMonthsAsYears(months: number): string {
+	const years = Math.floor(months / 12)
+	if (years === 0) return ''
+
+	const yearPart = `${years} ${years === 1 ? 'año' : 'años'}`
+	const restMonths = months % 12
+	if (restMonths === 0) return yearPart
+	return `${yearPart} y ${restMonths} ${restMonths === 1 ? 'mes' : 'meses'}`
+}
+
+/** Hint beside the months field: what the current draft would actually do. */
+function describeMaxAgeDraft(draft: string): string {
+	const months = parseMaxAgeDraft(draft)
+	if (months === 0) return 'Sin límite: se muestran todos'
+
+	const label = `${months} ${months === 1 ? 'mes' : 'meses'} sin actividad`
+	const asYears = formatMonthsAsYears(months)
+	return asYears ? `${label} · ${asYears}` : label
+}
+
 const NAVIGATION_SETTING_IDS = ['new-homepage', 'navbar-search']
-const EDITOR_SETTING_IDS = ['cinema-button', 'game-button', 'gif-picker', 'drafts-button', 'template-button']
+const EDITOR_SETTING_IDS = ['cinema-button', 'game-button', 'gif-picker', 'drafts-button', 'template-button', 'auto-tags']
 const CONTENT_SETTING_IDS = [
 	'improved-upvotes',
 	'media-hover-cards',
@@ -62,6 +99,8 @@ const CONTENT_SETTING_IDS = [
 	'classic-thread-actions',
 	'pinned-posts',
 	'thread-preview',
+	'related-threads-display',
+	'related-threads-max-age',
 	'thread-summarizer',
 	'post-summary',
 	'save-thread',
@@ -80,18 +119,22 @@ export function FeaturesContent({ settingFilter }: { settingFilter?: SettingsCon
 		draftsButtonEnabled,
 		templateButtonEnabled,
 		improvedUpvotesEnabled,
+		autoTagsEnabled,
 		mediaHoverCardsEnabled,
 		steamBundleInlineCardsEnabled,
 		itadSubforumSearchJuegosEnabled,
 		itadSubforumSearchHuchaEnabled,
 		itadCountry,
 		gameReleaseCalendarJuegosEnabled,
+		gameReleaseCalendarJuegosMovilEnabled,
 		movieReleaseCalendarCineEnabled,
 		threadClipperSubforums,
 		contentRulesEnabled,
 		classicThreadActionsEnabled,
 		pinnedPostsEnabled,
 		threadPreviewEnabled,
+		relatedThreadsDisplay,
+		relatedThreadsMaxAgeMonths,
 		threadSummarizerEnabled,
 		postSummaryEnabled,
 		saveThreadEnabled,
@@ -129,6 +172,7 @@ export function FeaturesContent({ settingFilter }: { settingFilter?: SettingsCon
 				| 'itadSubforumSearchJuegosEnabled'
 				| 'itadSubforumSearchHuchaEnabled'
 				| 'gameReleaseCalendarJuegosEnabled'
+				| 'gameReleaseCalendarJuegosMovilEnabled'
 				| 'movieReleaseCalendarCineEnabled'
 				| 'contentRulesEnabled'
 				| 'classicThreadActionsEnabled'
@@ -180,6 +224,39 @@ export function FeaturesContent({ settingFilter }: { settingFilter?: SettingsCon
 		toast.success('Región de precios actualizada', {
 			description: 'La moneda final depende de los datos que devuelva IsThereAnyDeal.',
 		})
+	}
+
+	const handleRelatedThreadsDisplayChange = async (value: string) => {
+		setSetting('relatedThreadsDisplay', value as RelatedThreadsDisplay)
+		toast.success('Visualización de hilos relacionados actualizada', {
+			description: 'Recargando pestañas de Mediavida...',
+		})
+		await new Promise(resolve => setTimeout(resolve, 300))
+		await reloadMediavidaTabs()
+	}
+
+	// Typed into, not saved into: writing "20" would otherwise commit "2" first, with its own
+	// toast and tab reload. The value is applied only when the user confirms.
+	const [maxAgeDraft, setMaxAgeDraft] = useState(
+		relatedThreadsMaxAgeMonths > 0 ? String(relatedThreadsMaxAgeMonths) : ''
+	)
+	const maxAgeDraftMonths = parseMaxAgeDraft(maxAgeDraft)
+	const maxAgeExceedsLimit = maxAgeDraftMonths > MAX_AGE_MONTHS_LIMIT
+	const maxAgeDirty = maxAgeDraftMonths !== relatedThreadsMaxAgeMonths && !maxAgeExceedsLimit
+
+	const handleRelatedThreadsMaxAgeCommit = async () => {
+		if (!maxAgeDirty) return
+
+		setSetting('relatedThreadsMaxAgeMonths', maxAgeDraftMonths)
+		setMaxAgeDraft(maxAgeDraftMonths > 0 ? String(maxAgeDraftMonths) : '')
+		toast.success(
+			maxAgeDraftMonths === 0
+				? 'Se mostrarán todos los hilos relacionados'
+				: `Se ocultarán los que lleven más de ${maxAgeDraftMonths} ${maxAgeDraftMonths === 1 ? 'mes' : 'meses'} sin actividad`,
+			{ description: 'Recargando pestañas de Mediavida...' }
+		)
+		await new Promise(resolve => setTimeout(resolve, 300))
+		await reloadMediavidaTabs()
 	}
 
 	const rowState = (settingId: string) => ({
@@ -294,6 +371,21 @@ export function FeaturesContent({ settingFilter }: { settingFilter?: SettingsCon
 				description="Añade un botón para insertar plantillas predefinidas o propias."
 			>
 				<Switch checked={templateButtonEnabled} onCheckedChange={withToastAndReload('templateButtonEnabled', true)} />
+			</SettingRow>
+
+			<SettingRow
+				{...rowState('auto-tags')}
+				icon={<Wand2 className="h-4 w-4" />}
+				label="Auto-tags al pegar"
+				description="Envuelve automáticamente las URLs de imágenes y vídeos pegadas en el editor con las etiquetas [img]/[media]. También disponible como atajo de teclado."
+			>
+				<Switch
+					checked={autoTagsEnabled}
+					onCheckedChange={checked => {
+						setSetting('autoTagsEnabled', checked)
+						toast.success(checked ? 'Auto-tags activados' : 'Auto-tags desactivados')
+					}}
+				/>
 			</SettingRow>
 				</>
 			)}
@@ -410,12 +502,24 @@ export function FeaturesContent({ settingFilter }: { settingFilter?: SettingsCon
 				{...rowState('game-release-calendar')}
 				icon={<CalendarDays className="h-4 w-4" />}
 				label="Próximos lanzamientos"
-				description="Muestra próximos lanzamientos de videojuegos en el subforo Juegos y permite preparar hilos con plantilla IGDB."
+				description="Muestra próximos lanzamientos de videojuegos en los subforos Juegos y Juegos de móvil, y permite preparar hilos con plantilla IGDB."
 			>
-				<Switch
-					checked={gameReleaseCalendarJuegosEnabled}
-					onCheckedChange={withToastAndReload('gameReleaseCalendarJuegosEnabled', true)}
-				/>
+				<div className="grid gap-2 min-w-[190px]">
+					<label className="flex items-center justify-between gap-3 text-sm font-medium">
+						<span>Juegos</span>
+						<Switch
+							checked={gameReleaseCalendarJuegosEnabled}
+							onCheckedChange={withToastAndReload('gameReleaseCalendarJuegosEnabled', true)}
+						/>
+					</label>
+					<label className="flex items-center justify-between gap-3 text-sm font-medium">
+						<span>Juegos de móvil</span>
+						<Switch
+							checked={gameReleaseCalendarJuegosMovilEnabled}
+							onCheckedChange={withToastAndReload('gameReleaseCalendarJuegosMovilEnabled', true)}
+						/>
+					</label>
+				</div>
 			</SettingRow>
 
 			<SettingRow
@@ -479,6 +583,79 @@ export function FeaturesContent({ settingFilter }: { settingFilter?: SettingsCon
 				description="Añade un botón en el Spy y en los listados de subforos para leer el OP sin salir de la página."
 			>
 				<Switch checked={threadPreviewEnabled} onCheckedChange={withToastAndReload('threadPreviewEnabled', true)} />
+			</SettingRow>
+
+			<SettingRow
+				{...rowState('related-threads-display')}
+				icon={<List className="h-4 w-4" />}
+				label="Hilos relacionados"
+				description="Elige si la sección del final de los hilos se oculta, aparece plegada o conserva la vista original de Mediavida."
+			>
+				<Select value={relatedThreadsDisplay} onValueChange={handleRelatedThreadsDisplayChange}>
+					<SelectTrigger
+						className="w-[220px] max-w-full"
+						aria-label="Visualización de hilos relacionados"
+					>
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="hidden">Ocultos</SelectItem>
+						<SelectItem value="collapsible">Desplegable</SelectItem>
+						<SelectItem value="original">Vista original de Mediavida</SelectItem>
+					</SelectContent>
+				</Select>
+			</SettingRow>
+
+			<SettingRow
+				{...rowState('related-threads-max-age')}
+				icon={<CalendarClock className="h-4 w-4" />}
+				label="Antigüedad máxima de los hilos relacionados"
+				description="Oculta los hilos cuyo último mensaje sea más antiguo. Se mide desde la última respuesta, no desde que se creó el hilo. Déjalo en 0 para no filtrar nada."
+			>
+				<div className="flex flex-col items-end gap-1.5">
+					<div className="flex items-center gap-2">
+						<Input
+							type="number"
+							min={1}
+							max={MAX_AGE_MONTHS_LIMIT}
+							step={1}
+							value={maxAgeDraft}
+							placeholder="Sin límite"
+							disabled={relatedThreadsDisplay === 'hidden'}
+							onChange={event => setMaxAgeDraft(sanitizeMaxAgeDraft(event.target.value))}
+							onKeyDown={event => {
+								if (event.key === 'Enter') {
+									event.preventDefault()
+									void handleRelatedThreadsMaxAgeCommit()
+								}
+							}}
+							className="w-[110px]"
+							aria-label="Antigüedad máxima en meses de los hilos relacionados. Vacío = sin límite"
+						/>
+						{/* The unit stays visible: a bare number box does not say months, days or years. */}
+						<span className="text-sm text-muted-foreground">meses</span>
+						<Button
+							size="icon-sm"
+							variant={maxAgeDirty ? 'default' : 'ghost'}
+							disabled={!maxAgeDirty || relatedThreadsDisplay === 'hidden'}
+							onClick={() => void handleRelatedThreadsMaxAgeCommit()}
+							title={maxAgeExceedsLimit ? `El máximo es ${MAX_AGE_MONTHS_LIMIT} meses` : maxAgeDirty ? 'Aplicar' : 'Ya aplicado'}
+							aria-label="Aplicar la antigüedad máxima"
+						>
+							<Check className="h-4 w-4" />
+						</Button>
+					</div>
+					{maxAgeExceedsLimit ? (
+						<span role="alert" className="text-xs font-medium text-destructive">
+							Máximo {MAX_AGE_MONTHS_LIMIT} meses ({formatMonthsAsYears(MAX_AGE_MONTHS_LIMIT)})
+						</span>
+					) : (
+						<span className="text-xs text-muted-foreground/80">
+							{describeMaxAgeDraft(maxAgeDraft)}
+							{maxAgeDirty && <span className="ml-1 text-primary">· sin aplicar</span>}
+						</span>
+					)}
+				</div>
 			</SettingRow>
 
 			<SettingRow

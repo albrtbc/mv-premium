@@ -5,6 +5,7 @@ import { useState } from 'react'
 import PanelTopClose from 'lucide-react/dist/esm/icons/panel-top-close'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import MessageSquare from 'lucide-react/dist/esm/icons/message-square'
+import Flower2 from 'lucide-react/dist/esm/icons/flower-2'
 import Settings2 from 'lucide-react/dist/esm/icons/settings-2'
 
 import LayoutDashboard from 'lucide-react/dist/esm/icons/layout-dashboard'
@@ -12,6 +13,7 @@ import Shield from 'lucide-react/dist/esm/icons/shield'
 import Rocket from 'lucide-react/dist/esm/icons/rocket'
 import Cog from 'lucide-react/dist/esm/icons/cog'
 import Briefcase from 'lucide-react/dist/esm/icons/briefcase'
+import AtSign from 'lucide-react/dist/esm/icons/at-sign'
 import CircleUserRound from 'lucide-react/dist/esm/icons/circle-user-round'
 import Image from 'lucide-react/dist/esm/icons/image'
 import Play from 'lucide-react/dist/esm/icons/play'
@@ -44,6 +46,7 @@ const DASHBOARD_ICON_OPTIONS: { value: DashboardIcon; label: string; icon: React
 const CONTENT_SETTING_IDS = [
 	'bold-color',
 	'twitter-lite',
+	'fragrantica-embeds',
 	'dashboard-icon',
 	'hide-header',
 	'work-mode',
@@ -55,6 +58,7 @@ export function ContentTabContent({ settingFilter }: { settingFilter?: SettingsC
 		boldColor,
 		boldColorEnabled,
 		twitterLiteEmbedsEnabled,
+		fragranticaEmbedsEnabled,
 		hideHeaderEnabled,
 		workModeEnabled,
 		workModeOptions,
@@ -114,6 +118,23 @@ export function ContentTabContent({ settingFilter }: { settingFilter?: SettingsC
 					onCheckedChange={checked => {
 						setSetting('twitterLiteEmbedsEnabled', checked)
 						toast.success(checked ? 'Modo ligero de tweets activado' : 'Configuración guardada')
+					}}
+				/>
+			</SettingRow>
+
+			{showSeparatorBefore('fragrantica-embeds') && <Separator />}
+
+			<SettingRow
+				{...rowState('fragrantica-embeds')}
+				icon={<Flower2 className="h-4 w-4" />}
+				label="Fichas de Fragrantica"
+				description="Convierte enlaces de perfumes de Fragrantica en tarjetas ligeras con imagen, valoración, acordes, pirámide y uso recomendado."
+			>
+				<Switch
+					checked={fragranticaEmbedsEnabled}
+					onCheckedChange={checked => {
+						setSetting('fragranticaEmbedsEnabled', checked)
+						toast.success(checked ? 'Fichas de Fragrantica activadas' : 'Configuración guardada')
 					}}
 				/>
 			</SettingRow>
@@ -203,6 +224,17 @@ export function ContentTabContent({ settingFilter }: { settingFilter?: SettingsC
 
 					<div className="flex items-center justify-between py-1.5">
 						<div className="flex items-center gap-2">
+							<AtSign className="h-3.5 w-3.5 text-muted-foreground" />
+							<span className="text-sm">Tu nick en la cabecera (hover para mostrarlo)</span>
+						</div>
+						<Switch
+							checked={workModeOptions.hideUsername !== false}
+							onCheckedChange={checked => updateWorkModeOption('hideUsername', checked)}
+						/>
+					</div>
+
+					<div className="flex items-center justify-between py-1.5">
+						<div className="flex items-center gap-2">
 							<Image className="h-3.5 w-3.5 text-muted-foreground" />
 							<span className="text-sm">Imágenes</span>
 						</div>
@@ -237,7 +269,7 @@ export function ContentTabContent({ settingFilter }: { settingFilter?: SettingsC
 					<div className="flex items-center justify-between py-1.5">
 						<div className="flex items-center gap-2">
 							<Gamepad2 className="h-3.5 w-3.5 text-muted-foreground" />
-							<span className="text-sm">Tarjetas de Steam</span>
+							<span className="text-sm">Tarjetas de Steam y GOG</span>
 						</div>
 						<Switch
 							checked={workModeOptions.hideSteamCards}

@@ -13,9 +13,13 @@
  */
 import { defineExtensionMessaging } from '@webext-core/messaging'
 import type { SteamGameDetails, SteamBundleDetails, SteamAppSearchResult } from '@/services/api/steam'
+import type { GogGameDetails } from '@/services/api/gog'
+import type { MobileStoreSearchResult } from '@/services/api/mobile-stores'
 import type { GiphyPaginatedResponse } from '@/services/api/giphy'
 import type { ItadGamePriceOverview, ItadGamePrices, ItadGameSearchResult } from '@/services/api/itad'
+import type { FragranticaFragrance } from '@/services/api/fragrantica'
 import type { ChatMessage } from '@/types/ai'
+import type { UploadAttemptInfo, UploadErrorCode, UploadProvider } from '@/lib/upload-errors'
 
 // =============================================================================
 // Response Types
@@ -26,8 +30,29 @@ export interface UploadResult {
 	url?: string
 	deleteUrl?: string
 	error?: string
+	errorCode?: UploadErrorCode
+	provider?: UploadProvider
+	attempts?: UploadAttemptInfo[]
 	/** Size in bytes (for stats tracking) */
 	size?: number
+}
+
+export interface UploadPayload {
+	base64: string
+	fileName?: string
+	mimeType?: string
+	fileSize?: number
+}
+
+export interface RhythmTimeChunkPayload {
+	subforum: string
+	ms: number
+	at: number
+}
+
+export interface RhythmTimeChunkResult {
+	success: boolean
+	error?: string
 }
 
 export interface GeminiResult {
@@ -36,6 +61,12 @@ export interface GeminiResult {
 	error?: string
 	/** The actual model that processed the request (may differ from requested due to fallback) */
 	modelUsed?: string
+}
+
+export interface GeminiConnectionResult {
+	success: boolean
+	message: string
+	availableModelIds?: string[]
 }
 
 export interface TweetLiteData {
@@ -87,12 +118,36 @@ export interface TweetLiteResult {
 	error?: string
 }
 
+export interface FragranticaFragranceResult {
+	success: boolean
+	data?: FragranticaFragrance
+	error?: string
+}
+
 export interface ThreadPageHtmlFetchResult {
 	success: boolean
 	html?: string
 	error?: string
 	status?: number
 	finalUrl?: string
+}
+
+export interface MvUserAvatarResult {
+	success: boolean
+	username?: string
+	avatarUrl?: string
+	error?: string
+}
+
+export interface MvUserSearchUser {
+	username: string
+	avatarUrl?: string
+}
+
+export interface MvUserSearchResult {
+	success: boolean
+	users?: MvUserSearchUser[]
+	error?: string
 }
 
 // =============================================================================
@@ -131,10 +186,27 @@ interface ProtocolMap {
 	refreshContextMenus: (data?: { threadClipperSubforums?: string[] }) => boolean
 
 	/**
+	 * Persist a time/rhythm tracking chunk through the background context so
+	 * multiple content scripts cannot overwrite each other's read-modify-write.
+	 */
+	recordRhythmTimeChunk: (data: RhythmTimeChunkPayload) => RhythmTimeChunkResult
+
+	/**
 	 * Fetch raw HTML for a Mediavida thread page via background script.
 	 * Keeps thread-page network requests out of content scripts.
 	 */
 	fetchThreadPageHtml: (data: { url: string }) => ThreadPageHtmlFetchResult
+
+	/**
+	 * Resolve a Mediavida user's avatar by username via background script.
+	 */
+	resolveMvUserAvatar: (data: { username: string }) => MvUserAvatarResult
+
+	/**
+	 * Search Mediavida users by partial username via background script
+	 * (autocomplete suggestions with avatars).
+	 */
+	searchMvUsers: (data: { query: string }) => MvUserSearchResult
 
 	/**
 	 * Fetch Steam game details (CORS proxy)
@@ -144,11 +216,30 @@ interface ProtocolMap {
 	fetchSteamGame: (appId: number) => SteamGameDetails | null
 
 	/**
+	 * Fetch GOG game details by exact product slug (CORS proxy).
+	 */
+	fetchGogGame: (slug: string) => GogGameDetails | null
+
+	/**
 	 * Search Steam apps by title (CORS proxy)
 	 * @param data - Search query and optional result limit
 	 * @returns Steam app search results
 	 */
 	searchSteamApps: (data: { query: string; limit?: number }) => SteamAppSearchResult[]
+
+	/**
+	 * Search the Apple App Store by title via the iTunes Search API (CORS proxy)
+	 * @param data - Search query
+	 * @returns Best matching app or null
+	 */
+	searchItunesApp: (data: { query: string }) => MobileStoreSearchResult | null
+
+	/**
+	 * Search Google Play by title via the public store search page (CORS proxy)
+	 * @param data - Search query
+	 * @returns First app result or null
+	 */
+	searchGooglePlayApp: (data: { query: string }) => MobileStoreSearchResult | null
 
 	/**
 	 * Fetch Steam bundle details (CORS proxy)
@@ -163,7 +254,7 @@ interface ProtocolMap {
 	 * @param data - Base64 image data and optional filename
 	 * @returns Upload result with URL or error
 	 */
-	uploadImageToImgbb: (data: { base64: string; fileName?: string }) => UploadResult
+	uploadImageToImgbb: (data: UploadPayload) => UploadResult
 
 	/**
 	 * Upload image to freeimage.host via background script
@@ -171,7 +262,7 @@ interface ProtocolMap {
 	 * @param data - Base64 image data and optional filename
 	 * @returns Upload result with URL or error
 	 */
-	uploadImageToFreeimage: (data: { base64: string; fileName?: string }) => UploadResult
+	uploadImageToFreeimage: (data: UploadPayload) => UploadResult
 
 	/**
 	 * Check if TMDB API key is configured in the background script
@@ -186,6 +277,9 @@ interface ProtocolMap {
 	 * @returns JSON response from TMDB
 	 */
 	tmdbRequest: (data: { endpoint: string; params?: Record<string, string> }) => unknown
+
+	/** Download an approved image for safe movie-review canvas rendering. */
+	fetchMovieReviewImage: (data: { url: string }) => { dataUrl: string }
 
 	/**
 	 * Get trending GIPHY results via background script
@@ -204,11 +298,16 @@ interface ProtocolMap {
 	 * Supports full chat history with model fallback on rate limits
 	 */
 	generateGemini: (data: {
-		apiKey: string
 		model: string
 		history?: ChatMessage[]
 		prompt?: string
 	}) => GeminiResult
+
+	/**
+	 * Test Gemini API connectivity via background script.
+	 * Background reads the configured API key from extension storage.
+	 */
+	testGeminiConnection: () => GeminiConnectionResult
 
 	/**
 	 * Syntax highlight code using PrismJS in background script
@@ -276,6 +375,12 @@ interface ProtocolMap {
 	 * Keeps network requests out of content scripts.
 	 */
 	fetchTweetLiteData: (data: { tweetUrl: string }) => TweetLiteResult
+
+	/**
+	 * Fetch and parse a Fragrantica perfume page via background script.
+	 * Keeps external requests and local cache outside content scripts.
+	 */
+	fetchFragranticaFragrance: (data: { url: string }) => FragranticaFragranceResult
 }
 
 // =============================================================================

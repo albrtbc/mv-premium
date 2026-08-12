@@ -1,0 +1,1311 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { HiddenThread } from '@/features/hidden-threads/logic/storage'
+import type { UserCustomization, UserCustomizationsData } from '@/features/user-customizations/storage'
+import { MobileLitePanel, MOBILE_LITE_PANEL_OPEN_EVENT } from '../components/mobile-lite-panel'
+import { initMobileLitePanel, teardownMobileLitePanel } from './panel'
+
+const mocks = vi.hoisted(() => ({
+	getPlatformKind: vi.fn(() => 'firefox-android'),
+	isFeatureEnabled: vi.fn(() => true),
+	getUserCustomizations: vi.fn(() =>
+		Promise.resolve<UserCustomizationsData>({
+			users: {},
+			globalSettings: {
+				adminColor: '',
+				subadminColor: '',
+				modColor: '',
+				userColor: '',
+			},
+		})
+	),
+	saveUserCustomizations: vi.fn((_data: UserCustomizationsData) => Promise.resolve()),
+	watchUserCustomizations: vi.fn(() => vi.fn()),
+	getHiddenThreads: vi.fn(() => Promise.resolve<HiddenThread[]>([])),
+	unhideThread: vi.fn((_threadId: string) => Promise.resolve()),
+	clearHiddenThreads: vi.fn(() => Promise.resolve()),
+	watchHiddenThreads: vi.fn(() => vi.fn()),
+	getMobileLiteBoldColorSettings: vi.fn(() => Promise.resolve({ color: '#ffffff', enabled: false })),
+	saveMobileLiteBoldColorSettings: vi.fn((settings: { color?: string; enabled?: boolean }) =>
+		Promise.resolve({ color: settings.color ?? '#ffffff', enabled: settings.enabled ?? false })
+	),
+	normalizeMobileLiteBoldColor: vi.fn((color: string | null | undefined) =>
+		color && /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#ffffff'
+	),
+	getMobileLiteImgbbApiKey: vi.fn(() => Promise.resolve('')),
+	saveMobileLiteImgbbApiKey: vi.fn((_apiKey: string) => Promise.resolve()),
+	getSettings: vi.fn(() =>
+		Promise.resolve({ liveThreadEnabled: false, hideThreadEnabled: true, relatedThreadsDisplay: 'hidden' })
+	),
+	setSetting: vi.fn(),
+	setLiveThreadEnabled: vi.fn(),
+	applyMobileLiteHiddenThreads: vi.fn(),
+	syncMobileLiteLiveThreadButton: vi.fn((_enabled?: boolean) => Promise.resolve()),
+	syncMobileLiteGalleryButton: vi.fn((_enabled?: boolean) => Promise.resolve()),
+	syncMobileLiteQuoteSelection: vi.fn((_enabled?: boolean) => Promise.resolve()),
+	applyRelatedThreadsDisplay: vi.fn(),
+	dispatchMobileLiteIgnoredUsersSync: vi.fn(),
+	sendMessage: vi.fn<(name: string, data?: unknown) => Promise<unknown>>(() => Promise.resolve({ success: false })),
+	getOwnUsername: vi.fn<() => string | null>(() => null),
+	getLatestMobileLiteEntry: vi.fn(() => ({
+		version: '3.1.0',
+		date: '2026-06-13',
+		title: 'Mobile Lite con novedades visibles',
+		summary: 'Resumen de cambios para Mobile Lite.',
+		changes: [
+			{
+				type: 'feature',
+				category: 'Mobile Lite',
+				description: 'Ahora Mobile Lite muestra las novedades dentro del panel.',
+				surface: 'mobile-lite',
+			},
+		],
+	})),
+	getMobileLiteChangelog: vi.fn(() => [
+		{
+			version: '3.1.0',
+			date: '2026-06-13',
+			title: 'Mobile Lite con novedades visibles',
+			summary: 'Resumen de cambios para Mobile Lite.',
+			changes: [
+				{
+					type: 'feature',
+					category: 'Mobile Lite',
+					description: 'Ahora Mobile Lite muestra las novedades dentro del panel.',
+					surface: 'mobile-lite',
+				},
+			],
+		},
+	]),
+	hasUnseenMobileLiteChanges: vi.fn(() => Promise.resolve(false)),
+	markCurrentMobileLiteVersionAsSeen: vi.fn(() => Promise.resolve()),
+	watchMobileLiteVersionChanges: vi.fn(() => vi.fn()),
+	createContainer: vi.fn((options: { id?: string; parent: Element }) => {
+		const container = document.createElement('div')
+		if (options.id) container.id = options.id
+		options.parent.appendChild(container)
+		return container
+	}),
+	isFeatureMounted: vi.fn(() => false),
+	mountFeatureWithBoundary: vi.fn(),
+	unmountFeature: vi.fn(),
+}))
+
+vi.mock('@/lib/platform', () => ({
+	getPlatformKind: mocks.getPlatformKind,
+}))
+
+vi.mock('@/lib/feature-flags', () => ({
+	FeatureFlag: {
+		MobileLite: 'mobile-lite',
+	},
+	isFeatureEnabled: mocks.isFeatureEnabled,
+}))
+
+vi.mock('@/lib/content-modules/utils/react-helpers', () => ({
+	createContainer: mocks.createContainer,
+	isFeatureMounted: mocks.isFeatureMounted,
+	mountFeatureWithBoundary: mocks.mountFeatureWithBoundary,
+	unmountFeature: mocks.unmountFeature,
+}))
+
+vi.mock('@/features/user-customizations/storage', () => ({
+	getUserCustomizations: mocks.getUserCustomizations,
+	saveUserCustomizations: mocks.saveUserCustomizations,
+	watchUserCustomizations: mocks.watchUserCustomizations,
+}))
+
+vi.mock('@/features/hidden-threads/logic/storage', () => ({
+	clearHiddenThreads: mocks.clearHiddenThreads,
+	getHiddenThreads: mocks.getHiddenThreads,
+	unhideThread: mocks.unhideThread,
+	watchHiddenThreads: mocks.watchHiddenThreads,
+}))
+
+vi.mock('./ignored-users-sync-event', () => ({
+	dispatchMobileLiteIgnoredUsersSync: mocks.dispatchMobileLiteIgnoredUsersSync,
+}))
+
+vi.mock('./own-username', () => ({
+	getOwnUsername: mocks.getOwnUsername,
+}))
+
+vi.mock('../logic/bold-color', () => ({
+	getMobileLiteBoldColorSettings: mocks.getMobileLiteBoldColorSettings,
+	normalizeMobileLiteBoldColor: mocks.normalizeMobileLiteBoldColor,
+	saveMobileLiteBoldColorSettings: mocks.saveMobileLiteBoldColorSettings,
+}))
+
+vi.mock('../logic/hidden-threads', () => ({
+	applyMobileLiteHiddenThreads: mocks.applyMobileLiteHiddenThreads,
+}))
+
+vi.mock('../logic/imgbb-api-key-storage', () => ({
+	getMobileLiteImgbbApiKey: mocks.getMobileLiteImgbbApiKey,
+	saveMobileLiteImgbbApiKey: mocks.saveMobileLiteImgbbApiKey,
+}))
+
+vi.mock('../logic/gallery', () => ({
+	syncMobileLiteGalleryButton: mocks.syncMobileLiteGalleryButton,
+}))
+
+vi.mock('../logic/live-thread', () => ({
+	syncMobileLiteLiveThreadButton: mocks.syncMobileLiteLiveThreadButton,
+}))
+
+vi.mock('../logic/quote-selection', () => ({
+	syncMobileLiteQuoteSelection: mocks.syncMobileLiteQuoteSelection,
+}))
+
+vi.mock('@/features/related-threads', () => ({
+	applyRelatedThreadsDisplay: mocks.applyRelatedThreadsDisplay,
+}))
+
+vi.mock('./whats-new', () => ({
+	getLatestMobileLiteEntry: mocks.getLatestMobileLiteEntry,
+	getMobileLiteChangelog: mocks.getMobileLiteChangelog,
+	hasUnseenMobileLiteChanges: mocks.hasUnseenMobileLiteChanges,
+	markCurrentMobileLiteVersionAsSeen: mocks.markCurrentMobileLiteVersionAsSeen,
+	watchMobileLiteVersionChanges: mocks.watchMobileLiteVersionChanges,
+}))
+
+vi.mock('@/lib/messaging', () => ({
+	sendMessage: mocks.sendMessage,
+}))
+
+vi.mock('@/store/settings-store', () => ({
+	getSettings: mocks.getSettings,
+	useSettingsStore: {
+		getState: () => ({
+			setSetting: mocks.setSetting,
+			setLiveThreadEnabled: mocks.setLiveThreadEnabled,
+		}),
+	},
+}))
+
+vi.mock('@/components/shadow-wrapper', () => ({
+	ShadowWrapper: ({ children }: { children: ReactNode }) => <>{children}</>,
+}))
+
+function createCustomizationData(users: Record<string, UserCustomization>): UserCustomizationsData {
+	return {
+		users,
+		globalSettings: {
+			adminColor: '',
+			subadminColor: '',
+			modColor: '',
+			userColor: '',
+		},
+	}
+}
+
+function cloneCustomizationData(data: UserCustomizationsData): UserCustomizationsData {
+	return createCustomizationData(
+		Object.fromEntries(Object.entries(data.users).map(([username, customization]) => [username, { ...customization }]))
+	)
+}
+
+async function openPanel() {
+	await act(async () => {
+		window.dispatchEvent(new CustomEvent(MOBILE_LITE_PANEL_OPEN_EVENT))
+	})
+}
+
+function filterButtonName(label: string, count: number): RegExp {
+	return new RegExp(`^${label}\\s*\\(\\s*${count}\\s*\\)$`)
+}
+
+describe('Mobile Lite panel injection', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		mocks.getPlatformKind.mockReturnValue('firefox-android')
+		mocks.isFeatureEnabled.mockReturnValue(true)
+		mocks.isFeatureMounted.mockReturnValue(false)
+		mocks.getUserCustomizations.mockResolvedValue(createCustomizationData({}))
+		mocks.saveUserCustomizations.mockResolvedValue(undefined)
+		mocks.getHiddenThreads.mockResolvedValue([])
+		mocks.unhideThread.mockResolvedValue(undefined)
+		mocks.clearHiddenThreads.mockResolvedValue(undefined)
+		mocks.watchHiddenThreads.mockReturnValue(vi.fn())
+		mocks.getMobileLiteBoldColorSettings.mockResolvedValue({ color: '#ffffff', enabled: false })
+		mocks.saveMobileLiteBoldColorSettings.mockImplementation((settings: { color?: string; enabled?: boolean }) =>
+			Promise.resolve({ color: settings.color ?? '#ffffff', enabled: settings.enabled ?? false })
+		)
+		mocks.getMobileLiteImgbbApiKey.mockResolvedValue('')
+		mocks.saveMobileLiteImgbbApiKey.mockResolvedValue(undefined)
+		mocks.getSettings.mockResolvedValue({ liveThreadEnabled: false, hideThreadEnabled: true, relatedThreadsDisplay: 'hidden' })
+		mocks.setSetting.mockReset()
+		mocks.applyMobileLiteHiddenThreads.mockReset()
+		mocks.syncMobileLiteLiveThreadButton.mockResolvedValue(undefined)
+		mocks.syncMobileLiteGalleryButton.mockResolvedValue(undefined)
+		mocks.syncMobileLiteQuoteSelection.mockResolvedValue(undefined)
+		mocks.sendMessage.mockResolvedValue({ success: false })
+		mocks.getOwnUsername.mockReturnValue(null)
+		mocks.getLatestMobileLiteEntry.mockReturnValue({
+			version: '3.1.0',
+			date: '2026-06-13',
+			title: 'Mobile Lite con novedades visibles',
+			summary: 'Resumen de cambios para Mobile Lite.',
+			changes: [
+				{
+					type: 'feature',
+					category: 'Mobile Lite',
+					description: 'Ahora Mobile Lite muestra las novedades dentro del panel.',
+					surface: 'mobile-lite',
+				},
+			],
+		})
+		mocks.getMobileLiteChangelog.mockReturnValue([
+			{
+				version: '3.1.0',
+				date: '2026-06-13',
+				title: 'Mobile Lite con novedades visibles',
+				summary: 'Resumen de cambios para Mobile Lite.',
+				changes: [
+					{
+						type: 'feature',
+						category: 'Mobile Lite',
+						description: 'Ahora Mobile Lite muestra las novedades dentro del panel.',
+						surface: 'mobile-lite',
+					},
+				],
+			},
+		])
+		mocks.hasUnseenMobileLiteChanges.mockResolvedValue(false)
+		mocks.markCurrentMobileLiteVersionAsSeen.mockResolvedValue(undefined)
+		mocks.watchMobileLiteVersionChanges.mockReturnValue(vi.fn())
+		document.body.innerHTML = `
+			<ul id="usermenu">
+				<li><a href="/notificaciones">Notificaciones</a></li>
+				<li><a href="/configuracion">Configuración</a></li>
+				<li><a href="/logout">Salir</a></li>
+			</ul>
+		`
+	})
+
+	afterEach(() => {
+		teardownMobileLitePanel()
+	})
+
+	it('adds the new thread and Panel MVPremium entries before configuration', async () => {
+		initMobileLitePanel()
+
+		await waitFor(() => {
+			const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('#usermenu > li > a')).map(link =>
+				link.textContent?.trim()
+			)
+
+			expect(links).toEqual(['Notificaciones', 'Nuevo hilo', 'Panel MVPremium', 'Configuración', 'Salir'])
+		})
+		expect(mocks.mountFeatureWithBoundary).toHaveBeenCalledOnce()
+	})
+
+	it('shows a NEW badge on the Panel MVPremium menu entry when Mobile Lite changes are unseen', async () => {
+		mocks.hasUnseenMobileLiteChanges.mockResolvedValue(true)
+
+		initMobileLitePanel()
+
+		await waitFor(() => {
+			expect(document.querySelector('[data-mvp-mobile-lite-whats-new-badge="true"]')).not.toBeNull()
+		})
+		const badge = document.querySelector<HTMLElement>('[data-mvp-mobile-lite-whats-new-badge="true"]')
+		const panelLink = document.querySelector<HTMLAnchorElement>('[data-mvp-mobile-lite-panel-menu-item] > a')
+
+		expect(badge).not.toBeNull()
+		expect(badge?.textContent).toBe('NEW!')
+		expect(badge).toHaveAttribute('aria-hidden', 'true')
+		expect(badge?.style.position).toBe('absolute')
+		expect(badge?.parentElement).toBe(panelLink)
+		expect(panelLink).toHaveAttribute('aria-label', 'Abrir panel MVPremium, hay novedades')
+	})
+
+	it('unmounts the panel root and removes injected menu entries on teardown', async () => {
+		initMobileLitePanel()
+
+		await waitFor(() => {
+			expect(document.getElementById('mvp-mobile-lite-panel-root')).not.toBeNull()
+			expect(document.querySelector('[data-mvp-mobile-lite-panel-menu-item]')).not.toBeNull()
+		})
+
+		teardownMobileLitePanel()
+
+		expect(mocks.unmountFeature).toHaveBeenCalledWith('mobile-lite-panel')
+		expect(document.getElementById('mvp-mobile-lite-panel-root')).toBeNull()
+		expect(document.querySelector('[data-mvp-mobile-lite-panel-menu-item]')).toBeNull()
+		expect(document.querySelector('[data-mvp-mobile-lite-new-thread-menu-item]')).toBeNull()
+	})
+
+	it('cancels delayed menu injection checks on teardown', async () => {
+		vi.useFakeTimers()
+		initMobileLitePanel()
+
+		expect(document.querySelector('[data-mvp-mobile-lite-panel-menu-item]')).not.toBeNull()
+
+		document.querySelector<HTMLElement>('#usermenu')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+		teardownMobileLitePanel()
+		document.querySelectorAll('[data-mvp-mobile-lite-panel-menu-item], [data-mvp-mobile-lite-new-thread-menu-item]').forEach(item => item.remove())
+
+		vi.runOnlyPendingTimers()
+
+		expect(document.querySelector('[data-mvp-mobile-lite-panel-menu-item]')).toBeNull()
+		expect(document.querySelector('[data-mvp-mobile-lite-new-thread-menu-item]')).toBeNull()
+		vi.useRealTimers()
+	})
+
+	it('adds the new thread and Panel MVPremium entries to Mediavida mobile side user menu', async () => {
+		document.body.innerHTML = `
+			<ul id="usermenu" class="m-side">
+				<li><a href="/notificaciones"><i class="fa fa-exclamation-circle"></i><span class="title">Notificaciones</span></a></li>
+				<li><a href="/foro/favoritos"><i class="fa fa-star"></i><span class="title">Favoritos</span></a></li>
+				<li><a href="/mensajes"><i class="fa fa-envelope"></i><span class="title">Mensajes</span></a></li>
+				<li><a href="/id/Test/marcadores"><i class="fa fa-bookmark"></i><span class="title">Marcadores</span></a></li>
+				<li><a href="/id/Test/menciones"><i class="fa fa-at"></i><span class="title">Menciones</span></a></li>
+				<li><a href="/configuracion"><i class="fa fa-cog"></i><span class="title">Configuración</span></a></li>
+				<li><a href="/logout"><i class="fa fa-sign-out"></i><span class="title">Salir</span></a></li>
+			</ul>
+		`
+
+		initMobileLitePanel()
+
+		await waitFor(() => {
+			const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('#usermenu > li > a')).map(link =>
+				link.textContent?.trim()
+			)
+
+			expect(links).toEqual(['Notificaciones', 'Favoritos', 'Mensajes', 'Marcadores', 'Menciones', 'Nuevo hilo', 'Panel MVPremium', 'Configuración', 'Salir'])
+		})
+	})
+
+	it('adds the new thread and Panel MVPremium entries to the visible mobile menu instead of the hidden logout dropdown', async () => {
+		document.body.innerHTML = `
+			<ul id="usermenu">
+				<li><a href="/notificaciones"><span class="title">Notificaciones</span></a></li>
+				<li><a href="/foro/favoritos"><span class="title">Favoritos</span></a></li>
+				<li><a href="/mensajes"><span class="title">Mensajes</span></a></li>
+				<li><a href="/id/Test/marcadores"><span class="title">Marcadores</span></a></li>
+				<li><a href="/id/Test/menciones"><span class="title">Menciones</span></a></li>
+				<li><a href="/configuracion"><span class="title">Configuración</span></a></li>
+				<li class="logout dd">
+					<a href="#" class="off dropdown-toggle">Más</a>
+					<ul class="dropdown-menu pull-right user-menu">
+						<li><a href="/id/Test/marcadores">Marcadores</a></li>
+						<li data-mvp-mobile-lite-panel-menu-item="true"><a href="#mvp-panel">Panel MVPremium</a></li>
+						<li><a href="/configuracion">Configuración</a></li>
+						<li><a href="/logout">Salir</a></li>
+					</ul>
+				</li>
+			</ul>
+		`
+
+		initMobileLitePanel()
+
+		await waitFor(() => {
+			const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('#usermenu > li > a')).map(link =>
+				link.textContent?.trim()
+			)
+
+			expect(links).toEqual(['Notificaciones', 'Favoritos', 'Mensajes', 'Marcadores', 'Menciones', 'Nuevo hilo', 'Panel MVPremium', 'Configuración', 'Más'])
+		})
+		expect(document.querySelector('#usermenu .dropdown-menu [data-mvp-mobile-lite-panel-menu-item]')).toBeNull()
+	})
+
+	it('toggles the new thread subforum list and keeps it open after menu reinjection checks', async () => {
+		initMobileLitePanel()
+
+		const newThreadLink = await waitFor(() => document.querySelector<HTMLAnchorElement>('[data-mvp-mobile-lite-new-thread-menu-item] > a'))
+		expect(newThreadLink?.textContent?.trim()).toBe('Nuevo hilo')
+
+		const subforumList = document.querySelector<HTMLUListElement>('[data-mvp-mobile-lite-new-thread-menu-item] > ul')
+		const menu = document.querySelector<HTMLElement>('#usermenu')
+		expect(subforumList?.style.display).toBe('none')
+		expect(subforumList?.getAttribute('aria-hidden')).toBe('true')
+
+		newThreadLink?.click()
+
+		expect(newThreadLink?.getAttribute('aria-expanded')).toBe('true')
+		expect(subforumList?.getAttribute('aria-hidden')).toBe('false')
+		expect(subforumList?.style.display).toBe('grid')
+		expect(subforumList?.style.gridTemplateColumns).toContain('repeat(2')
+		expect(subforumList?.style.position).toBe('fixed')
+		expect(subforumList?.style.left).toBe('0px')
+		expect(menu?.style.width).toBe('72px')
+		expect(menu?.style.minWidth).toBe('72px')
+		expect(menu?.style.maxWidth).toBe('72px')
+		expect(newThreadLink?.style.fontSize).toBe('0px')
+		expect(newThreadLink?.querySelector<HTMLElement>('i')?.style.fontSize).toBe('18px')
+		expect(newThreadLink?.querySelector<HTMLElement>('.title')?.style.display).toBe('none')
+
+		const subforumLinks = Array.from(subforumList?.querySelectorAll<HTMLAnchorElement>('a') ?? [])
+		expect(subforumLinks[0]?.textContent?.trim()).toBe('Off-topic')
+		expect(subforumLinks[0]?.getAttribute('href')).toBe('/foro/off-topic/nuevo-hilo')
+		expect(subforumLinks.some(link => link.textContent?.trim() === 'Juegos')).toBe(true)
+		const gameDevItem = subforumLinks.find(link => link.textContent?.trim() === 'Desarrollo de juegos')?.parentElement
+		expect(gameDevItem?.style.gridColumn).toBe('1 / -1')
+		const mediavidaItem = subforumLinks.find(link => link.textContent?.trim() === 'Mediavida')?.parentElement
+		expect(mediavidaItem?.style.gridColumn).toBe('1 / -1')
+		expect(subforumList?.querySelectorAll('[role="separator"]')).toHaveLength(3)
+
+		await new Promise(resolve => window.setTimeout(resolve, 180))
+
+		const stableNewThreadLink = document.querySelector<HTMLAnchorElement>('[data-mvp-mobile-lite-new-thread-menu-item] > a')
+		const stableSubforumList = document.querySelector<HTMLUListElement>('[data-mvp-mobile-lite-new-thread-menu-item] > ul')
+		expect(stableNewThreadLink).toBe(newThreadLink)
+		expect(stableNewThreadLink?.getAttribute('aria-expanded')).toBe('true')
+		expect(stableSubforumList?.style.display).toBe('grid')
+
+		stableNewThreadLink?.click()
+
+		expect(stableNewThreadLink?.getAttribute('aria-expanded')).toBe('false')
+		expect(stableSubforumList?.style.display).toBe('none')
+		expect(menu?.style.width).toBe('')
+		expect(stableNewThreadLink?.style.fontSize).toBe('')
+		expect(stableNewThreadLink?.querySelector<HTMLElement>('i')?.style.fontSize).toBe('')
+		expect(stableNewThreadLink?.querySelector<HTMLElement>('.title')?.style.display).toBe('')
+	})
+
+	it('hides text-only menu labels while the new thread list compacts the side menu', async () => {
+		document.body.innerHTML = `
+			<ul id="usermenu">
+				<li><a href="/notificaciones"><i class="fa fa-exclamation-circle"></i><span class="title">Notificaciones</span></a></li>
+				<li class="logout dd"><a href="#" class="off dropdown-toggle">Más</a></li>
+				<li><a href="/configuracion"><i class="fa fa-cog"></i><span class="title">Configuración</span></a></li>
+			</ul>
+		`
+
+		initMobileLitePanel()
+		const newThreadLink = await waitFor(() => document.querySelector<HTMLAnchorElement>('[data-mvp-mobile-lite-new-thread-menu-item] > a'))
+		const textOnlyLink = document.querySelector<HTMLAnchorElement>('#usermenu .logout > a')
+
+		newThreadLink?.click()
+
+		expect(textOnlyLink?.style.fontSize).toBe('0px')
+
+		newThreadLink?.click()
+
+		expect(textOnlyLink?.style.fontSize).toBe('')
+	})
+
+	it('opens the panel from the injected menu entry', async () => {
+		const openSpy = vi.fn()
+		window.addEventListener(MOBILE_LITE_PANEL_OPEN_EVENT, openSpy)
+
+		initMobileLitePanel()
+		const panelLink = await waitFor(() => document.querySelector<HTMLAnchorElement>('[data-mvp-mobile-lite-panel-menu-item] a'))
+		panelLink?.click()
+
+		expect(openSpy).toHaveBeenCalledOnce()
+
+		window.removeEventListener(MOBILE_LITE_PANEL_OPEN_EVENT, openSpy)
+	})
+
+	it('shows unseen Mobile Lite changes in the panel and lets users dismiss them', async () => {
+		mocks.hasUnseenMobileLiteChanges.mockResolvedValue(true)
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		expect(await screen.findByText('Nuevo en v3.1.0')).toBeInTheDocument()
+		expect(screen.getByText('Ahora Mobile Lite muestra las novedades dentro del panel.')).toBeInTheDocument()
+
+		await user.click(screen.getByRole('button', { name: 'Entendido' }))
+
+		await waitFor(() => {
+			expect(mocks.markCurrentMobileLiteVersionAsSeen).toHaveBeenCalledOnce()
+		})
+		expect(screen.queryByText('Nuevo en v3.1.0')).not.toBeInTheDocument()
+	})
+
+	it('opens the Mobile Lite changelog view from the unseen changes prompt', async () => {
+		mocks.hasUnseenMobileLiteChanges.mockResolvedValue(true)
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(await screen.findByRole('button', { name: 'Ver novedades' }))
+
+		expect(await screen.findByText('Novedades Mobile Lite')).toBeInTheDocument()
+		expect(screen.getByText('Mobile Lite con novedades visibles')).toBeInTheDocument()
+		expect(screen.getByText('Ahora Mobile Lite muestra las novedades dentro del panel.')).toBeInTheDocument()
+		expect(mocks.markCurrentMobileLiteVersionAsSeen).toHaveBeenCalledOnce()
+	})
+
+	it('closes the new thread panel and restores menu width before opening Panel MVPremium', async () => {
+		const openSpy = vi.fn()
+		window.addEventListener(MOBILE_LITE_PANEL_OPEN_EVENT, openSpy)
+
+		initMobileLitePanel()
+		const newThreadLink = await waitFor(() => document.querySelector<HTMLAnchorElement>('[data-mvp-mobile-lite-new-thread-menu-item] > a'))
+		const panelLink = await waitFor(() => document.querySelector<HTMLAnchorElement>('[data-mvp-mobile-lite-panel-menu-item] a'))
+		const subforumList = document.querySelector<HTMLUListElement>('[data-mvp-mobile-lite-new-thread-menu-item] > ul')
+		const menu = document.querySelector<HTMLElement>('#usermenu')
+
+		newThreadLink?.click()
+		expect(subforumList?.style.display).toBe('grid')
+		expect(menu?.style.width).toBe('72px')
+
+		panelLink?.click()
+
+		expect(openSpy).toHaveBeenCalledOnce()
+		expect(subforumList?.style.display).toBe('none')
+		expect(subforumList?.getAttribute('aria-hidden')).toBe('true')
+		expect(menu?.style.width).toBe('')
+
+		window.removeEventListener(MOBILE_LITE_PANEL_OPEN_EVENT, openSpy)
+	})
+
+	it('does not inject outside Firefox Android Mobile Lite', () => {
+		mocks.getPlatformKind.mockReturnValue('firefox-desktop')
+
+		initMobileLitePanel()
+
+		expect(document.querySelector('[data-mvp-mobile-lite-panel-menu-item]')).toBeNull()
+		expect(mocks.mountFeatureWithBoundary).not.toHaveBeenCalled()
+	})
+
+	it('shows a visible error when saving a filter fails', async () => {
+		mocks.saveUserCustomizations.mockRejectedValueOnce(new Error('storage failed'))
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'BrokenUser')
+		await user.click(screen.getByRole('button', { name: 'Ocultar' }))
+
+		await waitFor(() => {
+			expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar el filtro. Inténtalo de nuevo.')
+		})
+	})
+
+	it('clears the search after adding an exact username filter', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'NewHiddenUser')
+		await user.click(screen.getByRole('button', { name: 'Ocultar' }))
+
+		await waitFor(() => {
+			expect(searchInput).toHaveValue('')
+		})
+		expect(screen.getByRole('status')).toHaveTextContent('NewHiddenUser ocultado.')
+	})
+
+	it('stores the visible page avatar when adding a user from the search', async () => {
+		const user = userEvent.setup()
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			`
+				<a class="user-card" href="/id/AvatarUser">
+					<img class="avatar" alt="AvatarUser" src="https://www.mediavida.com/img/users/avatar/avatar-user.png">
+				</a>
+			`
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'AvatarUser')
+		await user.click(screen.getByRole('button', { name: 'Silenciar' }))
+
+		await waitFor(() => {
+			expect(mocks.saveUserCustomizations).toHaveBeenCalled()
+		})
+		const savedData = mocks.saveUserCustomizations.mock.calls[mocks.saveUserCustomizations.mock.calls.length - 1][0]
+		expect(savedData.users.AvatarUser).toMatchObject({
+			isIgnored: true,
+			ignoreType: 'mute',
+			avatarUrl: 'https://www.mediavida.com/img/users/avatar/avatar-user.png',
+		})
+		expect(mocks.sendMessage).not.toHaveBeenCalledWith('resolveMvUserAvatar', expect.anything())
+	})
+
+	it('blocks adding yourself from the panel search', async () => {
+		const user = userEvent.setup()
+		mocks.getOwnUsername.mockReturnValue('selfuser')
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'SelfUser')
+
+		expect(screen.getByText('No puedes silenciarte a ti mismo.')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Silenciar' })).not.toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Ocultar' })).not.toBeInTheDocument()
+		expect(mocks.saveUserCustomizations).not.toHaveBeenCalled()
+	})
+
+	it('suggests matching users while typing and adds them with their suggested avatar', async () => {
+		const user = userEvent.setup()
+		mocks.getOwnUsername.mockReturnValue('remoteself')
+		mocks.getUserCustomizations.mockImplementation(() =>
+			Promise.resolve(
+				createCustomizationData({
+					RemoteOld: { isIgnored: true, ignoreType: 'mute', avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-old.png' },
+				})
+			)
+		)
+		mocks.sendMessage.mockImplementation(name =>
+			name === 'searchMvUsers'
+				? Promise.resolve({
+						success: true,
+						users: [
+							{ username: 'RemoteUser', avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-user.png' },
+							{ username: 'RemoteUser2', avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-user-2.png' },
+							{ username: 'RemoteSelf', avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-self.png' },
+							{ username: 'RemoteOld', avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-old.png' },
+						],
+					})
+				: Promise.resolve({ success: false })
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'Remote')
+
+		// Debounced fetch: suggestion rows appear with per-user accessible names.
+		const hideSuggestionButton = await screen.findByRole('button', { name: 'Ocultar RemoteUser2' })
+		expect(screen.getByRole('button', { name: 'Silenciar RemoteUser' })).toBeInTheDocument()
+		// Yourself and already-filtered users never show up as suggestions.
+		expect(screen.queryByRole('button', { name: 'Ocultar RemoteSelf' })).not.toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Ocultar RemoteOld' })).not.toBeInTheDocument()
+
+		await user.click(hideSuggestionButton)
+
+		await waitFor(() => {
+			expect(mocks.saveUserCustomizations).toHaveBeenCalled()
+		})
+		const savedData = mocks.saveUserCustomizations.mock.calls[mocks.saveUserCustomizations.mock.calls.length - 1][0]
+		expect(savedData.users.RemoteUser2).toMatchObject({
+			isIgnored: true,
+			ignoreType: 'hide',
+			avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-user-2.png',
+		})
+		// The suggestion already carries the avatar, so no extra resolve request.
+		expect(mocks.sendMessage).not.toHaveBeenCalledWith('resolveMvUserAvatar', expect.anything())
+		await waitFor(() => {
+			expect(searchInput).toHaveValue('')
+		})
+		expect(screen.getByRole('status')).toHaveTextContent('RemoteUser2 ocultado.')
+	})
+
+	it('stores a resolved avatar when adding a user that is not visible on the page', async () => {
+		const user = userEvent.setup()
+		mocks.sendMessage.mockResolvedValueOnce({
+			success: true,
+			username: 'RemoteUser',
+			avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-user.png',
+		})
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'RemoteUser')
+		await user.click(screen.getByRole('button', { name: 'Ocultar' }))
+
+		await waitFor(() => {
+			expect(mocks.saveUserCustomizations).toHaveBeenCalled()
+		})
+		expect(mocks.sendMessage).toHaveBeenCalledWith('resolveMvUserAvatar', { username: 'RemoteUser' })
+		const savedData = mocks.saveUserCustomizations.mock.calls[mocks.saveUserCustomizations.mock.calls.length - 1][0]
+		expect(savedData.users.RemoteUser).toMatchObject({
+			isIgnored: true,
+			ignoreType: 'hide',
+			avatarUrl: 'https://www.mediavida.com/img/users/avatar/remote-user.png',
+		})
+	})
+
+	it('does not resolve the avatar again when toggling between mute and hide', async () => {
+		const user = userEvent.setup()
+		const initialData = createCustomizationData({
+			ToggleUser: {
+				isIgnored: true,
+				ignoreType: 'mute',
+				avatarUrl: 'https://www.mediavida.com/img/users/avatar/toggle-user.png',
+			},
+		})
+		mocks.getUserCustomizations.mockImplementation(() => Promise.resolve(cloneCustomizationData(initialData)))
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await user.click(await screen.findByRole('button', { name: 'Ocultar' }))
+
+		await waitFor(() => {
+			expect(mocks.saveUserCustomizations).toHaveBeenCalled()
+		})
+		expect(mocks.sendMessage).not.toHaveBeenCalled()
+		const savedData = mocks.saveUserCustomizations.mock.calls[mocks.saveUserCustomizations.mock.calls.length - 1][0]
+		expect(savedData.users.ToggleUser).toMatchObject({
+			isIgnored: true,
+			ignoreType: 'hide',
+			avatarUrl: 'https://www.mediavida.com/img/users/avatar/toggle-user.png',
+		})
+	})
+
+	it('updates the row state optimistically while the toggle is saving', async () => {
+		const user = userEvent.setup()
+		const initialData = createCustomizationData({
+			ToggleUser: {
+				isIgnored: true,
+				ignoreType: 'mute',
+				avatarUrl: 'https://www.mediavida.com/img/users/avatar/toggle-user.png',
+			},
+		})
+		mocks.getUserCustomizations.mockImplementation(() => Promise.resolve(cloneCustomizationData(initialData)))
+		let resolveSave: () => void = () => {}
+		mocks.saveUserCustomizations.mockImplementationOnce(
+			() =>
+				new Promise<void>(resolve => {
+					resolveSave = resolve
+				})
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await user.click(await screen.findByRole('button', { name: 'Ocultar' }))
+
+		const hideButton = screen.getByRole('button', { name: 'Ocultado' })
+		expect(hideButton).toHaveAttribute('aria-pressed', 'true')
+		expect(hideButton).toBeDisabled()
+
+		await act(async () => {
+			resolveSave()
+		})
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Ocultado' })).toBeEnabled()
+		})
+	})
+
+	it('rolls back the toggle when saving fails', async () => {
+		const user = userEvent.setup()
+		const initialData = createCustomizationData({
+			ToggleUser: {
+				isIgnored: true,
+				ignoreType: 'mute',
+				avatarUrl: 'https://www.mediavida.com/img/users/avatar/toggle-user.png',
+			},
+		})
+		mocks.getUserCustomizations.mockImplementation(() => Promise.resolve(cloneCustomizationData(initialData)))
+		mocks.saveUserCustomizations.mockRejectedValueOnce(new Error('storage failed'))
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await user.click(await screen.findByRole('button', { name: 'Ocultar' }))
+
+		await waitFor(() => {
+			expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar el filtro. Inténtalo de nuevo.')
+		})
+		expect(screen.getByRole('button', { name: 'Silenciado' })).toHaveAttribute('aria-pressed', 'true')
+		expect(screen.queryByRole('button', { name: 'Ocultado' })).not.toBeInTheDocument()
+	})
+
+	it('hydrates missing avatars for already filtered users when the panel opens', async () => {
+		const importedData = createCustomizationData({
+			ImportedUser: { isIgnored: true, ignoreType: 'hide' },
+		})
+		mocks.getUserCustomizations.mockResolvedValue(importedData)
+		mocks.sendMessage.mockResolvedValueOnce({
+			success: true,
+			username: 'ImportedUser',
+			avatarUrl: 'https://www.mediavida.com/img/users/avatar/imported-user.png',
+		})
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await waitFor(() => {
+			expect(mocks.saveUserCustomizations).toHaveBeenCalledWith(
+				createCustomizationData({
+					ImportedUser: {
+						isIgnored: true,
+						ignoreType: 'hide',
+						avatarUrl: 'https://www.mediavida.com/img/users/avatar/imported-user.png',
+					},
+				})
+			)
+		})
+	})
+
+	it('lets users manually refresh missing avatars after an automatic hydration miss', async () => {
+		const user = userEvent.setup()
+		const importedData = createCustomizationData({
+			LegacyUser: { isIgnored: true, ignoreType: 'hide' },
+		})
+		mocks.getUserCustomizations.mockResolvedValue(importedData)
+		mocks.sendMessage
+			.mockResolvedValueOnce({ success: false })
+			.mockResolvedValueOnce({
+				success: true,
+				username: 'LegacyUser',
+				avatarUrl: 'https://www.mediavida.com/img/users/avatar/legacy-user.png',
+			})
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await waitFor(() => {
+			expect(mocks.sendMessage).toHaveBeenCalledWith('resolveMvUserAvatar', { username: 'LegacyUser' })
+		})
+		await user.click(await screen.findByRole('button', { name: /Actualizar avatares \(1\)/ }))
+
+		await waitFor(() => {
+			expect(mocks.saveUserCustomizations).toHaveBeenCalledWith(
+				createCustomizationData({
+					LegacyUser: {
+						isIgnored: true,
+						ignoreType: 'hide',
+						avatarUrl: 'https://www.mediavida.com/img/users/avatar/legacy-user.png',
+					},
+				})
+			)
+		})
+	})
+
+	it('retries avatar hydration after a failed resolve when the panel opens again', async () => {
+		const user = userEvent.setup()
+		const importedData = createCustomizationData({
+			RetryUser: { isIgnored: true, ignoreType: 'hide' },
+		})
+		mocks.getUserCustomizations.mockResolvedValue(importedData)
+		mocks.sendMessage
+			.mockResolvedValueOnce({ success: false })
+			.mockResolvedValueOnce({
+				success: true,
+				username: 'RetryUser',
+				avatarUrl: 'https://www.mediavida.com/img/users/avatar/retry-user.png',
+			})
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await waitFor(() => {
+			expect(mocks.sendMessage).toHaveBeenCalledWith('resolveMvUserAvatar', { username: 'RetryUser' })
+		})
+		expect(mocks.saveUserCustomizations).not.toHaveBeenCalledWith(
+			createCustomizationData({
+				RetryUser: {
+					isIgnored: true,
+					ignoreType: 'hide',
+					avatarUrl: 'https://www.mediavida.com/img/users/avatar/retry-user.png',
+				},
+			})
+		)
+
+		await user.click(screen.getByRole('button', { name: 'Cerrar' }))
+		await openPanel()
+
+		await waitFor(() => {
+			expect(mocks.saveUserCustomizations).toHaveBeenCalledWith(
+				createCustomizationData({
+					RetryUser: {
+						isIgnored: true,
+						ignoreType: 'hide',
+						avatarUrl: 'https://www.mediavida.com/img/users/avatar/retry-user.png',
+					},
+				})
+			)
+		})
+	})
+
+	it('validates username length and allowed characters before adding a filter', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'ab')
+
+		expect(screen.getByText('Escribe al menos 3 caracteres para añadir un usuario.')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Silenciar' })).not.toBeInTheDocument()
+
+		await user.clear(searchInput)
+		await user.type(searchInput, 'bad user')
+
+		expect(screen.getByText('Usa solo letras, números, guiones y guiones bajos.')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Ocultar' })).not.toBeInTheDocument()
+
+		await user.clear(searchInput)
+		await user.type(searchInput, 'LongUserName123')
+
+		expect(searchInput).toHaveValue('LongUserName123')
+		expect(screen.getByText('El nick no puede tener más de 13 caracteres.')).toBeInTheDocument()
+		expect(screen.queryByRole('button', { name: 'Silenciar' })).not.toBeInTheDocument()
+	})
+
+	it('matches existing usernames case-insensitively while preserving stored casing', async () => {
+		const user = userEvent.setup()
+		mocks.getUserCustomizations.mockResolvedValue(
+			createCustomizationData({
+				FraG: { usernameColour: '#f0a020' },
+			})
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		const searchInput = await screen.findByPlaceholderText('Buscar o añadir nick (3-13)')
+		await user.type(searchInput, 'frag')
+
+		expect(screen.getByText('FraG')).toBeInTheDocument()
+		await user.click(screen.getByRole('button', { name: 'Ocultar' }))
+
+		await waitFor(() => {
+			expect(searchInput).toHaveValue('')
+		})
+		expect(screen.getByRole('status')).toHaveTextContent('FraG ocultado.')
+	})
+
+	it('labels active filtered-user buttons as applied states', async () => {
+		mocks.getUserCustomizations.mockResolvedValue(
+			createCustomizationData({
+				MutedUser: { isIgnored: true, ignoreType: 'mute' },
+				HiddenUser: { isIgnored: true, ignoreType: 'hide' },
+			})
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		expect(await screen.findByRole('button', { name: 'Silenciado' })).toBeInTheDocument()
+		expect(await screen.findByRole('button', { name: 'Ocultado' })).toBeInTheDocument()
+	})
+
+	it('shows user filter counters for all, muted and hidden users', async () => {
+		mocks.getUserCustomizations.mockResolvedValue(
+			createCustomizationData({
+				MutedUser: { isIgnored: true, ignoreType: 'mute' },
+				HiddenUser: { isIgnored: true, ignoreType: 'hide' },
+				LegacyHiddenUser: { isIgnored: true },
+				VisibleUser: { isIgnored: false },
+			})
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		expect(await screen.findByRole('button', { name: filterButtonName('Todos', 3) })).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: filterButtonName('Silenciados', 1) })).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: filterButtonName('Ocultos', 2) })).toBeInTheDocument()
+	})
+
+	it('filters the list to muted users', async () => {
+		const user = userEvent.setup()
+		mocks.getUserCustomizations.mockResolvedValue(
+			createCustomizationData({
+				MutedUser: { isIgnored: true, ignoreType: 'mute' },
+				HiddenUser: { isIgnored: true, ignoreType: 'hide' },
+				LegacyHiddenUser: { isIgnored: true },
+			})
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await user.click(await screen.findByRole('button', { name: filterButtonName('Silenciados', 1) }))
+
+		expect(screen.getByText('MutedUser')).toBeInTheDocument()
+		expect(screen.queryByText('HiddenUser')).not.toBeInTheDocument()
+		expect(screen.queryByText('LegacyHiddenUser')).not.toBeInTheDocument()
+	})
+
+	it('filters the list to hidden users including legacy entries without ignoreType', async () => {
+		const user = userEvent.setup()
+		mocks.getUserCustomizations.mockResolvedValue(
+			createCustomizationData({
+				MutedUser: { isIgnored: true, ignoreType: 'mute' },
+				HiddenUser: { isIgnored: true, ignoreType: 'hide' },
+				LegacyHiddenUser: { isIgnored: true },
+			})
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await user.click(await screen.findByRole('button', { name: filterButtonName('Ocultos', 2) }))
+
+		expect(screen.queryByText('MutedUser')).not.toBeInTheDocument()
+		expect(screen.getByText('HiddenUser')).toBeInTheDocument()
+		expect(screen.getByText('LegacyHiddenUser')).toBeInTheDocument()
+	})
+
+	it('applies text search inside the active user filter', async () => {
+		const user = userEvent.setup()
+		mocks.getUserCustomizations.mockResolvedValue(
+			createCustomizationData({
+				MutedUser: { isIgnored: true, ignoreType: 'mute' },
+				HiddenUser: { isIgnored: true, ignoreType: 'hide' },
+				LegacyHiddenUser: { isIgnored: true },
+			})
+		)
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await user.click(await screen.findByRole('button', { name: filterButtonName('Ocultos', 2) }))
+		await user.type(screen.getByPlaceholderText('Buscar o añadir nick (3-13)'), 'legacy')
+
+		expect(screen.getByText('LegacyHiddenUser')).toBeInTheDocument()
+		expect(screen.queryByText('HiddenUser')).not.toBeInTheDocument()
+		expect(screen.queryByText('MutedUser')).not.toBeInTheDocument()
+		expect(screen.getByRole('button', { name: filterButtonName('Todos', 3) })).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: filterButtonName('Ocultos', 2) })).toBeInTheDocument()
+	})
+
+	it('updates counters and visible results when changing a muted user to hidden', async () => {
+		const user = userEvent.setup()
+		let storedData = createCustomizationData({
+			MutedUser: { isIgnored: true, ignoreType: 'mute' },
+		})
+		mocks.getUserCustomizations.mockImplementation(() => Promise.resolve(cloneCustomizationData(storedData)))
+		mocks.saveUserCustomizations.mockImplementation((nextData: UserCustomizationsData) => {
+			storedData = nextData
+			return Promise.resolve()
+		})
+
+		render(<MobileLitePanel />)
+		await openPanel()
+
+		await user.click(await screen.findByRole('button', { name: filterButtonName('Silenciados', 1) }))
+		await user.click(screen.getByRole('button', { name: 'Ocultar' }))
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: filterButtonName('Silenciados', 0) })).toBeInTheDocument()
+		})
+		expect(screen.getByRole('button', { name: filterButtonName('Ocultos', 1) })).toBeInTheDocument()
+		expect(screen.queryByText('MutedUser')).not.toBeInTheDocument()
+		expect(screen.getByText('No hay resultados para este filtro.')).toBeInTheDocument()
+	})
+
+	it('lists hidden threads and lets users restore them from the panel', async () => {
+		const user = userEvent.setup()
+		const hiddenThread: HiddenThread = {
+			id: '/foro/cine/supergirl-2026-dc-studios-729454',
+			title: 'Supergirl (2026) | DC Studios',
+			subforum: 'Cine',
+			subforumId: '/foro/cine',
+			hiddenAt: new Date('2026-06-09T12:00:00Z').getTime(),
+		}
+		mocks.getHiddenThreads.mockResolvedValueOnce([hiddenThread]).mockResolvedValueOnce([])
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Hilos' }))
+
+		expect(await screen.findByText('Supergirl (2026) | DC Studios')).toBeInTheDocument()
+		expect(screen.getByText('Cine')).toBeInTheDocument()
+		expect(screen.getByText('09/06/26')).toBeInTheDocument()
+
+		await user.click(screen.getByRole('button', { name: 'Mostrar' }))
+
+		await waitFor(() => {
+			expect(mocks.unhideThread).toHaveBeenCalledWith('/foro/cine/supergirl-2026-dc-studios-729454')
+		})
+		expect(await screen.findByText('No hay hilos ocultos.')).toBeInTheDocument()
+		expect(screen.queryByRole('status')).not.toBeInTheDocument()
+	})
+
+	it('filters hidden threads by title or subforum in the panel', async () => {
+		const user = userEvent.setup()
+		mocks.getHiddenThreads.mockResolvedValue([
+			{
+				id: '/foro/cine/supergirl-2026-dc-studios-729454',
+				title: 'Supergirl (2026) | DC Studios',
+				subforum: 'Cine',
+				subforumId: '/foro/cine',
+				hiddenAt: 1,
+			},
+			{
+				id: '/foro/juegos/doom-the-dark-ages-123456',
+				title: 'DOOM: The Dark Ages',
+				subforum: 'Juegos',
+				subforumId: '/foro/juegos',
+				hiddenAt: 1,
+			},
+		])
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Hilos' }))
+		await user.type(await screen.findByPlaceholderText('Buscar hilo o subforo'), 'juegos')
+
+		expect(screen.getByText('DOOM: The Dark Ages')).toBeInTheDocument()
+		expect(screen.queryByText('Supergirl (2026) | DC Studios')).not.toBeInTheDocument()
+	})
+
+	it('restores all hidden threads from the panel', async () => {
+		const user = userEvent.setup()
+		mocks.getHiddenThreads.mockResolvedValue([
+			{
+				id: '/foro/cine/supergirl-2026-dc-studios-729454',
+				title: 'Supergirl (2026) | DC Studios',
+				subforum: 'Cine',
+				subforumId: '/foro/cine',
+				hiddenAt: 1,
+			},
+		])
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Hilos' }))
+		await user.click(await screen.findByRole('button', { name: 'Mostrar todos' }))
+
+		expect(screen.getByText('Se mostrarán todos los hilos ocultos.')).toBeInTheDocument()
+		expect(mocks.clearHiddenThreads).not.toHaveBeenCalled()
+		await user.click(screen.getByRole('button', { name: 'Continuar' }))
+
+		await waitFor(() => {
+			expect(mocks.clearHiddenThreads).toHaveBeenCalledOnce()
+		})
+		expect(await screen.findByText('No hay hilos ocultos.')).toBeInTheDocument()
+	})
+
+	it('saves the Mobile Lite bold color from settings', async () => {
+		const user = userEvent.setup()
+		mocks.getMobileLiteBoldColorSettings.mockResolvedValue({ color: '#ff8800', enabled: true })
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+
+		expect(await screen.findByText('Color de negrita')).toBeInTheDocument()
+		await user.click(screen.getByRole('button', { name: 'Editar color de negrita' }))
+		const colorTextInput = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="text"]')).find(
+			input => input.value === '#ff8800'
+		)
+		expect(colorTextInput).toBeTruthy()
+
+		await user.clear(colorTextInput!)
+		await user.type(colorTextInput!, '#00ff88')
+		await user.click(screen.getByRole('button', { name: 'Guardar color de negrita' }))
+
+		await waitFor(() => {
+			expect(mocks.saveMobileLiteBoldColorSettings).toHaveBeenCalledWith({
+				color: '#00ff88',
+				enabled: true,
+			})
+		})
+		expect(await screen.findByText('Color de negrita guardado.')).toBeInTheDocument()
+	})
+
+	it('keeps a Mobile Lite changelog entry available from settings', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+
+		expect(await screen.findByRole('button', { name: /Novedades/ })).toBeInTheDocument()
+		expect(screen.getByText('v3.1.0 - 1 cambios')).toBeInTheDocument()
+
+		await user.click(screen.getByRole('button', { name: /Novedades/ }))
+
+		expect(await screen.findByText('Novedades Mobile Lite')).toBeInTheDocument()
+		expect(screen.getByText('Ahora Mobile Lite muestra las novedades dentro del panel.')).toBeInTheDocument()
+		expect(mocks.markCurrentMobileLiteVersionAsSeen).toHaveBeenCalledOnce()
+	})
+
+	it('toggles the Mobile Lite bold color setting', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+		await user.click(await screen.findByRole('switch', { name: 'Color personalizado' }))
+
+		await waitFor(() => {
+			expect(mocks.saveMobileLiteBoldColorSettings).toHaveBeenCalledWith({
+				enabled: true,
+			})
+		})
+		expect(await screen.findByText('Color personalizado activado.')).toBeInTheDocument()
+	})
+
+	it('toggles the Mobile Lite live thread button from settings', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+		await user.click(await screen.findByRole('switch', { name: 'Modo Live' }))
+
+		await waitFor(() => {
+			expect(mocks.setLiveThreadEnabled).toHaveBeenCalledWith(true)
+		})
+		expect(mocks.syncMobileLiteLiveThreadButton).toHaveBeenCalledWith(true)
+		expect(await screen.findByText('Modo Live activado.')).toBeInTheDocument()
+	})
+
+	it('changes related threads display from Panel MVPremium settings', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+		await user.click(await screen.findByRole('radio', { name: 'Desplegable' }))
+
+		expect(mocks.setSetting).toHaveBeenCalledWith('relatedThreadsDisplay', 'collapsible')
+		expect(mocks.applyRelatedThreadsDisplay).toHaveBeenCalledWith('collapsible')
+		expect(await screen.findByText('Hilos relacionados en desplegable.')).toBeInTheDocument()
+	})
+
+	it('toggles the Mobile Lite gallery button from settings', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+		await user.click(await screen.findByRole('switch', { name: 'Botón galería' }))
+
+		await waitFor(() => {
+			expect(mocks.setSetting).toHaveBeenCalledWith('galleryButtonEnabled', false)
+		})
+		expect(mocks.syncMobileLiteGalleryButton).toHaveBeenCalledWith(false)
+		expect(await screen.findByText('Botón de galería desactivado.')).toBeInTheDocument()
+	})
+
+	it('toggles the Mobile Lite quote selection fix from settings', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+		await user.click(await screen.findByRole('switch', { name: 'Citar selección' }))
+
+		await waitFor(() => {
+			expect(mocks.setSetting).toHaveBeenCalledWith('quoteSelectionEnabled', false)
+		})
+		expect(mocks.syncMobileLiteQuoteSelection).toHaveBeenCalledWith(false)
+		expect(await screen.findByText('Citar selección desactivado.')).toBeInTheDocument()
+	})
+
+	it('toggles the Mobile Lite hide-thread button from settings', async () => {
+		const user = userEvent.setup()
+
+		render(<MobileLitePanel />)
+		await openPanel()
+		await user.click(screen.getByRole('tab', { name: 'Ajustes' }))
+		await user.click(await screen.findByRole('switch', { name: 'Botón ocultar hilos' }))
+
+		await waitFor(() => {
+			expect(mocks.setSetting).toHaveBeenCalledWith('hideThreadEnabled', false)
+		})
+		expect(mocks.applyMobileLiteHiddenThreads).toHaveBeenCalledOnce()
+		expect(await screen.findByText('Botón de ocultar hilos desactivado.')).toBeInTheDocument()
+	})
+})

@@ -4,15 +4,23 @@
  */
 
 import { browser } from 'wxt/browser'
+import { storage } from '#imports'
 import { logger } from '@/lib/logger'
 import { fetchSteamBundleDetails, fetchSteamGameDetails, searchSteamApps } from '@/services/api/steam'
+import { fetchGogGameDetails } from '@/services/api/gog'
+import { searchGooglePlayApp, searchItunesApp } from '@/services/api/mobile-stores'
 import {
 	onMessage,
+	type MvUserAvatarResult,
+	type MvUserSearchResult,
+	type MvUserSearchUser,
 	type ThreadPageHtmlFetchResult,
 	type TweetLiteData,
 	type TweetLiteResult,
+	type FragranticaFragranceResult,
 } from '@/lib/messaging'
-import { API_URLS } from '@/constants'
+import { fetchFragranticaFragrance } from '@/services/api/fragrantica'
+import { API_URLS, MV_BASE_URL, MV_URLS } from '@/constants'
 import type { GiphyPaginatedResponse } from '@/services/api/giphy'
 import { normalizeTweetUrl as normalizeTweetUrlBase } from '@/lib/content-modules/twitter-lite/utils'
 import { uploadBase64ImageToBestProvider } from './upload-handlers'
@@ -33,6 +41,8 @@ const ANILIST_IMAGE_HOST = 's4.anilist.co'
 const MAX_REHOST_IMAGE_BYTES = 8 * 1024 * 1024
 const TWITTER_FETCH_TIMEOUT_MS = 3500
 const MEDIAVIDA_THREAD_HOSTS = new Set(['www.mediavida.com', 'mediavida.com'])
+const MV_USERNAME_PATTERN = /^[A-Za-z0-9_-]{3,13}$/
+const MV_USER_SEARCH_MAX_RESULTS = 6
 
 interface GiphyApiResponse {
 	data: Array<{
@@ -308,6 +318,183 @@ function isAllowedMediavidaThreadUrl(rawUrl: string): boolean {
 	}
 }
 
+function normalizeMediavidaAvatarUrl(rawAvatar: string): string | undefined {
+	const avatar = rawAvatar.trim()
+	if (!avatar) return undefined
+	if (/^https?:\/\//i.test(avatar)) return avatar
+	if (avatar.startsWith('//')) return `https:${avatar}`
+	if (avatar.startsWith('/')) return `${MV_BASE_URL}${avatar}`
+	return `${MV_URLS.AVATAR_BASE}/${avatar}`
+}
+
+function isRecordArray(value: unknown): value is Record<string, unknown>[] {
+	return Array.isArray(value) && value.every(isRecord)
+}
+
+function getStringValue(value: unknown): string {
+	return typeof value === 'string' ? value.trim() : ''
+}
+
+function safeDecodeURIComponent(value: string): string {
+	try {
+		return decodeURIComponent(value)
+	} catch {
+		return value
+	}
+}
+
+function extractMvUserSuggestions(payload: unknown): Record<string, unknown>[] {
+	if (isRecord(payload) && isRecordArray(payload.suggestions)) return payload.suggestions
+	if (isRecordArray(payload)) return payload
+	return []
+}
+
+function extractAttribute(html: string, attributeName: string): string {
+	const pattern = new RegExp(`${attributeName}\\s*=\\s*["']([^"']+)["']`, 'i')
+	return decodeHtmlEntities(pattern.exec(html)?.[1] || '')
+}
+
+function extractAvatarSourceFromHtml(html: string): string {
+	const imageMatches = html.matchAll(/<img\b[^>]*>/gi)
+	for (const match of imageMatches) {
+		const src = extractAttribute(match[0], 'src')
+		if (src && /\/img\/users\/avatar\//i.test(src)) return src
+	}
+
+	return ''
+}
+
+function extractMvUserSuggestionsFromHtml(html: string): Record<string, unknown>[] {
+	const suggestions: Record<string, unknown>[] = []
+	const seenUsernames = new Set<string>()
+	const userLinkMatches = html.matchAll(/<a\b[^>]*href\s*=\s*["']\/id\/([^"'/?#]+)[^"']*["'][^>]*>[\s\S]*?<\/a>/gi)
+
+	for (const match of userLinkMatches) {
+		const username = safeDecodeURIComponent(match[1] || '').trim()
+		const usernameKey = username.toLowerCase()
+		if (!username || seenUsernames.has(usernameKey)) continue
+
+		seenUsernames.add(usernameKey)
+		const linkHtml = match[0]
+		const matchIndex = match.index ?? 0
+		const nearbyHtml = html.slice(Math.max(0, matchIndex - 400), matchIndex + linkHtml.length + 400)
+		const avatar = extractAvatarSourceFromHtml(linkHtml) || extractAvatarSourceFromHtml(nearbyHtml)
+
+		suggestions.push({
+			value: username,
+			data: {
+				nombre: username,
+				avatar,
+			},
+		})
+	}
+
+	return suggestions
+}
+
+function parseMvUserSuggestionsPayload(text: string): unknown {
+	const trimmed = text.trim()
+	if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+		try {
+			return JSON.parse(trimmed)
+		} catch {
+			// Fall through to the HTML parser; MV can return non-standard responses.
+		}
+	}
+
+	return extractMvUserSuggestionsFromHtml(text)
+}
+
+function getSuggestionUsername(suggestion: Record<string, unknown>): string {
+	const data = isRecord(suggestion.data) ? suggestion.data : null
+	return (
+		getStringValue(data?.nombre) ||
+		getStringValue(suggestion.nombre) ||
+		getStringValue(suggestion.value) ||
+		getStringValue(suggestion.username)
+	)
+}
+
+function getSuggestionAvatar(suggestion: Record<string, unknown>): string {
+	const data = isRecord(suggestion.data) ? suggestion.data : null
+	return getStringValue(data?.avatar) || getStringValue(suggestion.avatar)
+}
+
+async function fetchMvUserSuggestions(
+	query: string
+): Promise<{ suggestions: Record<string, unknown>[] } | { error: string }> {
+	const url = `${MV_URLS.USERS_LIST}?query=${encodeURIComponent(query)}`
+	const response = await fetch(url, {
+		credentials: 'include',
+		headers: {
+			Accept: 'application/json, text/javascript, */*; q=0.01',
+			'X-Requested-With': 'XMLHttpRequest',
+		},
+	})
+
+	if (!response.ok) {
+		return { error: `HTTP ${response.status}` }
+	}
+
+	return { suggestions: extractMvUserSuggestions(parseMvUserSuggestionsPayload(await response.text())) }
+}
+
+async function resolveMvUserAvatar(username: string): Promise<MvUserAvatarResult> {
+	const normalizedUsername = username.trim()
+	if (!MV_USERNAME_PATTERN.test(normalizedUsername)) {
+		return { success: false, error: 'Nick no valido' }
+	}
+
+	const result = await fetchMvUserSuggestions(normalizedUsername)
+	if ('error' in result) {
+		return { success: false, error: result.error }
+	}
+
+	const exactSuggestion = result.suggestions.find(
+		suggestion => getSuggestionUsername(suggestion).toLowerCase() === normalizedUsername.toLowerCase()
+	)
+	if (!exactSuggestion) {
+		return { success: false, error: 'Usuario no encontrado' }
+	}
+
+	const avatarUrl = normalizeMediavidaAvatarUrl(getSuggestionAvatar(exactSuggestion))
+	return {
+		success: Boolean(avatarUrl),
+		username: getSuggestionUsername(exactSuggestion) || normalizedUsername,
+		avatarUrl,
+		error: avatarUrl ? undefined : 'Avatar no encontrado',
+	}
+}
+
+async function searchMvUsers(query: string): Promise<MvUserSearchResult> {
+	const normalizedQuery = query.trim()
+	if (!MV_USERNAME_PATTERN.test(normalizedQuery)) {
+		return { success: false, error: 'Consulta no valida' }
+	}
+
+	const result = await fetchMvUserSuggestions(normalizedQuery)
+	if ('error' in result) {
+		return { success: false, error: result.error }
+	}
+
+	const users: MvUserSearchUser[] = []
+	const seenUsernames = new Set<string>()
+	for (const suggestion of result.suggestions) {
+		const username = getSuggestionUsername(suggestion)
+		const usernameKey = username.toLowerCase()
+		if (!username || seenUsernames.has(usernameKey)) continue
+
+		seenUsernames.add(usernameKey)
+		users.push({
+			username,
+			avatarUrl: normalizeMediavidaAvatarUrl(getSuggestionAvatar(suggestion)) || undefined,
+		})
+		if (users.length >= MV_USER_SEARCH_MAX_RESULTS) break
+	}
+
+	return { success: true, users }
+}
+
 async function fetchRecordWithTimeout(url: string, init?: RequestInit): Promise<Record<string, unknown> | null> {
 	const controller = new AbortController()
 	const timeoutId = setTimeout(() => controller.abort(), TWITTER_FETCH_TIMEOUT_MS)
@@ -541,6 +728,34 @@ async function requestGiphy(
 /**
  * Setup options page opener handler
  */
+/**
+ * Id of the dashboard tab we opened, kept in session storage so it survives the service worker
+ * being torn down. Tracking it is what lets the dashboard be reused without the "tabs" permission:
+ * `tabs.query({ url })` silently returns [] for the extension's own pages without it, which is why
+ * every click used to open a new tab. `tabs.get`/`tabs.update` need no such permission.
+ */
+const dashboardTabStorage = storage.defineItem<number | null>('session:mvp-dashboard-tab-id', {
+	fallback: null,
+})
+
+async function focusExistingDashboard(url: string): Promise<boolean> {
+	const tabId = await dashboardTabStorage.getValue()
+	if (tabId === null) return false
+
+	try {
+		const tab = await browser.tabs.get(tabId)
+		// Without the "tabs" permission tab.url is undefined, so navigate unconditionally when unknown.
+		if (tab.url !== url) await browser.tabs.update(tabId, { url })
+		await browser.tabs.update(tabId, { active: true })
+		if (typeof tab.windowId === 'number') await browser.windows.update(tab.windowId, { focused: true })
+		return true
+	} catch {
+		// The tab was closed since we stored it.
+		await dashboardTabStorage.setValue(null)
+		return false
+	}
+}
+
 export function setupOptionsHandler(): void {
 	onMessage('openOptionsPage', async ({ data: view }) => {
 		let url = browser.runtime.getURL('/options.html')
@@ -549,25 +764,10 @@ export function setupOptionsHandler(): void {
 			url += `#/${view}`
 		}
 
-		const baseOptionsUrl = browser.runtime.getURL('/options.html')
-		const existingTabs = await browser.tabs.query({ url: `${baseOptionsUrl}*` })
-		const existingTab = existingTabs[0]
+		if (await focusExistingDashboard(url)) return
 
-		if (existingTab?.id) {
-			if (existingTab.url !== url) {
-				await browser.tabs.update(existingTab.id, { url })
-			}
-
-			await browser.tabs.update(existingTab.id, { active: true })
-
-			if (typeof existingTab.windowId === 'number') {
-				await browser.windows.update(existingTab.windowId, { focused: true })
-			}
-
-			return
-		}
-
-		await browser.tabs.create({ url })
+		const created = await browser.tabs.create({ url })
+		await dashboardTabStorage.setValue(created.id ?? null)
 	})
 }
 
@@ -598,6 +798,38 @@ export function setupSteamHandler(): void {
 			return await fetchSteamBundleDetails(bundleId)
 		} catch (error) {
 			logger.error('Steam bundle fetch error:', error)
+			return null
+		}
+	})
+
+	onMessage('searchItunesApp', async ({ data }) => {
+		try {
+			return await searchItunesApp(data.query)
+		} catch (error) {
+			logger.error('iTunes search error:', error)
+			return null
+		}
+	})
+
+	onMessage('searchGooglePlayApp', async ({ data }) => {
+		try {
+			return await searchGooglePlayApp(data.query)
+		} catch (error) {
+			logger.error('Google Play search error:', error)
+			return null
+		}
+	})
+}
+
+/**
+ * Setup GOG catalog handler (CORS proxy).
+ */
+export function setupGogHandler(): void {
+	onMessage('fetchGogGame', async ({ data: slug }) => {
+		try {
+			return await fetchGogGameDetails(slug)
+		} catch (error) {
+			logger.error('GOG fetch error:', error)
 			return null
 		}
 	})
@@ -647,6 +879,26 @@ export function setupTmdbRequestHandler(): void {
 			logger.error('TMDB request error:', error)
 			throw error // Re-throw so the caller can handle it
 		}
+	})
+
+	onMessage('fetchMovieReviewImage', async ({ data }) => {
+		const url = new URL(data.url)
+		const isTmdbImage = url.hostname === 'image.tmdb.org' && url.pathname.startsWith('/t/p/')
+		const isMediavidaImage = url.hostname === 'mediavida.com' || url.hostname.endsWith('.mediavida.com')
+		if (url.protocol !== 'https:' || (!isTmdbImage && !isMediavidaImage)) {
+			throw new Error('Invalid movie review image URL')
+		}
+
+		const response = await fetch(url)
+		if (!response.ok) throw new Error(`TMDB image request failed: ${response.status}`)
+		const contentType = response.headers.get('content-type') || 'image/jpeg'
+		if (!contentType.startsWith('image/')) throw new Error('TMDB response is not an image')
+		const bytes = new Uint8Array(await response.arrayBuffer())
+		let binary = ''
+		for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+			binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+		}
+		return { dataUrl: `data:${contentType};base64,${btoa(binary)}` }
 	})
 }
 
@@ -716,6 +968,8 @@ export function setupAniListRequestHandler(): void {
 			return uploadBase64ImageToBestProvider({
 				base64: arrayBufferToBase64(buffer),
 				fileName: getSafeAniListImageFileName(url.toString(), contentType),
+				mimeType: contentType,
+				fileSize: buffer.byteLength,
 			})
 		} catch (error) {
 			logger.error('AniList image rehost error:', error)
@@ -806,6 +1060,26 @@ export function setupMediavidaThreadFetchHandler(): void {
 				error: error instanceof Error ? error.message : 'Fetch failed',
 				finalUrl: rawUrl,
 			}
+		}
+	})
+}
+
+export function setupMvUserAvatarHandler(): void {
+	onMessage('resolveMvUserAvatar', async ({ data }): Promise<MvUserAvatarResult> => {
+		try {
+			return await resolveMvUserAvatar(data.username)
+		} catch (error) {
+			logger.warn('Mediavida user avatar resolve failed:', error)
+			return { success: false, error: error instanceof Error ? error.message : 'Fetch failed' }
+		}
+	})
+
+	onMessage('searchMvUsers', async ({ data }): Promise<MvUserSearchResult> => {
+		try {
+			return await searchMvUsers(data.query)
+		} catch (error) {
+			logger.warn('Mediavida user search failed:', error)
+			return { success: false, error: error instanceof Error ? error.message : 'Fetch failed' }
 		}
 	})
 }
@@ -1013,16 +1287,41 @@ export function setupTwitterLiteHandler(): void {
 	})
 }
 
+export function setupFragranticaHandler(): void {
+	onMessage('fetchFragranticaFragrance', async ({ data }): Promise<FragranticaFragranceResult> => {
+		try {
+			const url = data.url?.trim()
+			if (!url) {
+				return { success: false, error: 'URL de Fragrantica vacía' }
+			}
+
+			return {
+				success: true,
+				data: await fetchFragranticaFragrance(url),
+			}
+		} catch (error) {
+			logger.warn('Fragrantica fetch failed:', error)
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'No se pudo cargar Fragrantica.',
+			}
+		}
+	})
+}
+
 /**
  * Setup all API handlers
  */
 export function setupApiHandlers(): void {
 	setupOptionsHandler()
 	setupMediavidaThreadFetchHandler()
+	setupMvUserAvatarHandler()
 	setupSteamHandler()
+	setupGogHandler()
 	setupTmdbKeyCheckHandler()
 	setupTmdbRequestHandler()
 	setupAniListRequestHandler()
 	setupGiphyHandlers()
 	setupTwitterLiteHandler()
+	setupFragranticaHandler()
 }

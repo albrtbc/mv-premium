@@ -32,6 +32,7 @@ export interface PageContext {
 import { MV_SELECTORS } from '@/constants'
 import { logger } from '@/lib/logger'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
+import { getPlatformKind } from '@/lib/platform'
 import { useSettingsStore } from '@/store/settings-store'
 
 // Track initialization state
@@ -133,6 +134,17 @@ async function loadThreadFeatureModules(): Promise<ThreadFeatureModules> {
  * @param pageContext - Pre-calculated page context to avoid repeated regex checks
  */
 export async function runInjections(ctx?: unknown, pageContext?: PageContext): Promise<void> {
+	if (getPlatformKind() === 'firefox-android') {
+		if (!isFeatureEnabled(FeatureFlag.MobileLite)) {
+			logger.debug('Skipping content injections on Firefox Android because mobile lite is disabled')
+			return
+		}
+
+		const { injectMobileLite } = await import('@/features/mobile-lite')
+		injectMobileLite()
+		return
+	}
+
 	// =========================================================================
 	// TRULY GLOBAL INJECTIONS - Run on all pages where extension loads
 	// =========================================================================
@@ -228,6 +240,9 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		})
 
 		if (window.location.pathname.includes('/nuevo-hilo')) {
+			import('@/features/drafts/logic/thread-publish').then(({ applyDashboardThreadPublish }) => {
+				void applyDashboardThreadPublish()
+			})
 			import('@/features/release-calendar').then(({ applyReleaseThreadPrefill }) => {
 				applyReleaseThreadPrefill()
 			})
@@ -244,6 +259,12 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		if (isFeatureEnabled(FeatureFlag.SteamBundleInlineCards)) {
 			import('@/features/media-hover-cards').then(({ initSteamBundleInlineCards }) => {
 				initSteamBundleInlineCards()
+			})
+		}
+
+		if (isFeatureEnabled(FeatureFlag.FragranticaEmbeds)) {
+			import('@/features/fragrantica-embeds').then(({ initFragranticaEmbeds }) => {
+				initFragranticaEmbeds()
 			})
 		}
 	}
@@ -303,7 +324,7 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 
 	if (
 		pageContext?.isSubforum &&
-		/^\/foro\/juegos\/?$/.test(window.location.pathname)
+		/^\/foro\/juegos(?:-movil)?\/?$/.test(window.location.pathname)
 	) {
 		const { injectReleaseCalendar } = await import('@/features/release-calendar')
 		injectReleaseCalendar()
@@ -329,6 +350,14 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 	// THREAD PAGES
 	// =========================================================================
 	if (pageContext?.isThread) {
+		const { initRelatedThreadsDisplay } = await import('@/features/related-threads')
+		initRelatedThreadsDisplay()
+
+		// Confirms which generated review cards ended up published. Returns immediately once a
+		// page load has established there is nothing pending, which is the common case.
+		const { detectPublishedMovieReviews } = await import('@/features/cine/logic/movie-review-detection')
+		void detectPublishedMovieReviews()
+
 		const twitterLiteEnabled = useSettingsStore.getState().twitterLiteEmbedsEnabled === true
 		if (twitterLiteEnabled) {
 			const { replaceTwitterEmbedsWithLite, startTwitterLiteEmbedGuard } = await import(
@@ -376,7 +405,7 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		})
 
 		// Check for pending thread creation, post edit, or reply (captures context after redirect)
-		import('@/features/stats').then(
+		import('@/features/stats/post-tracker').then(
 			({ completePendingThreadCreation, completePendingPostEdit, completePendingReply }) => {
 				completePendingThreadCreation()
 				completePendingPostEdit()
@@ -413,6 +442,16 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 
 		if (threadModules.savedThreads) {
 			threadModules.savedThreads.injectSaveThreadButton()
+		}
+
+		{
+			const [{ injectThreadPageHideButton, setupHiddenThreadGuard }, { desktopThreadHideNotifier }] =
+				await Promise.all([
+					import('@/features/hidden-threads/logic/thread-page-hide'),
+					import('@/features/hidden-threads/logic/hide-toast'),
+				])
+			setupHiddenThreadGuard()
+			injectThreadPageHideButton(desktopThreadHideNotifier)
 		}
 
 		if (threadModules.threadSummarizer && isFeatureEnabled(FeatureFlag.ThreadSummarizer)) {

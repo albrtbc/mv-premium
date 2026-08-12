@@ -33,6 +33,7 @@ export const FeatureFlag = {
 
 	// User-controlled Features (via settings)
 	NewHomepage: 'new-homepage',
+	MobileLite: 'mobile-lite',
 	InfiniteScroll: 'infinite-scroll',
 	LiveThread: 'live-thread',
 	MutedWords: 'muted-words',
@@ -46,6 +47,7 @@ export const FeatureFlag = {
 	CinemaCards: 'cinema-cards',
 	MediaHoverCards: 'media-hover-cards',
 	SteamBundleInlineCards: 'steam-bundle-inline-cards',
+	FragranticaEmbeds: 'fragrantica-embeds',
 	ItadSubforumSearch: 'itad-subforum-search',
 	GameReleaseCalendar: 'game-release-calendar',
 	PinnedPosts: 'pinned-posts',
@@ -84,6 +86,7 @@ const FEATURE_CONFIG: Record<FeatureFlagKey, FeatureConfig> = {
 
 	// User-controlled Features
 	[FeatureFlag.NewHomepage]: { settingsKey: 'newHomepageEnabled' },
+	[FeatureFlag.MobileLite]: { settingsKey: 'mobileLiteEnabled' },
 	[FeatureFlag.InfiniteScroll]: { settingsKey: 'infiniteScrollEnabled' },
 	[FeatureFlag.LiveThread]: { settingsKey: 'liveThreadEnabled' },
 	[FeatureFlag.MutedWords]: { settingsKey: 'mutedWordsEnabled' },
@@ -109,6 +112,7 @@ const FEATURE_CONFIG: Record<FeatureFlagKey, FeatureConfig> = {
 	[FeatureFlag.CinemaCards]: { settingsKey: 'cinemaButtonEnabled', requiresApiKey: 'tmdbApiKey' },
 	[FeatureFlag.MediaHoverCards]: { settingsKey: 'mediaHoverCardsEnabled' },
 	[FeatureFlag.SteamBundleInlineCards]: { settingsKey: 'steamBundleInlineCardsEnabled' },
+	[FeatureFlag.FragranticaEmbeds]: { settingsKey: 'fragranticaEmbedsEnabled' },
 	[FeatureFlag.ItadSubforumSearch]: { settingsKey: 'itadSubforumSearchEnabled' },
 	[FeatureFlag.GameReleaseCalendar]: { settingsKey: 'gameReleaseCalendarEnabled' },
 	[FeatureFlag.PinnedPosts]: { settingsKey: 'pinnedPostsEnabled' },

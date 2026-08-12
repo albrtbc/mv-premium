@@ -31,13 +31,17 @@ export const DEFAULT_SETTINGS: Settings = {
 	syncEnabled: false,
 
 	// Feature Toggles - Navigation
+	mobileLiteEnabled: true,
+	mobileLitePostGesturesEnabled: true,
 	infiniteScrollEnabled: false,
 	autoInfiniteScrollEnabled: false,
 	liveThreadEnabled: false,
+	autoLiveThreadEnabled: false,
 	newHomepageEnabled: false,
 	nativeLiveDelayEnabled: true,
 	liveThreadDelayEnabled: true,
 	galleryButtonEnabled: true,
+	quoteSelectionEnabled: true,
 	navbarSearchEnabled: true,
 
 	// Feature Toggles - Editor
@@ -46,17 +50,20 @@ export const DEFAULT_SETTINGS: Settings = {
 	gifPickerEnabled: true,
 	draftsButtonEnabled: true,
 	templateButtonEnabled: true,
+	autoTagsEnabled: true,
 
 	// Feature Toggles - Content
 	improvedUpvotesEnabled: true,
 	mediaHoverCardsEnabled: true,
 	steamBundleInlineCardsEnabled: true,
+	fragranticaEmbedsEnabled: true,
 	itadSubforumSearchEnabled: true,
 	itadSubforumSearchJuegosEnabled: true,
 	itadSubforumSearchHuchaEnabled: true,
 	itadCountry: 'ES',
 	gameReleaseCalendarEnabled: true,
 	gameReleaseCalendarJuegosEnabled: true,
+	gameReleaseCalendarJuegosMovilEnabled: true,
 	gameReleaseCalendarLayout: 'minimal',
 	movieReleaseCalendarCineEnabled: true,
 	movieReleaseCalendarLayout: 'minimal',
@@ -71,12 +78,15 @@ export const DEFAULT_SETTINGS: Settings = {
 	saveThreadEnabled: true,
 	hideThreadEnabled: true,
 	hideIgnoredUserThreadsEnabled: true,
+	relatedThreadsDisplay: 'hidden',
+	relatedThreadsMaxAgeMonths: 0,
 	// Feature Toggles - Users
 	mutedWordsEnabled: false,
 	mutedWords: [],
 
 	// Privacy & Storage
-	enableActivityTracking: true,
+	enableActivityTracking: false,
+	enableRhythmTracking: true,
 
 	// UI State
 	settingsActiveTab: 'integrations',
@@ -86,6 +96,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	workModeEnabled: false,
 	workModeOptions: {
 		hideAvatars: true,
+		hideUsername: true,
 		hideImages: true,
 		hideVideos: true,
 		hideSocialEmbeds: true,

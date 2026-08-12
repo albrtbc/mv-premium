@@ -9,6 +9,7 @@ export interface ChangeEntry {
 	type: 'feature' | 'fix' | 'improvement'
 	description: string
 	category?: string
+	surface?: 'desktop' | 'mobile-lite' | 'shared' | Array<'desktop' | 'mobile-lite' | 'shared'>
 }
 
 export interface ChangelogEntry {
@@ -20,6 +21,560 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+	{
+		version: '3.5.0',
+		date: '2026-08-09',
+		title: 'Críticas visuales de cine y más control al terminar los hilos',
+		summary:
+			'Mediavida Premium 3.5 estrena críticas visuales cinematográficas creadas con datos de TMDB, valoración por medias estrellas y una card lista para publicar. Los hilos relacionados ahora pueden ocultarse, plegarse o conservarse como en Mediavida tanto en escritorio como en Mobile Lite. También se corrige el consumo elevado de CPU que podía provocar Live automático al desactivar Live desde los ajustes.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Crear crítica visual: busca una película en TMDB, valórala de 0,5 a 10 con medias estrellas, añade una frase y un sello opcional, y genera una card cinematográfica personalizada lista para insertar en el post.',
+				category: 'Cine',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Hilos relacionados configurables: pueden permanecer ocultos —el nuevo valor predeterminado—, mostrarse en un desplegable o conservar el comportamiento original de Mediavida.',
+				category: 'Experiencia',
+				surface: 'shared',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Los hilos relacionados se ocultan desde el inicio de la carga para evitar que aparezcan brevemente antes de aplicar la preferencia elegida.',
+				category: 'Experiencia',
+				surface: 'shared',
+			},
+			{
+				type: 'fix',
+				description:
+					'Live automático deja de reintentarse continuamente cuando el usuario desactiva Live desde los ajustes, evitando el bucle que podía disparar el uso de CPU.',
+				category: 'Live Thread',
+				surface: 'desktop',
+			},
+		],
+	},
+	{
+		version: '3.4.0',
+		date: '2026-07-08',
+		title: 'Más control sobre auto-tags y swipes, modal de enlaces añadido y fichas de Fragrantica',
+		summary:
+			'Mediavida Premium 3.4 te da más control: desactiva los auto-tags al pegar enlaces cuando no los quieras o los gestos de swipe de Mobile Lite, ambos con atajo de teclado y aviso al cambiarlos. El diálogo de insertar enlace estrena diseño y ya se abre también desde el botón nativo y el editor de Live. También llegan las fichas de Fragrantica y se corrige el Live automático tras salir manualmente de un hilo.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Auto-tags al pegar: nuevo ajuste para desactivar el envoltorio automático en [img]/[media] al pegar enlaces de imágenes o vídeos en el editor (activado por defecto), con atajo de teclado propio que avisa al activarlo o desactivarlo.',
+				category: 'Editor',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'El diálogo de insertar enlace ahora también se abre desde el botón nativo de hipervínculo de Mediavida y desde el editor de Live Thread, no solo al crear borradores o plantillas.',
+				category: 'Editor',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description:
+					'El diálogo de insertar enlace estrena diseño: cabecera con icono, campos de URL y texto con iconos identificativos, y los botones Cancelar/Insertar ahora tienen el mismo tamaño.',
+				category: 'Editor',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Swipe para ignorar: nuevo ajuste en el panel de Mobile Lite para desactivar los gestos de deslizar sobre un post (ocultar o silenciar al autor) sin perder el menú del nick para ignorar usuarios.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Fichas de Fragrantica: los enlaces a perfumes de Fragrantica se convierten en tarjetas dentro del hilo con imagen, valoración, acordes, pirámide olfativa y uso recomendado.',
+				category: 'Fragrantica',
+				surface: 'desktop',
+			},
+			{
+				type: 'fix',
+				description: 'El Live automático ya no se reactiva solo después de salir manualmente de un hilo en directo.',
+				category: 'Live Thread',
+				surface: 'desktop',
+			},
+		],
+	},
+	{
+		version: '3.3.0',
+		date: '2026-07-06',
+		title: 'Live automático, tarjetas GOG y editor más listo',
+		summary:
+			'Mediavida Premium 3.3 hace más cómodo seguir hilos en directo, crear fichas de juegos y publicar desde plantillas: Live puede arrancar automáticamente en hilos de escritorio, el editor detecta enlaces de Telegram, las plantillas rellenan mejor el título del hilo y llegan las tarjetas de GOG. También se pulen el reloj de actividad y el dashboard.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Live automático en escritorio: nuevo ajuste para iniciar el modo Live al entrar en hilos compatibles, sin tener que activarlo manualmente cada vez.',
+				category: 'Live Thread',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Tarjetas de GOG: los enlaces de GOG ahora generan una ficha de juego con información de tienda, portada, precio y metadatos dentro de la vista previa y las plantillas.',
+				category: 'Juegos',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'El editor reconoce enlaces de posts de Telegram y los envuelve automáticamente como contenido multimedia.',
+				category: 'Editor',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Los títulos de hilos nuevos se rellenan automáticamente desde plantillas de películas, series y juegos cuando el medio seleccionado trae un título disponible.',
+				category: 'Plantillas',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Reloj de actividad más preciso: la vista diaria abre el día actual, la semanal abre la semana actual y las barras usan escalas calibradas para comparar mejor la actividad real.',
+				category: 'Estadísticas',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description:
+					'El dashboard refresca las estadísticas de inicio cuando cambian los datos guardados, evitando cifras desactualizadas tras navegar o sincronizar actividad.',
+				category: 'Dashboard',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description: 'El avatar del usuario actual en el dashboard se carga con mejor calidad cuando está disponible.',
+				category: 'Dashboard',
+				surface: 'desktop',
+			},
+			{
+				type: 'fix',
+				description:
+					'Las tarjetas de usuario vuelven a quedar por encima del control de retardo en hilos con Live nativo.',
+				category: 'Live Thread',
+				surface: 'desktop',
+			},
+		],
+	},
+	{
+		version: '3.2.0',
+		date: '2026-06-16',
+		title: 'Resúmenes con IA en el móvil, reloj de actividad y panel renovado',
+		summary:
+			'Mediavida Premium 3.2 trae los resúmenes con IA al móvil (por hilo, por post y de varias páginas), un nuevo reloj "Tiempo en Mediavida" con imágenes para compartir, un panel de control rediseñado y mejoras en hilos ocultos, plantillas de juegos y publicación de hilos desde borradores.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Tiempo en Mediavida: un nuevo reloj de actividad de 24 horas que muestra a qué horas y en qué subforos pasas el tiempo, con medias por día, semana y mes y un resumen anual.',
+				category: 'Estadísticas',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Comparte tu actividad: genera una imagen lista para Mediavida con tu resumen del año, los últimos 30 días, una semana o un día de la semana concreto.',
+				category: 'Estadísticas',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Resúmenes con IA en el móvil: resume un hilo completo, post a post o varias páginas, con selector de modelo y análisis de usuarios; cópialo como BBCode para pegarlo y añade tu clave de Gemini desde los ajustes del panel.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Oculta el hilo en el que estás desde dentro, con un control disponible tanto en el escritorio como en el móvil.',
+				category: 'Hilos ocultos',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description: 'Publica hilos desde un borrador: convierte cualquier borrador guardado en un hilo nuevo.',
+				category: 'Borradores',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Plantillas para juegos de Android e iOS con tarjetas de tienda: rellenan los datos automáticamente desde Google Play y la App Store.',
+				category: 'Plantillas',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description: 'Botones de Copiar y Limpiar en el editor del móvil.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Tarjeta de uso de almacenamiento en los ajustes del panel móvil, con un medidor del espacio usado.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description: 'Avisos de novedades en el panel móvil: al actualizar verás un resumen de las últimas mejoras.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Panel de control rediseñado: nueva tipografía, tarjetas de estadísticas con la cifra protagonista, lista de subforos más limpia, tarjeta de almacenamiento y animaciones de entrada.',
+				category: 'Dashboard',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Lista de hilos ocultos rediseñada en el escritorio: iconos nativos de subforo, mejor contraste y estados de fila y etiqueta más claros.',
+				category: 'Hilos ocultos',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Calendario de lanzamientos de juegos mejorado, con opción para mostrar también los juegos de móvil.',
+				category: 'Juegos',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description: 'El texto que seleccionas dentro de un post ahora se resalta en ámbar en el móvil.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'improvement',
+				description: 'El QR de sincronización con el móvil ahora también transfiere tu clave de Gemini.',
+				category: 'Mobile Lite',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'fix',
+				description: 'Corregida la cita por selección de texto en Android.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'fix',
+				description: 'Ya no se muestran acciones de ignorar sobre tu propia ficha de usuario en el panel.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'fix',
+				description: 'Los hilos ocultos se mantienen ocultos también en las páginas de perfil.',
+				category: 'Hilos ocultos',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'fix',
+				description: 'Los iconos de subforo se muestran correctamente en el panel de subforos ocultos.',
+				category: 'Subforos ocultos',
+				surface: 'desktop',
+			},
+		],
+	},
+	{
+		version: '3.1.0',
+		date: '2026-06-11',
+		title: 'Mobile Lite 2.0: panel renovado, gestos, galería y Live',
+		summary:
+			'Mediavida Premium 3.1 convierte Mobile Lite en una experiencia mucho más completa: panel rediseñado como una app, gestos para filtrar usuarios, galería y modo Live en el móvil, autocompletado de usuarios, gestión de hilos ocultos y nuevas opciones de personalización.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Panel móvil rediseñado como una app: Mobile Lite estrena hoja inferior con pestañas de Usuarios, Hilos y Ajustes, gesto de arrastre para cerrar, avisos tipo toast y un estilo nativo unificado en todo el panel.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Gestos para filtrar usuarios: Desliza un post hacia la derecha para silenciar a su autor o hacia la izquierda para ocultarlo, con aviso de confirmación y botón Deshacer.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Galería de hilos en móvil: La galería de imágenes llega a Mobile Lite con tira de miniaturas desplazable y botón propio en el hilo, activable desde los ajustes del panel.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Modo Live en móvil: El live nativo de Mediavida se integra en la barra inferior de Mobile Lite con cabecera renovada, y puede activarse o desactivarse desde los ajustes del panel.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Hilos ocultos en móvil: Puedes ocultar hilos desde los listados y gestionarlos en una pestaña dedicada del panel, con búsqueda, restauración individual y opción de restaurarlos todos.',
+				category: 'Mobile Lite',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Autocompletado de usuarios en el panel: El buscador sugiere usuarios reales de Mediavida con su avatar mientras escribes, para silenciarlos u ocultarlos sin teclear el nick exacto.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Recorte de imágenes renovado: El diálogo de recorte móvil estrena el nuevo diseño, zoom con dos dedos (pinch) y acciones más claras antes de subir una imagen.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Color de negrita personalizable en móvil: Nuevo ajuste en el panel para elegir el color del texto en negrita de los posts.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Modo Trabajo: Nueva opción para ocultar tu propio nick en la cabecera de Mediavida y mostrarlo solo al pasar el ratón por encima.',
+				category: 'Privacidad',
+				surface: 'desktop',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Mobile Lite activado por defecto: En Firefox para Android la experiencia móvil viene activada de serie al instalar la extensión.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Cambiar un usuario entre Silenciado y Ocultado es instantáneo: el panel aplica el cambio al momento sin esperar a peticiones de red innecesarias.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Avatares más fiables en el panel: los usuarios añadidos resuelven su avatar automáticamente y un botón permite actualizar de golpe los que falten.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'fix',
+				description:
+					'Auto-silenciado bloqueado: El panel móvil ya no permite silenciarte u ocultarte a ti mismo, igual que los gestos en los posts.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'fix',
+				description:
+					'Ocultación de hilos por autor: Ya no se aplica en vistas globales del foro (Spy, Nuevos, Sin leer, Top), donde el avatar visible es del último en responder y no del creador del hilo, evitando ocultar hilos por error.',
+				category: 'Filtros',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'fix',
+				description:
+					'Limpieza de almacenamiento: La caché de próximos lanzamientos (IGDB) ya no se guarda en disco — acumulaba entradas que nunca se reutilizaban hasta llenar el almacenamiento de la extensión, especialmente en Firefox. Al actualizar a esta versión se purgan automáticamente las cachés antiguas de IGDB, TMDB, AniList, Steam y resolutores de medios.',
+				category: 'Rendimiento',
+				surface: ['desktop', 'shared'],
+			},
+		],
+	},
+	{
+		version: '3.0.0',
+		date: '2026-06-07',
+		title: 'Mobile Lite, QR unificado, ImgBB y recorte de imágenes',
+		summary:
+			'Mediavida Premium 3.0 estrena una experiencia Mobile Lite para Firefox Android, permite llevar usuarios ignorados y la API key de ImgBB al móvil mediante QR, mejora las subidas de imágenes y añade herramientas móviles para gestionar filtros, crear hilos y recortar imágenes.',
+		changes: [
+			{
+				type: 'feature',
+				description:
+					'Mobile Lite para Firefox Android: Nueva experiencia ligera adaptada al móvil para usar Mediavida Premium desde Firefox Android sin permisos nuevos ni backend adicional.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Panel móvil de usuarios filtrados: Desde Mobile Lite puedes consultar, buscar, añadir, silenciar, ocultar o quitar usuarios ignorados con una interfaz pensada para pantallas pequeñas.',
+				category: 'Mobile Lite',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Usuarios ocultos y silenciados en móvil: Los posts se ocultan por completo o se colapsan según el modo elegido, manteniendo la misma lógica de filtros que en escritorio.',
+				category: 'Mobile Lite',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Ocultación de hilos por autor en subforos móviles: Si tienes a un usuario en modo Ocultar, sus hilos dejan de aparecer también en listados normales de subforo en Mobile Lite.',
+				category: 'Mobile Lite',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Crear hilos desde Mobile Lite: El menú móvil incorpora acceso rápido a Nuevo hilo con selección de subforo en una vista compacta adaptada al viewport.',
+				category: 'Mobile Lite',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Editor móvil mejorado: Mobile Lite reconoce enlaces de imagen y media al pegar texto, conserva mejor el contenido al cambiar de editor e incorpora subida directa de imágenes.',
+				category: 'Mobile Lite',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Recorte opcional antes de subir imágenes desde móvil: Antes de enviar una imagen puedes recortarla en formato cuadrado o libre, hacer zoom, arrastrar el encuadre o subir el original.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'Vista original en el recorte móvil: El editor de imágenes permite alternar entre Original, Cuadrado y Libre para revisar la imagen completa antes de decidir si recortarla o subirla sin cambios.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'feature',
+				description:
+					'API key de ImgBB en Mobile Lite: El panel móvil incorpora una pestaña dedicada para pegar, guardar y ver claramente si ImgBB está configurado en el dispositivo.',
+				category: 'ImgBB',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'QR Mobile Lite en el dashboard: Nueva zona dedicada para generar un QR o copiar un enlace con usuarios ignorados y la API key de ImgBB si está configurada, con resumen visual antes de transferirlo al móvil.',
+				category: 'QR Mobile Lite',
+				surface: ['desktop', 'shared'],
+			},
+			{
+				type: 'feature',
+				description:
+					'Backup seguro local: Nueva zona avanzada para crear copias de seguridad completas desde el dashboard, con selección de datos, resumen previo y restauración controlada.',
+				category: 'Copias de seguridad',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Backup opcional de claves personales: Las claves de API personales pueden incluirse en la copia de seguridad solo si el usuario lo activa expresamente.',
+				category: 'Copias de seguridad',
+				surface: 'desktop',
+			},
+			{
+				type: 'feature',
+				description:
+					'Importación manual por QR: Mobile Lite puede leer un enlace especial de Mediavida, mostrar resumen de usuarios ocultos, silenciados y API key de ImgBB, pedir confirmación y guardar los datos en el móvil.',
+				category: 'Mobile Lite',
+				surface: ['mobile-lite', 'shared'],
+			},
+			{
+				type: 'improvement',
+				description:
+					'Sincronización sin cuenta ni servidor: La transferencia escritorio -> móvil se hace con un payload comprimido y versionado en la URL, con validación de nicks, límite de tamaño y limpieza del enlace tras procesarlo.',
+				category: 'Sincronización',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'improvement',
+				description:
+					'QR Mobile Lite unificado: La transferencia manual agrupa usuarios ignorados e ImgBB en un único QR, con confirmación en el móvil y sin mantener accesos duplicados en la gestión de usuarios.',
+				category: 'Sincronización',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'improvement',
+				description:
+					'La importación de ignorados no borra filtros existentes: Los datos se fusionan, se evitan duplicados por nick y Ocultar gana sobre Silenciar cuando hay conflicto.',
+				category: 'Sincronización',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'improvement',
+				description:
+					'El panel móvil se adapta mejor a distintos viewports y teclados en pantalla, recolocándose para que el input y los estados vacíos queden más cómodos.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'improvement',
+				description:
+					'El importador móvil muestra confirmación, conteos de usuarios y un mensaje claro de importación completada antes de cerrar el panel.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Subidas de imágenes más fiables: Si configuras ImgBB se usará como proveedor principal, y si usas el servicio gratuito se muestran mensajes más claros cuando hay límites temporales, errores de red o archivos demasiado grandes.',
+				category: 'ImgBB',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'improvement',
+				description:
+					'Recorte móvil más estable: El modal mantiene mejor su altura al ajustar el recorte libre y mejora la lectura visual del encuadre durante el zoom y el arrastre.',
+				category: 'Mobile Lite',
+				surface: 'mobile-lite',
+			},
+			{
+				type: 'improvement',
+				description:
+					'Errores de subida más entendibles: La extensión distingue límites de uso, claves inválidas, fallos temporales del proveedor, problemas de red y errores genéricos para explicar mejor qué puede hacer el usuario.',
+				category: 'Subida de imágenes',
+				surface: ['desktop', 'mobile-lite', 'shared'],
+			},
+			{
+				type: 'fix',
+				description:
+					'Perfiles de usuario: Corregidos los separadores visuales de las filas de hilos cuando se muestran acciones Premium en listados de perfil.',
+				category: 'Perfiles',
+				surface: 'desktop',
+			},
+		],
+	},
 	{
 		version: '2.0.0',
 		date: '2026-06-01',

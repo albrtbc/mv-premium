@@ -29,11 +29,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 // Views
 import { HomeView } from './views/home-view'
 import { SubforumsView } from './views/subforums-view'
+import { CineView } from './views/cine-view'
 import { DraftsView } from './views/drafts-view'
 import { DraftEditorView } from './views/draft-editor-view'
 import { SettingsView } from './views/settings-view'
 import { FiltersView } from './views/filters-view'
 import { WhatsNewView } from './views/whats-new-view'
+import { MobileLiteQrView } from './views/mobile-lite-qr-view'
 
 const MvThemeView = lazy(() =>
 	import('@/features/mv-theme/components/mv-theme-view').then(module => ({
@@ -66,7 +68,9 @@ const routeLabels: Record<string, string> = {
 	'hidden-subforums': 'Subforos ocultos',
 	favorites: 'Subforos Favoritos',
 	subforums: 'Subforos',
+	cine: 'Mis Críticas',
 	users: 'Usuarios',
+	'mobile-lite-qr': 'QR Mobile Lite',
 	settings: 'Ajustes',
 
 	'mv-theme': 'Tema de Mediavida',
@@ -247,6 +251,7 @@ export default function OptionsApp() {
 						<Routes>
 							<Route path="/" element={<HomeView />} />
 							<Route path="/subforums" element={<SubforumsView />} />
+							<Route path="/cine" element={<CineView />} />
 							{/* Drafts */}
 							<Route path="/drafts" element={<DraftsView filterType="draft" />} />
 							<Route path="/drafts/new" element={<DraftEditorView docType="draft" />} />
@@ -273,6 +278,7 @@ export default function OptionsApp() {
 							<Route path="/hidden-threads" element={<Navigate to="/filters?tab=hidden-threads" replace />} />
 							<Route path="/hidden-subforums" element={<Navigate to="/filters?tab=hidden-subforums" replace />} />
 							<Route path="/users" element={<Navigate to="/filters?tab=users" replace />} />
+							<Route path="/mobile-lite-qr" element={<MobileLiteQrView />} />
 							<Route path="/settings" element={<SettingsView />} />
 
 							<Route path="/whats-new" element={<WhatsNewView />} />

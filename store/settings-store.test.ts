@@ -64,8 +64,18 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().infiniteScrollEnabled).toBe(false)
 		})
 
+		it('has mobile lite enabled by default', () => {
+			expect(useSettingsStore.getState().mobileLiteEnabled).toBe(true)
+			expect(DEFAULT_SETTINGS.mobileLiteEnabled).toBe(true)
+		})
+
 		it('has live thread disabled by default', () => {
 			expect(useSettingsStore.getState().liveThreadEnabled).toBe(false)
+		})
+
+		it('has automatic live thread disabled by default', () => {
+			expect(useSettingsStore.getState().autoLiveThreadEnabled).toBe(false)
+			expect(DEFAULT_SETTINGS.autoLiveThreadEnabled).toBe(false)
 		})
 
 		it('has live thread delay enabled by default', () => {
@@ -74,6 +84,16 @@ describe('settings-store', () => {
 
 		it('has ignored user thread filtering enabled by default', () => {
 			expect(useSettingsStore.getState().hideIgnoredUserThreadsEnabled).toBe(true)
+		})
+
+		it('hides related threads by default', () => {
+			expect(useSettingsStore.getState().relatedThreadsDisplay).toBe('hidden')
+			expect(DEFAULT_SETTINGS.relatedThreadsDisplay).toBe('hidden')
+		})
+
+		it('has legacy activity heatmap tracking disabled by default', () => {
+			expect(useSettingsStore.getState().enableActivityTracking).toBe(false)
+			expect(DEFAULT_SETTINGS.enableActivityTracking).toBe(false)
 		})
 
 		it('has ITAD subforum search enabled by default', () => {
@@ -139,6 +159,17 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().infiniteScrollEnabled).toBe(true)
 		})
 
+		it('setAutoTagsEnabled toggles auto-tags on paste', () => {
+			act(() => {
+				useSettingsStore.getState().setAutoTagsEnabled(false)
+			})
+			expect(useSettingsStore.getState().autoTagsEnabled).toBe(false)
+		})
+
+		it('autoTagsEnabled defaults to true', () => {
+			expect(useSettingsStore.getState().autoTagsEnabled).toBe(true)
+		})
+
 		it('setImgbbApiKey updates API key', () => {
 			act(() => {
 				useSettingsStore.getState().setImgbbApiKey('test-key-123')
@@ -185,11 +216,35 @@ describe('settings-store', () => {
 			expect(useSettingsStore.getState().liveThreadEnabled).toBe(true)
 		})
 
+		it('setSetting supports automatic live thread toggle', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('autoLiveThreadEnabled', true)
+			})
+			expect(useSettingsStore.getState().autoLiveThreadEnabled).toBe(true)
+		})
+
+		it('disables auto Live atomically when Live is disabled', () => {
+			act(() => {
+				useSettingsStore.setState({ liveThreadEnabled: true, autoLiveThreadEnabled: true })
+				useSettingsStore.getState().setLiveThreadEnabled(false)
+			})
+
+			expect(useSettingsStore.getState().liveThreadEnabled).toBe(false)
+			expect(useSettingsStore.getState().autoLiveThreadEnabled).toBe(false)
+		})
+
 		it('setSetting supports ignored user thread filtering toggle', () => {
 			act(() => {
 				useSettingsStore.getState().setSetting('hideIgnoredUserThreadsEnabled', false)
 			})
 			expect(useSettingsStore.getState().hideIgnoredUserThreadsEnabled).toBe(false)
+		})
+
+		it('setSetting supports related thread display modes', () => {
+			act(() => {
+				useSettingsStore.getState().setSetting('relatedThreadsDisplay', 'collapsible')
+			})
+			expect(useSettingsStore.getState().relatedThreadsDisplay).toBe('collapsible')
 		})
 
 		it('setSetting supports centered controls position', () => {

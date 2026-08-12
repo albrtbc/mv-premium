@@ -37,9 +37,13 @@ export type GameReleaseCalendarLayout = 'showcase' | 'minimal' | 'bottom'
 /** Country used by IsThereAnyDeal to localize shops and currency */
 export type ItadCountry = 'ES' | 'GB' | 'US'
 
+/** Presentation mode for Mediavida's related-thread block */
+export type RelatedThreadsDisplay = 'hidden' | 'collapsible' | 'original'
+
 /** Work mode sub-options */
 export interface WorkModeOptions {
 	hideAvatars: boolean
+	hideUsername: boolean
 	hideImages: boolean
 	hideVideos: boolean
 	hideSocialEmbeds: boolean
@@ -70,11 +74,15 @@ export interface Settings {
 	syncEnabled: boolean
 
 	// Feature Toggles - Navigation
+	mobileLiteEnabled: boolean
+	mobileLitePostGesturesEnabled: boolean
 	infiniteScrollEnabled: boolean
 	autoInfiniteScrollEnabled: boolean
 	liveThreadEnabled: boolean
+	autoLiveThreadEnabled: boolean
 	newHomepageEnabled: boolean
 	galleryButtonEnabled: boolean
+	quoteSelectionEnabled: boolean
 	nativeLiveDelayEnabled: boolean
 	liveThreadDelayEnabled: boolean
 	navbarSearchEnabled: boolean
@@ -85,17 +93,20 @@ export interface Settings {
 	gifPickerEnabled: boolean
 	draftsButtonEnabled: boolean
 	templateButtonEnabled: boolean
+	autoTagsEnabled: boolean
 
 	// Feature Toggles - Content
 	improvedUpvotesEnabled: boolean
 	mediaHoverCardsEnabled: boolean
 	steamBundleInlineCardsEnabled: boolean
+	fragranticaEmbedsEnabled: boolean
 	itadSubforumSearchEnabled: boolean
 	itadSubforumSearchJuegosEnabled: boolean
 	itadSubforumSearchHuchaEnabled: boolean
 	itadCountry: ItadCountry
 	gameReleaseCalendarEnabled: boolean
 	gameReleaseCalendarJuegosEnabled: boolean
+	gameReleaseCalendarJuegosMovilEnabled: boolean
 	gameReleaseCalendarLayout: GameReleaseCalendarLayout
 	movieReleaseCalendarCineEnabled: boolean
 	movieReleaseCalendarLayout: GameReleaseCalendarLayout
@@ -110,6 +121,9 @@ export interface Settings {
 	saveThreadEnabled: boolean
 	hideThreadEnabled: boolean
 	hideIgnoredUserThreadsEnabled: boolean
+	relatedThreadsDisplay: RelatedThreadsDisplay
+	/** 0 = no limit. Measured from the thread's LAST message, not from when it was created. */
+	relatedThreadsMaxAgeMonths: number
 
 	// Feature Toggles - Users
 	mutedWordsEnabled: boolean
@@ -117,6 +131,7 @@ export interface Settings {
 
 	// Privacy & Storage
 	enableActivityTracking: boolean
+	enableRhythmTracking: boolean
 
 	// UI State
 	settingsActiveTab: string
