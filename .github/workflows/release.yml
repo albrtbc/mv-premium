@@ -47,9 +47,17 @@ jobs:
         run: npm run test:run
 
       - name: Build for Chrome
+        env:
+          VITE_IGDB_CLIENT_ID: ${{ secrets.VITE_IGDB_CLIENT_ID }}
+          VITE_IGDB_CLIENT_SECRET: ${{ secrets.VITE_IGDB_CLIENT_SECRET }}
+          VITE_ITAD_API_KEY: ${{ secrets.VITE_ITAD_API_KEY }}
         run: npm run build:chrome
 
       - name: Build for Firefox
+        env:
+          VITE_IGDB_CLIENT_ID: ${{ secrets.VITE_IGDB_CLIENT_ID }}
+          VITE_IGDB_CLIENT_SECRET: ${{ secrets.VITE_IGDB_CLIENT_SECRET }}
+          VITE_ITAD_API_KEY: ${{ secrets.VITE_ITAD_API_KEY }}
         run: npm run build:firefox
 
       - name: Zip Chrome extension
