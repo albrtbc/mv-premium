@@ -1,5 +1,7 @@
-import { logger } from '@/lib/logger'
-import { sendMessage } from '@/lib/messaging'
+import { cover, HEAVY_FONT, loadImage, roundedRect, truncateToWidth, UI_FONT } from './canvas-utils'
+
+// Re-exported from its original home so existing importers keep working.
+export { truncateToWidth }
 import {
 	buildMovieMetadata,
 	getMovieRatingTier,
@@ -11,58 +13,6 @@ import {
 
 const WIDTH = 1200
 const HEIGHT = 453
-const UI_FONT = 'Inter, "Segoe UI", Arial, sans-serif'
-const HEAVY_FONT = 'Inter, "Segoe UI Black", "Arial Black", "Segoe UI", Arial, sans-serif'
-
-/**
- * Decoded images, keyed by URL. The card is redrawn on every keystroke of the quote, and without
- * this each redraw re-fetched, re-base64'd and re-decoded the same backdrop, poster and avatar.
- * Entries are promises so concurrent redraws share one in-flight load instead of racing.
- */
-const imageCache = new Map<string, Promise<HTMLImageElement | null>>()
-
-async function fetchImage(url: string): Promise<HTMLImageElement | null> {
-	try {
-		const source = url.startsWith('data:') ? url : (await sendMessage('fetchMovieReviewImage', { url })).dataUrl
-		return await new Promise((resolve, reject) => {
-			const image = new Image()
-			image.onload = () => resolve(image)
-			image.onerror = reject
-			image.src = source
-		})
-	} catch (cause) {
-		logger.debug('Movie review card: could not load image, rendering without it', url, cause)
-		return null
-	}
-}
-
-function loadImage(url: string | null | undefined): Promise<HTMLImageElement | null> {
-	if (!url) return Promise.resolve(null)
-	const cached = imageCache.get(url)
-	if (cached) return cached
-
-	const pending = fetchImage(url)
-	imageCache.set(url, pending)
-	// A failed load is not worth caching; the next redraw should be free to try again.
-	void pending.then(image => {
-		if (!image) imageCache.delete(url)
-	})
-	return pending
-}
-
-function cover(
-	ctx: CanvasRenderingContext2D,
-	image: HTMLImageElement,
-	x: number,
-	y: number,
-	width: number,
-	height: number
-) {
-	const scale = Math.max(width / image.width, height / image.height)
-	const sw = width / scale
-	const sh = height / scale
-	ctx.drawImage(image, (image.width - sw) / 2, (image.height - sh) / 2, sw, sh, x, y, width, height)
-}
 
 const TITLE_MAX_FONT_SIZE = 38
 const TITLE_MIN_FONT_SIZE = 18
@@ -148,14 +98,6 @@ export function layoutMovieTitle(ctx: CanvasRenderingContext2D, title: string, m
  * Clamps a single line to `maxWidth` with an ellipsis, using the font already set on the context.
  * Canvas `fillText(maxWidth)` only condenses glyphs, so long values must be cut before drawing.
  */
-export function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
-	if (ctx.measureText(text).width <= maxWidth) return text
-	const characters = Array.from(text)
-	let end = characters.length
-	while (end > 1 && ctx.measureText(`${characters.slice(0, end).join('').trimEnd()}…`).width > maxWidth) end -= 1
-	return `${characters.slice(0, end).join('').trimEnd()}…`
-}
-
 function drawWrappedText(
 	ctx: CanvasRenderingContext2D,
 	text: string,
@@ -223,28 +165,6 @@ function drawMovieMetadata(
 	ctx.restore()
 }
 
-function roundedRect(
-	ctx: CanvasRenderingContext2D,
-	x: number,
-	y: number,
-	width: number,
-	height: number,
-	radius: number
-) {
-	const safeRadius = Math.min(radius, width / 2, height / 2)
-	ctx.beginPath()
-	ctx.moveTo(x + safeRadius, y)
-	ctx.lineTo(x + width - safeRadius, y)
-	ctx.quadraticCurveTo(x + width, y, x + width, y + safeRadius)
-	ctx.lineTo(x + width, y + height - safeRadius)
-	ctx.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height)
-	ctx.lineTo(x + safeRadius, y + height)
-	ctx.quadraticCurveTo(x, y + height, x, y + height - safeRadius)
-	ctx.lineTo(x, y + safeRadius)
-	ctx.quadraticCurveTo(x, y, x + safeRadius, y)
-	ctx.closePath()
-}
-
 function traceStar(
 	ctx: CanvasRenderingContext2D,
 	centerX: number,
@@ -297,6 +217,46 @@ function drawStars(ctx: CanvasRenderingContext2D, rating: number, x: number, y: 
 			ctx.restore()
 		}
 	}
+
+	ctx.restore()
+}
+
+/**
+ * The rewatch mark: a circular arrow, traced by hand for the same reason the stars are.
+ *
+ * "↺" is a glyph the platform may or may not have, and a missing one would print as a box on
+ * someone else's machine. It sits between the score and the stars, at the weight of the hairline
+ * artwork around it — it is a footnote to the score, not a second badge.
+ */
+function drawRewatchMark(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+	const radius = 8
+	const end = Math.PI * 1.72
+
+	ctx.save()
+	ctx.strokeStyle = color
+	ctx.globalAlpha = 0.85
+	ctx.lineWidth = 2.1
+	ctx.lineCap = 'round'
+
+	ctx.beginPath()
+	ctx.arc(x, y, radius, Math.PI * 0.16, end)
+	ctx.stroke()
+
+	// The head points along the circle, so the ring reads as travelling rather than as a broken O.
+	const tipX = x + Math.cos(end) * radius
+	const tipY = y + Math.sin(end) * radius
+	const alongX = -Math.sin(end)
+	const alongY = Math.cos(end)
+	const acrossX = Math.cos(end)
+	const acrossY = Math.sin(end)
+
+	ctx.beginPath()
+	ctx.moveTo(tipX + alongX * 5, tipY + alongY * 5)
+	ctx.lineTo(tipX - alongX * 3 + acrossX * 4.5, tipY - alongY * 3 + acrossY * 4.5)
+	ctx.lineTo(tipX - alongX * 3 - acrossX * 4.5, tipY - alongY * 3 - acrossY * 4.5)
+	ctx.closePath()
+	ctx.fillStyle = color
+	ctx.fill()
 
 	ctx.restore()
 }
@@ -394,6 +354,17 @@ function getStaticLayer(data: MovieReviewCardData, images: CardImages): HTMLCanv
 	if (!layerCtx) throw new Error('Canvas is not available')
 	drawStaticLayer(layerCtx, images)
 
+	/*
+	 * A layer drawn while one of its images was missing is never kept.
+	 *
+	 * `loadImage` deletes a failed URL from its own cache so the next redraw retries it, but this
+	 * layer sat above that and undid it: one lost request — a service worker still waking up, a
+	 * rate-limited burst — and the "SIN PÓSTER" placeholder got baked into a canvas that every
+	 * later redraw reused, for the whole session, while the URL itself worked perfectly.
+	 */
+	const isComplete = (!data.backdropUrl || images.backdrop) && (!data.posterUrl || images.poster)
+	if (!isComplete) return layer
+
 	if (staticLayerCache.size >= STATIC_LAYER_CACHE_LIMIT) {
 		const oldest = staticLayerCache.keys().next().value
 		if (oldest !== undefined) staticLayerCache.delete(oldest)
@@ -431,6 +402,7 @@ function drawMovieReviewCard(ctx: CanvasRenderingContext2D, data: MovieReviewCar
 	ctx.font = `600 18px ${UI_FONT}`
 	ctx.fillStyle = '#aaa7ad'
 	ctx.fillText('/10', 53 + ratingWidth, 174)
+	if (data.rewatch) drawRewatchMark(ctx, 105 + ratingWidth, 163, rating === null ? '#5f6066' : tier.accent)
 	drawStars(ctx, rating ?? 0, 138 + ratingWidth, 172, rating === null ? '#5f6066' : tier.accent)
 
 	if (badge) {

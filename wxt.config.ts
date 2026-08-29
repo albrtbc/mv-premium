@@ -60,11 +60,17 @@ export default defineConfig({
 			'https://freeimage.host/*',
 			'https://api.isthereanydeal.com/*',
 			'https://assets.isthereanydeal.com/*',
+			'https://api.football-data.org/*',
 			'https://dbxce1spal1df.cloudfront.net/*',
 			'https://publish.twitter.com/*',
 			'https://cdn.syndication.twimg.com/*',
 			'https://graphql.anilist.co/*',
 			'https://s4.anilist.co/*',
+			// The API answers with `Access-Control-Allow-Origin: *`, which is why it worked without a
+			// permission; the image CDN does not send it, so without this CORS blocks the background's
+			// fetch for a poster and cards are drawn with a grey gap where the artwork goes.
+			'https://api.themoviedb.org/*',
+			'https://image.tmdb.org/*',
 			'*://api.igdb.com/*',
 			'*://id.twitch.tv/*',
 			'https://itunes.apple.com/*',
@@ -86,8 +92,8 @@ export default defineConfig({
 			},
 		],
 		// --- CSP (hardened) ---
-		content_security_policy: {
-			extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://*.mediavida.com https://api.giphy.com https://generativelanguage.googleapis.com https://store.steampowered.com https://catalog.gog.com https://api.imgbb.com https://freeimage.host https://api.isthereanydeal.com https://assets.isthereanydeal.com https://dbxce1spal1df.cloudfront.net https://publish.twitter.com https://cdn.syndication.twimg.com https://graphql.anilist.co https://s4.anilist.co https://api.themoviedb.org https://image.tmdb.org https://id.twitch.tv https://api.igdb.com https://itunes.apple.com https://play.google.com https://www.fragrantica.com https://fragrantica.com https://www.fragrantica.es https://fragrantica.es ${
+			content_security_policy: {
+				extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://*.mediavida.com https://api.giphy.com https://generativelanguage.googleapis.com https://store.steampowered.com https://catalog.gog.com https://api.imgbb.com https://freeimage.host https://api.isthereanydeal.com https://assets.isthereanydeal.com https://api.football-data.org https://dbxce1spal1df.cloudfront.net https://publish.twitter.com https://cdn.syndication.twimg.com https://graphql.anilist.co https://s4.anilist.co https://api.themoviedb.org https://image.tmdb.org https://id.twitch.tv https://api.igdb.com https://itunes.apple.com https://play.google.com https://www.fragrantica.com https://fragrantica.com https://www.fragrantica.es https://fragrantica.es ${
 				process.env.NODE_ENV === 'development'
 					? 'ws://localhost:3000 http://localhost:3000 ws://localhost:3001 http://localhost:3001'
 					: ''

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-	countSharingPost,
+	countUniqueMovies,
 	filterMovieReviews,
 	getAvailableYears,
+	getDistinctPosterUrls,
 	getMovieReviewStats,
+	getMovieViewings,
+	groupMovieReviews,
 	sortMovieReviews,
 	splitByPublication,
 } from './movie-review-list'
@@ -66,7 +69,28 @@ describe('getMovieReviewStats', () => {
 	})
 
 	it('reports an empty collection without dividing by zero', () => {
-		expect(getMovieReviewStats([])).toEqual({ count: 0, averageRating: null, best: null })
+		expect(getMovieReviewStats([])).toEqual({ count: 0, averageRating: null, best: null, bestTies: 0 })
+	})
+
+	/** Naming a single favourite out of a tie is how the hero and the recap ended up disagreeing. */
+	it('counts how many films share the top score, by film and not by review', () => {
+		const records = [
+			makeRecord({ imageId: 'origen-1', tmdbId: 27205, rating: 10 }),
+			makeRecord({ imageId: 'origen-2', tmdbId: 27205, rating: 10 }),
+			makeRecord({ imageId: 'padrino', tmdbId: 238, rating: 10 }),
+			makeRecord({ imageId: 'dune', tmdbId: 438631, rating: 8.5 }),
+		]
+
+		expect(getMovieReviewStats(records).bestTies).toBe(2)
+	})
+
+	it('has a single favourite when nothing ties with it', () => {
+		const records = [
+			makeRecord({ imageId: 'a', tmdbId: 1, rating: 10 }),
+			makeRecord({ imageId: 'b', tmdbId: 2, rating: 9 }),
+		]
+
+		expect(getMovieReviewStats(records).bestTies).toBe(1)
 	})
 
 	it('keeps the first record when ratings tie', () => {
@@ -126,14 +150,50 @@ describe('filterMovieReviews', () => {
 	]
 
 	it('filters by year, by badge, and by both at once', () => {
-		expect(filterMovieReviews(records, { year: '2024', badge: 'all' })).toHaveLength(2)
-		expect(filterMovieReviews(records, { year: 'all', badge: 'masterpiece' })).toHaveLength(2)
-		expect(filterMovieReviews(records, { year: '2024', badge: 'masterpiece' })).toHaveLength(1)
+		expect(filterMovieReviews(records, { year: '2024', badge: 'all', query: '' })).toHaveLength(2)
+		expect(filterMovieReviews(records, { year: 'all', badge: 'masterpiece', query: '' })).toHaveLength(2)
+		expect(filterMovieReviews(records, { year: '2024', badge: 'masterpiece', query: '' })).toHaveLength(1)
 	})
 
 	it('returns everything with no filters applied', () => {
-		expect(filterMovieReviews(records, { year: 'all', badge: 'all' })).toHaveLength(3)
+		expect(filterMovieReviews(records, { year: 'all', badge: 'all', query: '' })).toHaveLength(3)
 	})
+
+	/** Nobody types accents into a search box, and this catalogue is full of them. */
+	it('matches a title ignoring case and accents', () => {
+		const titled = [
+			makeRecord({ imageId: 'a', title: 'Parásitos' }),
+			makeRecord({ imageId: 'b', title: 'El padrino' }),
+			makeRecord({ imageId: 'c', title: 'La habitación de al lado' }),
+		]
+
+		const search = (query: string) =>
+			filterMovieReviews(titled, { year: 'all', badge: 'all', query }).map(record => record.imageId)
+
+		expect(search('parasitos')).toEqual(['a'])
+		expect(search('PADRINO')).toEqual(['b'])
+		expect(search('habitacion')).toEqual(['c'])
+	})
+
+	it('matches anywhere in the title, not only at the start', () => {
+		const titled = [makeRecord({ imageId: 'a', title: 'El caballero oscuro' })]
+
+		expect(filterMovieReviews(titled, { year: 'all', badge: 'all', query: 'oscuro' })).toHaveLength(1)
+	})
+
+	it('ignores surrounding whitespace and an empty query', () => {
+		expect(filterMovieReviews(records, { year: 'all', badge: 'all', query: '   ' })).toHaveLength(3)
+	})
+
+	it('combines the search with the other filters', () => {
+		const titled = [
+			makeRecord({ imageId: 'a', title: 'Dune', year: '2021', badge: 'masterpiece' }),
+			makeRecord({ imageId: 'b', title: 'Dune: Parte dos', year: '2024', badge: 'masterpiece' }),
+		]
+
+		expect(filterMovieReviews(titled, { year: '2024', badge: 'all', query: 'dune' })).toHaveLength(1)
+	})
+
 })
 
 describe('getAvailableYears', () => {
@@ -154,34 +214,163 @@ describe('getAvailableYears', () => {
 	})
 })
 
-describe('countSharingPost', () => {
-	it('counts the other reviews published in the same message', () => {
-		const target = makeRecord({ imageId: 'aaaaaaaaa', publication: publishedAt('45') })
+/**
+ * A film reviewed more than once is several reviews of one film, and the dashboard has to be able
+ * to say both numbers without contradicting itself.
+ */
+describe('getMovieViewings', () => {
+	it('numbers the viewings of a film by when they happened', () => {
 		const records = [
-			target,
-			makeRecord({ imageId: 'bbbbbbbbb', publication: publishedAt('45') }),
-			makeRecord({ imageId: 'ccccccccc', publication: publishedAt('88') }),
+			makeRecord({ imageId: 'segunda', tmdbId: 27205, createdAt: 2000, publication: publishedAt('2') }),
+			makeRecord({ imageId: 'primera', tmdbId: 27205, createdAt: 1000, publication: publishedAt('1') }),
+			makeRecord({ imageId: 'tercera', tmdbId: 27205, createdAt: 3000, publication: publishedAt('3') }),
 		]
 
-		expect(countSharingPost(records, target)).toBe(1)
+		const viewings = getMovieViewings(records)
+
+		expect(viewings.get('primera')).toEqual({ ordinal: 1, isRewatch: false })
+		expect(viewings.get('segunda')).toEqual({ ordinal: 2, isRewatch: true })
+		expect(viewings.get('tercera')).toEqual({ ordinal: 3, isRewatch: true })
 	})
 
-	it('does not confuse the same post number in a different thread', () => {
-		const target = makeRecord({ imageId: 'aaaaaaaaa', publication: publishedAt('45') })
+	it('keeps films apart even when they were reviewed the same day', () => {
 		const records = [
-			target,
-			makeRecord({
-				imageId: 'bbbbbbbbb',
-				publication: publishedAt('45', 'https://www.mediavida.com/foro/cine/otro-hilo-2'),
-			}),
+			makeRecord({ imageId: 'origen', tmdbId: 27205, createdAt: 1000, publication: publishedAt('1') }),
+			makeRecord({ imageId: 'dune', tmdbId: 438631, createdAt: 1000, publication: publishedAt('2') }),
 		]
 
-		expect(countSharingPost(records, target)).toBe(0)
+		const viewings = getMovieViewings(records)
+
+		expect(viewings.get('origen')?.ordinal).toBe(1)
+		expect(viewings.get('dune')?.ordinal).toBe(1)
 	})
 
-	it('counts nothing for an unpublished record', () => {
-		const target = makeRecord({ imageId: 'aaaaaaaaa' })
+	/** A pending card shows the number it will keep, without claiming it for the collection. */
+	it('gives a pending card its number without letting it advance the count', () => {
+		const records = [
+			makeRecord({ imageId: 'publicada', tmdbId: 27205, createdAt: 1000, publication: publishedAt('1') }),
+			makeRecord({ imageId: 'abandonada', tmdbId: 27205, createdAt: 2000 }),
+			makeRecord({ imageId: 'siguiente', tmdbId: 27205, createdAt: 3000, publication: publishedAt('2') }),
+		]
 
-		expect(countSharingPost([target, makeRecord({ imageId: 'bbbbbbbbb' })], target)).toBe(0)
+		const viewings = getMovieViewings(records)
+
+		expect(viewings.get('abandonada')?.ordinal).toBe(2)
+		// The one that made it into a message is the second viewing, not the third.
+		expect(viewings.get('siguiente')?.ordinal).toBe(2)
+	})
+
+	/** The store only knows what it has recorded, so the user's own answer has to be able to win. */
+	it('honours a first review the user declared a rewatch', () => {
+		const viewings = getMovieViewings([makeRecord({ imageId: 'clasico', rewatch: true })])
+
+		expect(viewings.get('clasico')).toEqual({ ordinal: 1, isRewatch: true })
+	})
+
+	it('does not mutate the input', () => {
+		const records = [
+			makeRecord({ imageId: 'b', createdAt: 2000 }),
+			makeRecord({ imageId: 'a', createdAt: 1000 }),
+		]
+		getMovieViewings(records)
+
+		expect(records.map(record => record.imageId)).toEqual(['b', 'a'])
+	})
+
+	it('has nothing to say about an empty collection', () => {
+		expect(getMovieViewings([]).size).toBe(0)
+	})
+})
+
+describe('countUniqueMovies', () => {
+	it('counts films, not reviews', () => {
+		const records = [
+			makeRecord({ imageId: 'a', tmdbId: 27205 }),
+			makeRecord({ imageId: 'b', tmdbId: 27205 }),
+			makeRecord({ imageId: 'c', tmdbId: 438631 }),
+		]
+
+		expect(countUniqueMovies(records)).toBe(2)
+	})
+
+	it('counts nothing in an empty collection', () => {
+		expect(countUniqueMovies([])).toBe(0)
+	})
+})
+
+describe('getDistinctPosterUrls', () => {
+	it('gives a repeated film one slot on the wall, not three', () => {
+		const records = [
+			makeRecord({ imageId: 'a', tmdbId: 27205, rating: 10, posterUrl: 'origen.jpg' }),
+			makeRecord({ imageId: 'b', tmdbId: 27205, rating: 9, posterUrl: 'origen.jpg' }),
+			makeRecord({ imageId: 'c', tmdbId: 438631, rating: 8, posterUrl: 'dune.jpg' }),
+		]
+
+		expect(getDistinctPosterUrls(records, 14)).toEqual(['origen.jpg', 'dune.jpg'])
+	})
+
+	it('takes the best rated first and stops at the limit', () => {
+		const records = [
+			makeRecord({ imageId: 'a', tmdbId: 1, rating: 6, posterUrl: 'floja.jpg' }),
+			makeRecord({ imageId: 'b', tmdbId: 2, rating: 10, posterUrl: 'buenisima.jpg' }),
+			makeRecord({ imageId: 'c', tmdbId: 3, rating: 8, posterUrl: 'buena.jpg' }),
+		]
+
+		expect(getDistinctPosterUrls(records, 2)).toEqual(['buenisima.jpg', 'buena.jpg'])
+	})
+
+	it('skips records with no poster', () => {
+		const records = [
+			makeRecord({ imageId: 'a', tmdbId: 1, rating: 10, posterUrl: null }),
+			makeRecord({ imageId: 'b', tmdbId: 2, rating: 8, posterUrl: 'dune.jpg' }),
+		]
+
+		expect(getDistinctPosterUrls(records, 14)).toEqual(['dune.jpg'])
+	})
+})
+
+/**
+ * Galería shows films, Diario shows reviews. Without this grouping, a film watched three times
+ * took three slots of the wall with the same poster in each.
+ */
+describe('groupMovieReviews', () => {
+	it('gives a film one entry however many times it was reviewed', () => {
+		const records = [
+			makeRecord({ imageId: 'a', tmdbId: 27205 }),
+			makeRecord({ imageId: 'b', tmdbId: 27205 }),
+			makeRecord({ imageId: 'c', tmdbId: 438631 }),
+		]
+
+		const entries = groupMovieReviews(records)
+
+		expect(entries).toHaveLength(2)
+		expect(entries[0].reviews.map(review => review.imageId)).toEqual(['a', 'b'])
+		expect(entries[1].reviews.map(review => review.imageId)).toEqual(['c'])
+	})
+
+	/** So the card always agrees with the sort in force, whatever the caller ordered by. */
+	it('takes the first review in the given order as the one that stands for the film', () => {
+		const records = [
+			makeRecord({ imageId: 'mejor', tmdbId: 27205, rating: 10 }),
+			makeRecord({ imageId: 'peor', tmdbId: 27205, rating: 7 }),
+		]
+
+		expect(groupMovieReviews(records)[0].record.imageId).toBe('mejor')
+		expect(groupMovieReviews([...records].reverse())[0].record.imageId).toBe('peor')
+	})
+
+	it('keeps the films in the order they first appear', () => {
+		const records = [
+			makeRecord({ imageId: 'a', tmdbId: 3 }),
+			makeRecord({ imageId: 'b', tmdbId: 1 }),
+			makeRecord({ imageId: 'c', tmdbId: 3 }),
+			makeRecord({ imageId: 'd', tmdbId: 2 }),
+		]
+
+		expect(groupMovieReviews(records).map(entry => entry.record.tmdbId)).toEqual([3, 1, 2])
+	})
+
+	it('has nothing to group in an empty collection', () => {
+		expect(groupMovieReviews([])).toEqual([])
 	})
 })

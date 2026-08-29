@@ -13,6 +13,7 @@
 export interface PageContext {
 	isThread: boolean
 	isCine: boolean
+	isDeportes: boolean
 	isFavorites: boolean
 	isForumGlobalView: boolean
 	isBookmarks: boolean
@@ -338,6 +339,11 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		injectMovieReleaseCalendar()
 	}
 
+	if (pageContext?.isDeportes && /^\/foro\/deportes\/?$/.test(window.location.pathname)) {
+		const { injectFootballCalendar } = await import('@/features/football-calendar')
+		injectFootballCalendar()
+	}
+
 	// Sidebar on subforum pages, global view pages (spy, new, unread, top, featured), and thread pages
 	if (pageContext?.isSubforum || pageContext?.isForumGlobalView || pageContext?.isThread) {
 		const { injectFavoriteSubforumsSidebar } = await import(
@@ -357,6 +363,11 @@ export async function runInjections(ctx?: unknown, pageContext?: PageContext): P
 		// page load has established there is nothing pending, which is the common case.
 		const { detectPublishedMovieReviews } = await import('@/features/cine/logic/movie-review-detection')
 		void detectPublishedMovieReviews()
+
+		// Offers to register cards published before the review log existed. Returns immediately
+		// when the user has no posts on this page.
+		const { injectMovieReviewImportButtons } = await import('@/features/cine/logic/inject-import-button')
+		void injectMovieReviewImportButtons()
 
 		const twitterLiteEnabled = useSettingsStore.getState().twitterLiteEmbedsEnabled === true
 		if (twitterLiteEnabled) {

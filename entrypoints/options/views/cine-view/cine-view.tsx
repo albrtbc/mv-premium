@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDebounce } from 'use-debounce'
 import Film from 'lucide-react/dist/esm/icons/film'
-import Star from 'lucide-react/dist/esm/icons/star'
-import Trophy from 'lucide-react/dist/esm/icons/trophy'
+import Loader2 from 'lucide-react/dist/esm/icons/loader-2'
+import Search from 'lucide-react/dist/esm/icons/search'
+import X from 'lucide-react/dist/esm/icons/x'
 import { toast } from 'sonner'
-import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MOVIE_REVIEW_BADGES, type MovieReviewBadge } from '@/features/cine/logic/movie-review'
 import {
-	countSharingPost,
+	countUniqueMovies,
 	filterMovieReviews,
 	getAvailableYears,
+	getDistinctPosterUrls,
 	getMovieReviewStats,
+	getMovieViewings,
 	sortMovieReviews,
 	splitByPublication,
 	type MovieReviewSort,
@@ -24,32 +29,71 @@ import {
 	watchMovieReviews,
 	type MovieReviewRecord,
 } from '@/features/cine/logic/movie-review-store'
-import { MovieReviewTile } from './movie-review-tile'
+import {
+	getMovieReviewView,
+	setMovieReviewView,
+	type MovieReviewView,
+} from '@/features/cine/logic/movie-review-view'
+import {
+	getTotalRuntime,
+	resolveMovieRuntimes,
+	type MovieRuntimes,
+} from '@/features/cine/logic/movie-runtime-cache'
+import { CineHero } from './cine-hero'
+import { CineSkeleton } from './cine-skeleton'
+import { InfoPill } from './info-pill'
+import { MovieReviewCollection } from './movie-review-collection'
+import { RecapShareDialog } from './recap-share-dialog'
+import { ViewModeToggle } from './view-mode-toggle'
 
-function StatCard({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
-	return (
-		<Card>
-			<CardContent className="flex items-center gap-3 p-4">
-				<div className="shrink-0 text-muted-foreground">{icon}</div>
-				<div className="min-w-0">
-					<p className="text-2xl font-bold leading-none tabular-nums">{value}</p>
-					<p className="mt-1 truncate text-xs text-muted-foreground">{label}</p>
-				</div>
-			</CardContent>
-		</Card>
-	)
-}
+/** Below this there is no distribution to show, only three bars and a podium of everything. */
+const MIN_RECAP_REVIEWS = 3
+
+/**
+ * Radix always renders the panel element and only marks the inactive one with `hidden`, which the
+ * UA stylesheet turns into `display: none`. Any author class declaring `display` beats that, so a
+ * `flex` here would leave the inactive panel generating a box, and its margin plus the root's gap
+ * would push the active panel down. Layout classes go on the inner wrapper instead.
+ */
+const TAB_PANEL = 'mt-4 flex-none'
+const TAB_PANEL_INNER = 'flex flex-col gap-4'
+
+/** The empty states share one floor, so their different copy lengths cannot diverge either. */
+const EMPTY_STATE_HEIGHT = 'min-h-[26rem]'
+
+/** Enough slices to read as a wall at full width; beyond this each one is too thin to tell apart. */
+const HERO_POSTER_COUNT = 14
 
 export function CineView() {
 	const [records, setRecords] = useState<MovieReviewRecord[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [sortBy, setSortBy] = useState<MovieReviewSort>('recent')
 	const [year, setYear] = useState('all')
+	const [query, setQuery] = useState('')
+	/**
+	 * Long enough to skip the middle of a word, short enough that the grid feels live. Filtering is
+	 * synchronous, so this is not waiting on anything — it is only there to stop rebuilding the wall
+	 * on every keystroke.
+	 */
+	const [debouncedQuery] = useDebounce(query, 250)
 	const [badge, setBadge] = useState<MovieReviewBadge | 'all'>('all')
-	const [pendingDelete, setPendingDelete] = useState<MovieReviewRecord | null>(null)
+	/** Everything the pending confirmation would remove: one review, or every review of a film. */
+	const [pendingDelete, setPendingDelete] = useState<MovieReviewRecord[] | null>(null)
+	const [isSharingRecap, setIsSharingRecap] = useState(false)
+	const [view, setView] = useState<MovieReviewView>('gallery')
+	const [runtimes, setRuntimes] = useState<MovieRuntimes | null>(null)
+
+	const changeView = useCallback((next: MovieReviewView) => {
+		setView(next)
+		void setMovieReviewView(next)
+	}, [])
 
 	useEffect(() => {
 		let mounted = true
+
+		void getMovieReviewView().then(stored => {
+			if (mounted) setView(stored)
+		})
 
 		void getMovieReviews().then(data => {
 			if (!mounted) return
@@ -69,152 +113,299 @@ export function CineView() {
 	}, [])
 
 	const { published, pending } = useMemo(() => splitByPublication(records), [records])
+
+	/**
+	 * The runtimes arrive after the rest of the page, and only the first time: they are cached by
+	 * film id, so a second visit resolves from storage without a single request.
+	 */
+	const publishedIds = useMemo(() => published.map(record => record.tmdbId), [published])
+
+	useEffect(() => {
+		if (publishedIds.length === 0) return
+		let cancelled = false
+
+		void resolveMovieRuntimes(publishedIds).then(next => {
+			if (!cancelled) setRuntimes(next)
+		})
+
+		return () => {
+			cancelled = true
+		}
+	}, [publishedIds])
+
+	const runtimeMinutes = useMemo(
+		() => (runtimes === null ? null : getTotalRuntime(published, runtimes)),
+		[published, runtimes]
+	)
 	const stats = useMemo(() => getMovieReviewStats(published), [published])
 	const years = useMemo(() => getAvailableYears(published), [published])
+	// Best rated first, so the films you rate highest are the ones colouring the backdrop.
+	const heroPosterUrls = useMemo(() => getDistinctPosterUrls(published, HERO_POSTER_COUNT), [published])
+	const uniqueMovieCount = useMemo(() => countUniqueMovies(published), [published])
+	// Over every record, published or not, and never over the filtered view: "2ª vez" is a fact
+	// about how many times you sat through the film, so a year filter must not renumber it and an
+	// unpublished card still counts as a viewing.
+	const viewings = useMemo(() => getMovieViewings(records), [records])
+	/**
+	 * Filtering runs over every published review, never over the batch on screen. The grid renders
+	 * thirty at a time as you scroll, so a search of what is rendered would only find what you had
+	 * already scrolled past.
+	 */
 	const visible = useMemo(
-		() => sortMovieReviews(filterMovieReviews(published, { year, badge }), sortBy),
-		[published, year, badge, sortBy]
+		() => sortMovieReviews(filterMovieReviews(published, { year, badge, query: debouncedQuery }), sortBy),
+		[published, year, badge, debouncedQuery, sortBy]
 	)
+
+	const isFiltered = year !== 'all' || badge !== 'all' || debouncedQuery.trim() !== ''
+	/** The typed text has not reached the results yet — the only real waiting there is here. */
+	const isSearching = query !== debouncedQuery
+
+	/**
+	 * Each mode counts its own unit, because each shows a different number of things: Galería puts
+	 * one card per film, Diario one row per review. A single figure would be wrong in one of them.
+	 */
+	const tally = useMemo(() => {
+		const noun = view === 'gallery' ? 'películas' : 'críticas'
+		const shown = view === 'gallery' ? countUniqueMovies(visible) : visible.length
+		const total = view === 'gallery' ? uniqueMovieCount : published.length
+
+		return isFiltered ? `${shown} de ${total}` : `${total} ${noun}`
+	}, [isFiltered, published.length, uniqueMovieCount, view, visible])
+
+	const clearFilters = useCallback(() => {
+		setYear('all')
+		setBadge('all')
+		setQuery('')
+	}, [])
 
 	const handleDelete = useCallback(async () => {
 		if (!pendingDelete) return
 
-		await deleteMovieReview(pendingDelete.imageId)
+		for (const record of pendingDelete) {
+			await deleteMovieReview(record.imageId)
+		}
+
 		setRecords(await getMovieReviews())
-		toast.success('Crítica eliminada del registro')
+		toast.success(pendingDelete.length === 1 ? 'Crítica eliminada del registro' : 'Críticas eliminadas del registro')
 		setPendingDelete(null)
 	}, [pendingDelete])
 
 	if (isLoading) {
-		return <p className="p-6 text-sm text-muted-foreground">Cargando tus críticas…</p>
+		return <CineSkeleton />
 	}
 
 	return (
-		<div className="flex flex-col gap-6 p-6">
-			<div>
-				<h1 className="text-2xl font-bold">Mis Críticas</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Las películas que has valorado con la card de crítica, con enlace al mensaje donde las publicaste.
-				</p>
-			</div>
+		<div className="flex flex-col gap-6">
+			<CineHero
+				stats={stats}
+				movieCount={uniqueMovieCount}
+				runtimeMinutes={runtimeMinutes}
+				posterUrls={heroPosterUrls}
+				onShare={() => setIsSharingRecap(true)}
+				minRecapReviews={MIN_RECAP_REVIEWS}
+			/>
 
-			<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-				<StatCard icon={<Film className="h-5 w-5" />} value={String(stats.count)} label="Críticas publicadas" />
-				<StatCard
-					icon={<Star className="h-5 w-5" />}
-					value={stats.averageRating === null ? '—' : stats.averageRating.toFixed(1)}
-					label="Nota media"
-				/>
-				<StatCard
-					icon={<Trophy className="h-5 w-5" />}
-					value={stats.best ? stats.best.rating.toFixed(1) : '—'}
-					label={stats.best ? stats.best.title : 'Mejor valorada'}
-				/>
-			</div>
+			<Tabs defaultValue="published" className="reveal reveal-d2">
+				<div className="flex items-center gap-2">
+					<TabsList>
+						<TabsTrigger value="published">Publicadas ({published.length})</TabsTrigger>
+						<TabsTrigger value="pending">Sin publicar ({pending.length})</TabsTrigger>
+					</TabsList>
+					<InfoPill title="Cómo se publica una crítica">
+						<p>
+							Una crítica pasa sola a <strong className="font-semibold text-foreground">Publicadas</strong> cuando la
+							extensión encuentra su imagen dentro de un mensaje tuyo. No hay nada que marcar a mano, y las que se
+							quedan sin publicar no cuentan para ninguna de tus cifras.
+						</p>
+						<p className="mt-2">
+							El enlace de la imagen se guarda desde que la generas, así que{' '}
+							<strong className="font-semibold text-foreground">nunca se pierde</strong>: en Sin publicar, pasa por
+							encima de una crítica y usa el botón de copiar para llevarte su BBCode. Al pegarlo en un mensaje, pasará
+							sola a Publicadas.
+						</p>
+						<p className="mt-2">
+							Si alguna se quedó por el camino, bórrala sin miedo: no cuenta para tus cifras y borrarla no deja rastro.
+						</p>
+						<p className="mt-2">
+							Y si ya tenías cards publicadas antes de instalar la extensión, el botón con forma de estrella que aparece
+							sobre ellas en el foro las añade a tu registro.
+						</p>
+					</InfoPill>
+				</div>
 
-			<Tabs defaultValue="published">
-				<TabsList>
-					<TabsTrigger value="published">Publicadas ({published.length})</TabsTrigger>
-					<TabsTrigger value="pending">Sin publicar ({pending.length})</TabsTrigger>
-				</TabsList>
+				<TabsContent value="published" className={TAB_PANEL}>
+					<div className={TAB_PANEL_INNER}>
+						{published.length > 0 && (
+							<div className="flex flex-wrap items-center gap-2">
+								<div className="relative">
+									<Search
+										aria-hidden
+										className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+									/>
+									<Input
+										value={query}
+										onChange={event => setQuery(event.target.value)}
+										placeholder="Buscar por título"
+										aria-label="Buscar entre tus críticas por título"
+										className="h-9 w-56 pl-8 pr-8"
+									/>
+									{/*
+									 * One slot of a fixed size holds both: while the debounce is pending there is nothing
+									 * to clear yet, and once it settles there is nothing to wait for.
+									 *
+									 * The centring lives on this wrapper and never on the spinner. Tailwind's `animate-spin`
+									 * keyframe sets `transform: rotate(...)` outright, so a `-translate-y-1/2` on the same
+									 * element is wiped out for the length of the animation and restored between cycles —
+									 * which is the icon bobbing up and down.
+									 */}
+									<span className="absolute right-2 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center">
+										{isSearching ? (
+											<Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+										) : (
+											query !== '' && (
+												<button
+													type="button"
+													onClick={() => setQuery('')}
+													aria-label="Borrar la búsqueda"
+													className="grid h-full w-full place-items-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+												>
+													<X className="h-3.5 w-3.5" />
+												</button>
+											)
+										)}
+									</span>
+								</div>
 
-				<TabsContent value="published" className="mt-4 flex flex-col gap-4">
-					{published.length > 0 && (
-						<div className="flex flex-wrap gap-2">
-							<Select value={sortBy} onValueChange={value => setSortBy(value as MovieReviewSort)}>
-								<SelectTrigger className="w-44">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="recent">Más recientes</SelectItem>
-									<SelectItem value="oldest">Más antiguas</SelectItem>
-									<SelectItem value="rating">Mejor valoradas</SelectItem>
-									<SelectItem value="title">Por título</SelectItem>
-								</SelectContent>
-							</Select>
+								<Select value={sortBy} onValueChange={value => setSortBy(value as MovieReviewSort)}>
+									<SelectTrigger className="w-44">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent className="max-h-72">
+										<SelectItem value="recent">Más recientes</SelectItem>
+										<SelectItem value="oldest">Más antiguas</SelectItem>
+										<SelectItem value="rating">Mejor valoradas</SelectItem>
+										<SelectItem value="title">Por título</SelectItem>
+									</SelectContent>
+								</Select>
 
-							<Select value={year} onValueChange={setYear}>
-								<SelectTrigger className="w-36">
-									<SelectValue placeholder="Año" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">Todos los años</SelectItem>
-									{years.map(option => (
-										<SelectItem key={option} value={option}>
-											{option}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+								<Select value={year} onValueChange={setYear}>
+									<SelectTrigger className="w-36">
+										<SelectValue placeholder="Año" />
+									</SelectTrigger>
+									<SelectContent className="max-h-72">
+										<SelectItem value="all">Todos los años</SelectItem>
+										{years.map(option => (
+											<SelectItem key={option} value={option}>
+												{option}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 
-							<Select value={badge} onValueChange={value => setBadge(value as MovieReviewBadge | 'all')}>
-								<SelectTrigger className="w-52">
-									<SelectValue placeholder="Veredicto" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">Todos los veredictos</SelectItem>
-									{MOVIE_REVIEW_BADGES.map(option => (
-										<SelectItem key={option.id} value={option.id}>
-											{option.label}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-					)}
+								<Select value={badge} onValueChange={value => setBadge(value as MovieReviewBadge | 'all')}>
+									<SelectTrigger className="w-52">
+										<SelectValue placeholder="Veredicto" />
+									</SelectTrigger>
+									<SelectContent className="max-h-72">
+										<SelectItem value="all">Todos los veredictos</SelectItem>
+										{MOVIE_REVIEW_BADGES.map(option => (
+											<SelectItem key={option.id} value={option.id}>
+												{option.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 
-					{visible.length === 0 ? (
-						<EmptyState
-							icon={Film}
-							title={published.length === 0 ? 'Todavía no hay críticas publicadas' : 'Ningún resultado'}
-							description={
-								published.length === 0
-									? 'Crea una crítica con la card desde el editor de Mediavida y publícala. Aparecerá aquí sola.'
-									: 'Prueba a quitar algún filtro.'
-							}
-						/>
-					) : (
-						<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-							{visible.map(record => (
-								<MovieReviewTile
-									key={record.imageId}
-									record={record}
-									sharingPost={countSharingPost(published, record)}
-									onDelete={setPendingDelete}
-								/>
-							))}
-						</div>
-					)}
+								{isFiltered && (
+									<Button variant="ghost" size="sm" onClick={clearFilters}>
+										Quitar filtros
+									</Button>
+								)}
+
+								<InfoPill title="Ordenar y filtrar">
+									El año es el de <strong className="font-semibold text-foreground">estreno de la película</strong>, no el
+									de tu crítica. El veredicto es la etiqueta que confirmaste al crear la card, y la extensión te sugiere
+									una a partir de la nota.
+								</InfoPill>
+
+								<div className="ml-auto flex items-center gap-2">
+									<p aria-live="polite" className="font-data text-xs text-muted-foreground">
+										{tally}
+									</p>
+									<ViewModeToggle value={view} onChange={changeView} />
+									<InfoPill title="Galería y Diario" side="left">
+										<strong className="font-semibold text-foreground">Galería</strong> enseña los carteles grandes, para
+										recorrer tu colección. <strong className="font-semibold text-foreground">Diario</strong> los pone en
+										filas con las notas alineadas, para encontrar y comparar. Los filtros funcionan igual en los dos.
+									</InfoPill>
+								</div>
+							</div>
+						)}
+
+						{visible.length === 0 ? (
+							<EmptyState
+								className={EMPTY_STATE_HEIGHT}
+								icon={Film}
+								title={published.length === 0 ? 'Todavía no hay críticas publicadas' : 'Ningún resultado'}
+								description={
+									published.length === 0
+										? 'Crea una crítica con la card desde el editor de Mediavida y publícala. Aparecerá aquí sola.'
+										: 'Prueba a quitar algún filtro.'
+								}
+								action={
+									published.length > 0 ? (
+										<Button variant="outline" onClick={clearFilters}>
+											Quitar filtros
+										</Button>
+									) : undefined
+								}
+							/>
+						) : (
+							<MovieReviewCollection
+								records={visible}
+								view={view}
+								viewings={viewings}
+								onDelete={setPendingDelete}
+							/>
+						)}
+					</div>
 				</TabsContent>
 
-				<TabsContent value="pending" className="mt-4">
-					{pending.length === 0 ? (
-						<EmptyState
-							icon={Film}
-							title="No hay nada pendiente"
-							description="Aquí aparecen las críticas que generaste pero nunca llegaste a publicar."
-						/>
-					) : (
-						<div className="flex flex-col gap-4">
-							<p className="text-sm text-muted-foreground">
-								Generaste estas críticas pero no se han encontrado publicadas en ningún mensaje. Si las publicas, se
-								moverán solas a la otra pestaña.
-							</p>
-							<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-								{pending.map(record => (
-									<MovieReviewTile key={record.imageId} record={record} sharingPost={0} onDelete={setPendingDelete} />
-								))}
-							</div>
-						</div>
-					)}
+				<TabsContent value="pending" className={TAB_PANEL}>
+					<div className={TAB_PANEL_INNER}>
+						{pending.length === 0 ? (
+							<EmptyState
+								className={EMPTY_STATE_HEIGHT}
+								icon={Film}
+								title="No hay nada pendiente"
+								description="Aquí aparecen las críticas que generaste pero nunca llegaste a publicar."
+							/>
+						) : (
+							<>
+								<MovieReviewCollection
+									records={pending}
+									view={view}
+									viewings={viewings}
+									onDelete={setPendingDelete}
+								/>
+							</>
+						)}
+					</div>
 				</TabsContent>
 			</Tabs>
 
+			<RecapShareDialog isOpen={isSharingRecap} onClose={() => setIsSharingRecap(false)} records={published} />
+
+			{/* Galería deletes the whole film, so the dialog says how many reviews it takes with it. */}
 			<ConfirmDialog
 				open={pendingDelete !== null}
 				onOpenChange={open => !open && setPendingDelete(null)}
-				title="¿Eliminar esta crítica del registro?"
-				description={`Se quitará "${pendingDelete?.title ?? ''}" de tu registro. El mensaje en Mediavida no se toca.`}
+				title={pendingDelete && pendingDelete.length > 1 ? '¿Eliminar esta película del registro?' : '¿Eliminar esta crítica del registro?'}
+				description={
+					pendingDelete && pendingDelete.length > 1
+						? `Se quitarán las ${pendingDelete.length} críticas de "${pendingDelete[0].title}" de tu registro. Los mensajes en Mediavida no se tocan.`
+						: `Se quitará "${pendingDelete?.[0]?.title ?? ''}" de tu registro. El mensaje en Mediavida no se toca.`
+				}
 				confirmText="Eliminar"
 				variant="destructive"
 				onConfirm={() => void handleDelete()}

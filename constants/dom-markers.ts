@@ -32,6 +32,7 @@ export const DOM_MARKERS = {
 		PIN_INJECTED: 'mvp-pin-injected',
 		SUMMARY_INJECTED: 'mvp-summary-injected',
 		MUTED_REVEALED: 'mvp-muted-revealed',
+		REVIEW_IMPORT_INJECTED: 'mvp-review-import-injected',
 		RELATED_THREADS_MODE: 'mvp-related-threads-mode',
 		RELATED_THREADS_CONTENT_ID: 'mvp-related-threads-content-id',
 		// Injection Status
@@ -155,6 +156,7 @@ export const DOM_MARKERS = {
 		GAME_RELEASE_CALENDAR: 'mvp-game-release-calendar',
 		GAME_RELEASE_CALENDAR_MOVIL: 'mvp-game-release-calendar-movil',
 		MOVIE_RELEASE_CALENDAR: 'mvp-movie-release-calendar',
+		FOOTBALL_CALENDAR: 'mvp-football-calendar',
 		// Gallery
 		GALLERY_BTN: 'mvp-gallery-btn',
 		GALLERY_TRIGGER: 'mvp-gallery-trigger',

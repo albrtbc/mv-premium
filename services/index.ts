@@ -89,6 +89,31 @@ export {
 
 export type { IGDBGame, IGDBCover, IGDBSearchResult, IGDBImageSize } from './api/igdb'
 
+// Football Data
+export {
+	fetchCompetitionMatches,
+	getSeasonMatchWindow,
+	getCurrentSeasonStartYear,
+	fetchCompetitionStandings,
+	normalizeStandings,
+	getFootballCacheTtl,
+	shouldPollMatches,
+	shouldWatchMatches,
+	normalizeMatches,
+	testFootballDataConnection,
+} from './api/football-data'
+
+export type {
+	FootballCompetitionCode,
+	FootballFetchResult,
+	FootballMatch,
+	FootballScore,
+	FootballStandingRow,
+	FootballStandings,
+	FootballStandingsFetchResult,
+	FootballTeam,
+} from './api/football-data'
+
 // AniList
 export {
   searchAnime,
