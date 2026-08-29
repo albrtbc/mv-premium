@@ -1,5 +1,36 @@
 # Changelog
 
+## [4.1.0](https://github.com/albrtbc/mv-premium/compare/v4.0.1...v4.1.0) (2026-08-29)
+
+
+### Features
+
+* **cine:** add the shared dialog for filling in imported reviews ([f316146](https://github.com/albrtbc/mv-premium/commit/f3161466bc8b0593a9be7cde9edc31b50bf09a4f))
+* **cine:** draw the poster wall ([96da50e](https://github.com/albrtbc/mv-premium/commit/96da50e44c75cd032a13644400d1217ce39174b9))
+* **cine:** find unregistered review cards in the user own posts ([b73a6b5](https://github.com/albrtbc/mv-premium/commit/b73a6b528879911eceec8ac33056baa2785403b6))
+* **cine:** identify published review cards by their aspect ratio ([8c2d4cb](https://github.com/albrtbc/mv-premium/commit/8c2d4cb8feaac463a10ae681a8f1652fa9cf9578))
+* **cine:** lay out the shareable poster wall ([4754f65](https://github.com/albrtbc/mv-premium/commit/4754f65919294469d627616e92803a722066de5a))
+* **cine:** let an unpublished review be published from the dashboard ([4cfaf23](https://github.com/albrtbc/mv-premium/commit/4cfaf2375f143b09225ed34c2d27b5b6741faecc))
+* **cine:** rebuild the review log as Mediaffinity, with a gallery and a diary ([4b6885b](https://github.com/albrtbc/mv-premium/commit/4b6885b8a2323d8d4b0cba302dbbe3d7bb0d32f1))
+* **cine:** redraw the recap's rating distribution as an intensity band ([6595e48](https://github.com/albrtbc/mv-premium/commit/6595e48b001583534164b50bd226b6637d9c6d85))
+* **cine:** register review cards you published before the log existed ([4bd26a6](https://github.com/albrtbc/mv-premium/commit/4bd26a6a1418780eb8bfc944af1a149e1d22036a))
+* **cine:** search Mediaffinity by title ([18bbe48](https://github.com/albrtbc/mv-premium/commit/18bbe482f75b518b8f3160029df86b263f199d30))
+* **cine:** share a recap of how you rate and what you repeat ([ef6bf7d](https://github.com/albrtbc/mv-premium/commit/ef6bf7dc1e825ebaee029524eac71f608daede95))
+* **cine:** share a recap of how you rate and what you repeat ([77472f6](https://github.com/albrtbc/mv-premium/commit/77472f601b47ac912ec44951bcbf3a0a40b424af))
+* **cine:** share your poster wall as BBCode ([3114df4](https://github.com/albrtbc/mv-premium/commit/3114df4932f60f7cbccd97e84a401943b17109dd))
+* **cine:** support importing and correcting review records ([98b87fc](https://github.com/albrtbc/mv-premium/commit/98b87fcc00a1fbd8be0e4c3428131a064ad1c789))
+* **football:** redesign the fixtures card and add standings ([bb24e33](https://github.com/albrtbc/mv-premium/commit/bb24e3325ecd1f7366107ed3b7790e34ea231e9e))
+* **football:** show La Liga and Champions fixtures in the Deportes subforum ([89707eb](https://github.com/albrtbc/mv-premium/commit/89707eb49527ab45e0199785c5607363519f96f1))
+* **upstream:** sync with upstream v3.7.0 ([17c7088](https://github.com/albrtbc/mv-premium/commit/17c7088c8a358d6f8cba6ac75e441c21f9ba562d))
+
+
+### Bug Fixes
+
+* **backup:** include Mediaffinity and clipped threads in export and import ([55c6a11](https://github.com/albrtbc/mv-premium/commit/55c6a11dc1882e807f6d1afcccaf03b27d01c0d2))
+* **cine:** draw the posters and stop the dialog crashing on startup ([6f13772](https://github.com/albrtbc/mv-premium/commit/6f13772877c59a604dbf69deb9c6056d422fc628))
+* **debug:** redact credentials in the mvpDebug() dump ([392f41e](https://github.com/albrtbc/mv-premium/commit/392f41e302c4bb84da8c1471b2a026f6f5683a20))
+* **ui:** stop tooltips outliving the dialog they opened ([e8f2b6f](https://github.com/albrtbc/mv-premium/commit/e8f2b6fa87de88e990383926424a23e1f1b54f6c))
+
 ## [4.0.1](https://github.com/albrtbc/mv-premium/compare/v4.0.0...v4.0.1) (2026-08-12)
 
 
